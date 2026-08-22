@@ -33,16 +33,22 @@ public sealed class SysctlBackendException : IOException {
 	}
 
 	/// <summary>Gets the classified failure.</summary>
-	public SysctlBackendFailureKind Kind { get; }
+	public SysctlBackendFailureKind Kind {
+		get;
+	}
 }
 
 /// <summary>Defines the Linux sysctl value and configuration-file boundary consumed by the command.</summary>
 public interface ISysctlBackend {
 	/// <summary>Gets whether Linux-style <c>/proc/sys</c> kernel parameter access is available.</summary>
-	bool IsSupported { get; }
+	bool IsSupported {
+		get;
+	}
 
 	/// <summary>Gets a diagnostic explaining why kernel parameter access is unavailable.</summary>
-	string UnsupportedReason { get; }
+	string UnsupportedReason {
+		get;
+	}
 
 	/// <summary>Reads the value for a normalized slash-separated kernel parameter key.</summary>
 	Task<string> ReadValueAsync( string key, CancellationToken cancellationToken = default );
@@ -66,7 +72,8 @@ internal sealed class SystemSysctlBackend : ISysctlBackend {
 	private static readonly char[] GlobCharacters = [ '*', '?', '[' ];
 	/// <summary>Gets the shared system instance.</summary>
 	internal static SystemSysctlBackend Instance { get; } = new();
-	private SystemSysctlBackend() { }
+	private SystemSysctlBackend() {
+	}
 	/// <summary>Gets whether Linux <c>/proc/sys</c> access is supported on this host.</summary>
 	public bool IsSupported => OperatingSystem.IsLinux() && Directory.Exists( ProcRoot );
 	/// <summary>Gets the diagnostic used when Linux <c>/proc/sys</c> access is unavailable.</summary>
@@ -80,96 +87,227 @@ internal sealed class SystemSysctlBackend : ISysctlBackend {
 	}
 	/// <summary>Reads a kernel parameter value asynchronously.</summary>
 	public async Task<string> ReadValueAsync( string key, CancellationToken cancellationToken = default ) {
-		ArgumentNullException.ThrowIfNull( key ); EnsureSupported(); var path = ResolveProcPath( key );
-		if ( Directory.Exists( path ) ) { throw new SysctlBackendException( SysctlBackendFailureKind.IsDirectory, "Is a directory" ); }
-		if ( !File.Exists( path ) ) { throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory" ); }
+		ArgumentNullException.ThrowIfNull( key );
+		EnsureSupported();
+		var path = ResolveProcPath( key );
+		if ( Directory.Exists( path ) ) {
+			throw new SysctlBackendException( SysctlBackendFailureKind.IsDirectory, "Is a directory" );
+		}
+		if ( !File.Exists( path ) ) {
+			throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory" );
+		}
 		try {
 			await using var stream = new FileStream( path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan );
 			using var reader = new StreamReader( stream, Encoding.UTF8, true, 4096, leaveOpen: false );
-			var value = await reader.ReadToEndAsync( cancellationToken ).ConfigureAwait( false ); return TrimTerminalLineSeparators( value );
-		} catch ( UnauthorizedAccessException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.PermissionDenied, "Permission denied", exception ); }
-		catch ( IOException exception ) { throw ClassifyIoException( exception ); }
+			var value = await reader.ReadToEndAsync( cancellationToken ).ConfigureAwait( false );
+			return TrimTerminalLineSeparators( value );
+		} catch ( UnauthorizedAccessException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.PermissionDenied, "Permission denied", exception ); } catch ( IOException exception ) { throw ClassifyIoException( exception ); }
 	}
 	/// <summary>Writes a kernel parameter value asynchronously, or validates it in dry-run mode.</summary>
 	public async Task WriteValueAsync( string key, string value, bool dryRun, CancellationToken cancellationToken = default ) {
-		ArgumentNullException.ThrowIfNull( key ); ArgumentNullException.ThrowIfNull( value ); EnsureSupported(); var path = ResolveProcPath( key );
-		if ( Directory.Exists( path ) ) { throw new SysctlBackendException( SysctlBackendFailureKind.IsDirectory, "Is a directory" ); }
-		if ( !File.Exists( path ) ) { throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory" ); }
-		EnsureOwnerWritable( path ); if ( dryRun ) { return; }
+		ArgumentNullException.ThrowIfNull( key );
+		ArgumentNullException.ThrowIfNull( value );
+		EnsureSupported();
+		var path = ResolveProcPath( key );
+		if ( Directory.Exists( path ) ) {
+			throw new SysctlBackendException( SysctlBackendFailureKind.IsDirectory, "Is a directory" );
+		}
+		if ( !File.Exists( path ) ) {
+			throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory" );
+		}
+		EnsureOwnerWritable( path );
+		if ( dryRun ) {
+			return;
+		}
 		try {
 			await using var stream = new FileStream( path, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete, 4096, FileOptions.Asynchronous );
-			var bytes = new UTF8Encoding( false ).GetBytes( string.Concat( value, "\n" ) ); await stream.WriteAsync( bytes, cancellationToken ).ConfigureAwait( false ); await stream.FlushAsync( cancellationToken ).ConfigureAwait( false );
-		} catch ( UnauthorizedAccessException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.PermissionDenied, "Permission denied", exception ); }
-		catch ( IOException exception ) { throw ClassifyIoException( exception ); }
+			var bytes = new UTF8Encoding( false ).GetBytes( string.Concat( value, "\n" ) );
+			await stream.WriteAsync( bytes, cancellationToken ).ConfigureAwait( false );
+			await stream.FlushAsync( cancellationToken ).ConfigureAwait( false );
+		} catch ( UnauthorizedAccessException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.PermissionDenied, "Permission denied", exception ); } catch ( IOException exception ) { throw ClassifyIoException( exception ); }
 	}
 	/// <summary>Enumerates readable kernel parameter keys asynchronously.</summary>
 	public Task<IReadOnlyList<string>> EnumerateKeysAsync( CancellationToken cancellationToken = default ) {
-		EnsureSupported(); cancellationToken.ThrowIfCancellationRequested(); var keys = new List<string>(); var pending = new Stack<string>(); pending.Push( ProcRoot );
+		EnsureSupported();
+		cancellationToken.ThrowIfCancellationRequested();
+		var keys = new List<string>();
+		var pending = new Stack<string>();
+		pending.Push( ProcRoot );
 		while ( 0 < pending.Count ) {
-			cancellationToken.ThrowIfCancellationRequested(); var directory = pending.Pop(); IEnumerable<string> entries;
-			try { entries = Directory.EnumerateFileSystemEntries( directory ); } catch ( UnauthorizedAccessException ) { continue; } catch ( IOException ) { continue; }
+			cancellationToken.ThrowIfCancellationRequested();
+			var directory = pending.Pop();
+			IEnumerable<string> entries;
+			try {
+				entries = Directory.EnumerateFileSystemEntries( directory );
+			} catch ( UnauthorizedAccessException ) { continue; } catch ( IOException ) { continue; }
 			foreach ( var entry in entries ) {
 				cancellationToken.ThrowIfCancellationRequested();
-				if ( Directory.Exists( entry ) ) { if ( IsReparsePoint( entry ) ) { continue; } pending.Push( entry ); continue; }
-				if ( File.Exists( entry ) ) { var relative = System.IO.Path.GetRelativePath( ProcRoot, entry ).Replace( System.IO.Path.DirectorySeparatorChar, '/' ); keys.Add( relative ); }
+				if ( Directory.Exists( entry ) ) {
+					if ( IsReparsePoint( entry ) ) {
+						continue;
+					}
+					pending.Push( entry );
+					continue;
+				}
+				if ( File.Exists( entry ) ) {
+					var relative = System.IO.Path.GetRelativePath( ProcRoot, entry ).Replace( System.IO.Path.DirectorySeparatorChar, '/' );
+					keys.Add( relative );
+				}
 			}
 		}
-		keys.Sort( StringComparer.Ordinal ); return Task.FromResult<IReadOnlyList<string>>( keys );
+		keys.Sort( StringComparer.Ordinal );
+		return Task.FromResult<IReadOnlyList<string>>( keys );
 	}
 	/// <summary>Expands a configuration-file glob asynchronously.</summary>
 	public Task<IReadOnlyList<string>> ExpandConfigurationFilesAsync( string pattern, CancellationToken cancellationToken = default ) {
-		ArgumentNullException.ThrowIfNull( pattern ); cancellationToken.ThrowIfCancellationRequested();
-		if ( 0 > pattern.IndexOfAny( GlobCharacters ) ) { return Task.FromResult<IReadOnlyList<string>>( [ pattern ] ); }
-		var root = ResolveGlobRoot( pattern ); if ( !Directory.Exists( root ) ) { return Task.FromResult<IReadOnlyList<string>>( [ pattern ] ); }
+		ArgumentNullException.ThrowIfNull( pattern );
+		cancellationToken.ThrowIfCancellationRequested();
+		if ( 0 > pattern.IndexOfAny( GlobCharacters ) ) {
+			return Task.FromResult<IReadOnlyList<string>>( [ pattern ] );
+		}
+		var root = ResolveGlobRoot( pattern );
+		if ( !Directory.Exists( root ) ) {
+			return Task.FromResult<IReadOnlyList<string>>( [ pattern ] );
+		}
 		var matches = new List<string>();
 		try {
 			var options = new EnumerationOptions { IgnoreInaccessible = true, RecurseSubdirectories = true, ReturnSpecialDirectories = false };
-			foreach ( var file in Directory.EnumerateFiles( root, "*", options ) ) { cancellationToken.ThrowIfCancellationRequested(); if ( GlobMatch( pattern, file ) ) { matches.Add( file ); } }
+			foreach ( var file in Directory.EnumerateFiles( root, "*", options ) ) {
+				cancellationToken.ThrowIfCancellationRequested();
+				if ( GlobMatch( pattern, file ) ) {
+					matches.Add( file );
+				}
+			}
 		} catch ( UnauthorizedAccessException ) { }
-		matches.Sort( StringComparer.Ordinal ); if ( 0 == matches.Count ) { matches.Add( pattern ); } return Task.FromResult<IReadOnlyList<string>>( matches );
+		matches.Sort( StringComparer.Ordinal );
+		if ( 0 == matches.Count ) {
+			matches.Add( pattern );
+		}
+		return Task.FromResult<IReadOnlyList<string>>( matches );
 	}
 	/// <summary>Enumerates <c>.conf</c> files in a configuration directory asynchronously.</summary>
 	public Task<IReadOnlyList<string>> EnumerateConfigurationFilesAsync( string directory, CancellationToken cancellationToken = default ) {
-		ArgumentNullException.ThrowIfNull( directory ); cancellationToken.ThrowIfCancellationRequested(); if ( !Directory.Exists( directory ) ) { return Task.FromResult<IReadOnlyList<string>>( [] ); }
-		try { var files = Directory.EnumerateFiles( directory, "*.conf", SearchOption.TopDirectoryOnly ).OrderBy( static path => GetPortableFileName( path ), StringComparer.Ordinal ).ToArray(); return Task.FromResult<IReadOnlyList<string>>( files ); }
-		catch ( UnauthorizedAccessException ) { return Task.FromResult<IReadOnlyList<string>>( [] ); } catch ( IOException ) { return Task.FromResult<IReadOnlyList<string>>( [] ); }
+		ArgumentNullException.ThrowIfNull( directory );
+		cancellationToken.ThrowIfCancellationRequested();
+		if ( !Directory.Exists( directory ) ) {
+			return Task.FromResult<IReadOnlyList<string>>( [] );
+		}
+		try {
+			var files = Directory.EnumerateFiles( directory, "*.conf", SearchOption.TopDirectoryOnly ).OrderBy( static path => GetPortableFileName( path ), StringComparer.Ordinal ).ToArray();
+			return Task.FromResult<IReadOnlyList<string>>( files );
+		} catch ( UnauthorizedAccessException ) { return Task.FromResult<IReadOnlyList<string>>( [] ); } catch ( IOException ) { return Task.FromResult<IReadOnlyList<string>>( [] ); }
 	}
 	/// <summary>Determines asynchronously whether a configuration file exists.</summary>
-	public Task<bool> ConfigurationFileExistsAsync( string path, CancellationToken cancellationToken = default ) { ArgumentNullException.ThrowIfNull( path ); cancellationToken.ThrowIfCancellationRequested(); return Task.FromResult( File.Exists( path ) ); }
+	public Task<bool> ConfigurationFileExistsAsync( string path, CancellationToken cancellationToken = default ) {
+		ArgumentNullException.ThrowIfNull( path );
+		cancellationToken.ThrowIfCancellationRequested();
+		return Task.FromResult( File.Exists( path ) );
+	}
 	/// <summary>Reads all lines from a sysctl configuration file asynchronously.</summary>
 	public async Task<IReadOnlyList<string>> ReadConfigurationFileAsync( string path, CancellationToken cancellationToken = default ) {
-		ArgumentNullException.ThrowIfNull( path ); cancellationToken.ThrowIfCancellationRequested();
-		try { return await File.ReadAllLinesAsync( path, cancellationToken ).ConfigureAwait( false ); }
-		catch ( FileNotFoundException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory", exception ); }
-		catch ( DirectoryNotFoundException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory", exception ); }
-		catch ( UnauthorizedAccessException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.PermissionDenied, "Permission denied", exception ); }
-		catch ( IOException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.IoFailure, exception.Message, exception ); }
+		ArgumentNullException.ThrowIfNull( path );
+		cancellationToken.ThrowIfCancellationRequested();
+		try {
+			return await File.ReadAllLinesAsync( path, cancellationToken ).ConfigureAwait( false );
+		} catch ( FileNotFoundException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory", exception ); } catch ( DirectoryNotFoundException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory", exception ); } catch ( UnauthorizedAccessException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.PermissionDenied, "Permission denied", exception ); } catch ( IOException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.IoFailure, exception.Message, exception ); }
 	}
-	private static void EnsureSupported() { if ( !Instance.IsSupported ) { throw new SysctlBackendException( SysctlBackendFailureKind.Unsupported, Instance.UnsupportedReason ); } }
+	private static void EnsureSupported() {
+		if ( !Instance.IsSupported ) {
+			throw new SysctlBackendException( SysctlBackendFailureKind.Unsupported, Instance.UnsupportedReason );
+		}
+	}
 	private static string ResolveProcPath( string key ) {
-		if ( string.IsNullOrWhiteSpace( key ) || key.StartsWith( "/", StringComparison.Ordinal ) || key.Contains( '\0' ) ) { throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory" ); }
-		foreach ( var segment in key.Split( '/', StringSplitOptions.None ) ) { if ( ".." == segment ) { throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory" ); } }
-		var root = System.IO.Path.GetFullPath( ProcRoot ); var candidate = System.IO.Path.GetFullPath( System.IO.Path.Combine( root, key.Replace( '/', System.IO.Path.DirectorySeparatorChar ) ) ); var rootPrefix = string.Concat( root.TrimEnd( System.IO.Path.DirectorySeparatorChar ), System.IO.Path.DirectorySeparatorChar );
-		if ( !candidate.StartsWith( rootPrefix, StringComparison.Ordinal ) ) { throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory" ); }
+		if ( string.IsNullOrWhiteSpace( key ) || key.StartsWith( "/", StringComparison.Ordinal ) || key.Contains( '\0' ) ) {
+			throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory" );
+		}
+		foreach ( var segment in key.Split( '/', StringSplitOptions.None ) ) {
+			if ( ".." == segment ) {
+				throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory" );
+			}
+		}
+		var root = System.IO.Path.GetFullPath( ProcRoot );
+		var candidate = System.IO.Path.GetFullPath( System.IO.Path.Combine( root, key.Replace( '/', System.IO.Path.DirectorySeparatorChar ) ) );
+		var rootPrefix = string.Concat( root.TrimEnd( System.IO.Path.DirectorySeparatorChar ), System.IO.Path.DirectorySeparatorChar );
+		if ( !candidate.StartsWith( rootPrefix, StringComparison.Ordinal ) ) {
+			throw new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory" );
+		}
 		return candidate;
 	}
 	private static void EnsureOwnerWritable( string path ) {
-		ArgumentNullException.ThrowIfNull( path ); if ( !OperatingSystem.IsLinux() ) { return; }
-		try { var mode = File.GetUnixFileMode( path ); if ( 0 == ( mode & UnixFileMode.UserWrite ) ) { throw new SysctlBackendException( SysctlBackendFailureKind.NotWritable, "Operation not permitted" ); } }
-		catch ( PlatformNotSupportedException ) { } catch ( UnauthorizedAccessException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.PermissionDenied, "Permission denied", exception ); } catch ( IOException exception ) { throw ClassifyIoException( exception ); }
+		ArgumentNullException.ThrowIfNull( path );
+		if ( !OperatingSystem.IsLinux() ) {
+			return;
+		}
+		try {
+			var mode = File.GetUnixFileMode( path );
+			if ( 0 == ( mode & UnixFileMode.UserWrite ) ) {
+				throw new SysctlBackendException( SysctlBackendFailureKind.NotWritable, "Operation not permitted" );
+			}
+		} catch ( PlatformNotSupportedException ) { } catch ( UnauthorizedAccessException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.PermissionDenied, "Permission denied", exception ); } catch ( IOException exception ) { throw ClassifyIoException( exception ); }
 	}
-	private static SysctlBackendException ClassifyIoException( IOException exception ) { ArgumentNullException.ThrowIfNull( exception ); if ( exception is FileNotFoundException or DirectoryNotFoundException ) { return new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory", exception ); } return new SysctlBackendException( SysctlBackendFailureKind.IoFailure, exception.Message, exception ); }
-	private static bool IsReparsePoint( string path ) { ArgumentNullException.ThrowIfNull( path ); try { return 0 != ( File.GetAttributes( path ) & FileAttributes.ReparsePoint ); } catch ( IOException ) { return true; } catch ( UnauthorizedAccessException ) { return true; } }
-	private static string TrimTerminalLineSeparators( string value ) { ArgumentNullException.ThrowIfNull( value ); return value.TrimEnd( '\r', '\n' ); }
+	private static SysctlBackendException ClassifyIoException( IOException exception ) {
+		ArgumentNullException.ThrowIfNull( exception );
+		if ( exception is FileNotFoundException or DirectoryNotFoundException ) {
+			return new SysctlBackendException( SysctlBackendFailureKind.NotFound, "No such file or directory", exception );
+		}
+		return new SysctlBackendException( SysctlBackendFailureKind.IoFailure, exception.Message, exception );
+	}
+	private static bool IsReparsePoint( string path ) {
+		ArgumentNullException.ThrowIfNull( path );
+		try {
+			return 0 != ( File.GetAttributes( path ) & FileAttributes.ReparsePoint );
+		} catch ( IOException ) { return true; } catch ( UnauthorizedAccessException ) { return true; }
+	}
+	private static string TrimTerminalLineSeparators( string value ) {
+		ArgumentNullException.ThrowIfNull( value );
+		return value.TrimEnd( '\r', '\n' );
+	}
 	private static string ResolveGlobRoot( string pattern ) {
-		ArgumentNullException.ThrowIfNull( pattern ); var wildcard = pattern.IndexOfAny( GlobCharacters );
-		if ( 0 > wildcard ) { var literalDirectory = System.IO.Path.GetDirectoryName( pattern ); return string.IsNullOrEmpty( literalDirectory ) ? Directory.GetCurrentDirectory() : literalDirectory; }
-		var separator = pattern.LastIndexOfAny( [ '/', '\\' ], wildcard ); if ( 0 > separator ) { return Directory.GetCurrentDirectory(); } if ( 0 == separator ) { return System.IO.Path.GetPathRoot( pattern ) ?? System.IO.Path.DirectorySeparatorChar.ToString(); } return pattern[..separator];
+		ArgumentNullException.ThrowIfNull( pattern );
+		var wildcard = pattern.IndexOfAny( GlobCharacters );
+		if ( 0 > wildcard ) {
+			var literalDirectory = System.IO.Path.GetDirectoryName( pattern );
+			return string.IsNullOrEmpty( literalDirectory ) ? Directory.GetCurrentDirectory() : literalDirectory;
+		}
+		var separator = pattern.LastIndexOfAny( [ '/', '\\' ], wildcard );
+		if ( 0 > separator ) {
+			return Directory.GetCurrentDirectory();
+		}
+		if ( 0 == separator ) {
+			return System.IO.Path.GetPathRoot( pattern ) ?? System.IO.Path.DirectorySeparatorChar.ToString();
+		}
+		return pattern[ ..separator ];
 	}
 	private static bool GlobMatch( string pattern, string value ) {
-		ArgumentNullException.ThrowIfNull( pattern ); ArgumentNullException.ThrowIfNull( value ); var expression = new StringBuilder( "^" );
-		for ( var index = 0; index < pattern.Length; index++ ) { var current = pattern[index]; if ( '*' == current ) { expression.Append( @"[^/\\]*" ); continue; } if ( '?' == current ) { expression.Append( @"[^/\\]" ); continue; } if ( '[' == current ) { var close = pattern.IndexOf( ']', index + 1 ); if ( 0 < close ) { expression.Append( pattern.AsSpan( index, close - index + 1 ) ); index = close; continue; } } expression.Append( Regex.Escape( current.ToString() ) ); }
-		expression.Append( '$' ); return Regex.IsMatch( value, expression.ToString(), RegexOptions.CultureInvariant );
+		ArgumentNullException.ThrowIfNull( pattern );
+		ArgumentNullException.ThrowIfNull( value );
+		var expression = new StringBuilder( "^" );
+		for ( var index = 0; index < pattern.Length; index++ ) {
+			var current = pattern[ index ];
+			if ( '*' == current ) {
+				expression.Append( @"[^/\\]*" );
+				continue;
+			}
+			if ( '?' == current ) {
+				expression.Append( @"[^/\\]" );
+				continue;
+			}
+			if ( '[' == current ) {
+				var close = pattern.IndexOf( ']', index + 1 );
+				if ( 0 < close ) {
+					expression.Append( pattern.AsSpan( index, close - index + 1 ) );
+					index = close;
+					continue;
+				}
+			}
+			expression.Append( Regex.Escape( current.ToString() ) );
+		}
+		expression.Append( '$' );
+		return Regex.IsMatch( value, expression.ToString(), RegexOptions.CultureInvariant );
 	}
-	private static string GetPortableFileName( string path ) { ArgumentNullException.ThrowIfNull( path ); var slash = Math.Max( path.LastIndexOf( '/' ), path.LastIndexOf( '\\' ) ); return 0 > slash ? path : path[( slash + 1 )..]; }
+	private static string GetPortableFileName( string path ) {
+		ArgumentNullException.ThrowIfNull( path );
+		var slash = Math.Max( path.LastIndexOf( '/' ), path.LastIndexOf( '\\' ) );
+		return 0 > slash ? path : path[ ( slash + 1 ).. ];
+	}
 }

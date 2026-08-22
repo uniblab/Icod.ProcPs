@@ -671,17 +671,40 @@ For more details see w(1).
 		}
 		var name = token[ 2.. ];
 		switch ( name ) {
-			case "container": options.ContainerMode = true; return true;
-			case "no-header": options.ShowHeader = false; return true;
-			case "no-current": options.NoCurrentUserFilter = true; return true;
-			case "short": options.ShortFormat = true; return true;
-			case "terminal": options.TerminalMode = true; return true;
-			case "from": options.ShowFrom = !options.ShowFrom; return true;
-			case "old-style": options.OldStyle = true; return true;
-			case "ip-addr": options.IpAddress = true; options.ShowFrom = true; return true;
-			case "pids": options.ShowPids = true; return true;
-			case "help": options.ShowHelp = true; return true;
-			case "version": options.ShowVersion = true; return true;
+			case "container":
+				options.ContainerMode = true;
+				return true;
+			case "no-header":
+				options.ShowHeader = false;
+				return true;
+			case "no-current":
+				options.NoCurrentUserFilter = true;
+				return true;
+			case "short":
+				options.ShortFormat = true;
+				return true;
+			case "terminal":
+				options.TerminalMode = true;
+				return true;
+			case "from":
+				options.ShowFrom = !options.ShowFrom;
+				return true;
+			case "old-style":
+				options.OldStyle = true;
+				return true;
+			case "ip-addr":
+				options.IpAddress = true;
+				options.ShowFrom = true;
+				return true;
+			case "pids":
+				options.ShowPids = true;
+				return true;
+			case "help":
+				options.ShowHelp = true;
+				return true;
+			case "version":
+				options.ShowVersion = true;
+				return true;
 			default:
 				options.Error = $"w: unrecognized option '{token}'";
 				return false;
@@ -691,16 +714,37 @@ For more details see w(1).
 	private static bool ApplyShortOption( char option, ParsedArguments options ) {
 		ArgumentNullException.ThrowIfNull( options );
 		switch ( option ) {
-			case 'c': options.ContainerMode = true; return true;
-			case 'h': options.ShowHeader = false; return true;
-			case 'u': options.NoCurrentUserFilter = true; return true;
-			case 's': options.ShortFormat = true; return true;
-			case 't': options.TerminalMode = true; return true;
-			case 'f': options.ShowFrom = !options.ShowFrom; return true;
-			case 'o': options.OldStyle = true; return true;
-			case 'i': options.IpAddress = true; options.ShowFrom = true; return true;
-			case 'p': options.ShowPids = true; return true;
-			case 'V': options.ShowVersion = true; return true;
+			case 'c':
+				options.ContainerMode = true;
+				return true;
+			case 'h':
+				options.ShowHeader = false;
+				return true;
+			case 'u':
+				options.NoCurrentUserFilter = true;
+				return true;
+			case 's':
+				options.ShortFormat = true;
+				return true;
+			case 't':
+				options.TerminalMode = true;
+				return true;
+			case 'f':
+				options.ShowFrom = !options.ShowFrom;
+				return true;
+			case 'o':
+				options.OldStyle = true;
+				return true;
+			case 'i':
+				options.IpAddress = true;
+				options.ShowFrom = true;
+				return true;
+			case 'p':
+				options.ShowPids = true;
+				return true;
+			case 'V':
+				options.ShowVersion = true;
+				return true;
 			default:
 				options.Error = $"w: invalid option -- '{option}'";
 				return false;
@@ -798,30 +842,60 @@ For more details see w(1).
 	}
 
 	private sealed class ParsedArguments {
-		public bool ContainerMode { get; set; }
+		public bool ContainerMode {
+			get; set;
+		}
 		public bool ShowHeader { get; set; } = true;
-		public bool NoCurrentUserFilter { get; set; }
-		public bool ShortFormat { get; set; }
-		public bool TerminalMode { get; set; }
+		public bool NoCurrentUserFilter {
+			get; set;
+		}
+		public bool ShortFormat {
+			get; set;
+		}
+		public bool TerminalMode {
+			get; set;
+		}
 		public bool ShowFrom { get; set; } = true;
-		public bool OldStyle { get; set; }
-		public bool IpAddress { get; set; }
-		public bool ShowPids { get; set; }
-		public bool ShowHelp { get; set; }
-		public bool ShowVersion { get; set; }
+		public bool OldStyle {
+			get; set;
+		}
+		public bool IpAddress {
+			get; set;
+		}
+		public bool ShowPids {
+			get; set;
+		}
+		public bool ShowHelp {
+			get; set;
+		}
+		public bool ShowVersion {
+			get; set;
+		}
 		public int UserWidth { get; set; } = DefaultUserWidth;
 		public int FromWidth { get; set; } = DefaultFromWidth;
 		public int CommandWidth { get; set; } = 512;
 		public List<string> Warnings { get; } = [];
-		public string? UserName { get; set; }
-		public string? Error { get; set; }
+		public string? UserName {
+			get; set;
+		}
+		public string? Error {
+			get; set;
+		}
 	}
 
 	private sealed class SessionActivity {
-		public TimeSpan JobCpu { get; }
-		public TimeSpan? ProcessCpu { get; }
-		public int? CurrentProcessId { get; }
-		public string What { get; }
+		public TimeSpan JobCpu {
+			get;
+		}
+		public TimeSpan? ProcessCpu {
+			get;
+		}
+		public int? CurrentProcessId {
+			get;
+		}
+		public string What {
+			get;
+		}
 
 		public SessionActivity( TimeSpan jobCpu, TimeSpan? processCpu, int? currentProcessId, string what ) {
 			ArgumentNullException.ThrowIfNull( what );
