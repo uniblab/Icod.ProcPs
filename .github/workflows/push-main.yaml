@@ -1,0 +1,29 @@
+name: build
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  # ----------------------------------------------------
+  # STAGE 1: Cross-Platform Build (All 3 OSs)
+  # ----------------------------------------------------
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - run: dotnet clean Icod.ProcPs.sln -c Release
+      - run: dotnet restore Icod.ProcPs.sln
+      - run: dotnet build Icod.ProcPs.sln -c Release --no-restore -p:ContinuousIntegrationBuild=true
