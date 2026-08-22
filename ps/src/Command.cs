@@ -209,13 +209,14 @@ Output:
 		return result;
 	}
 	private static void ParseLongOption( string[] args, ref int index, string argument, ParsedArguments result, IProcPsAccountResolver accounts ) {
+		var argumentIndex = index;
 		var equals = argument.IndexOf( '=' );
 		var name = 0 <= equals ? argument[ ..equals ] : argument;
 		var attached = 0 <= equals ? argument[ ( equals + 1 ).. ] : null;
 		string? Value() {
 			if ( null != attached )
 				return attached;
-			return index + 1 < args.Length ? args[ ++index ] : null;
+			return argumentIndex + 1 < args.Length ? args[ ++argumentIndex ] : null;
 		}
 		switch ( name ) {
 			case "--help":
@@ -311,8 +312,10 @@ Output:
 				result.Fail( $"unknown option {name}" );
 				break;
 		}
+		index = argumentIndex;
 	}
 	private static void ParseUnixOptions( string[] args, ref int index, string argument, ParsedArguments result, IProcPsAccountResolver accounts ) {
+		var argumentIndex = index;
 		for ( var i = 1; i < argument.Length; i++ ) {
 			var option = argument[ i ];
 			string? Value() {
@@ -321,9 +324,9 @@ Output:
 					i = argument.Length;
 					return v;
 				}
-				if ( index + 1 < args.Length ) {
+				if ( argumentIndex + 1 < args.Length ) {
 					i = argument.Length;
-					return args[ ++index ];
+					return args[ ++argumentIndex ];
 				}
 				return null;
 			}
@@ -426,6 +429,7 @@ Output:
 					return;
 			}
 		}
+		index = argumentIndex;
 	}
 	private static void ParseBsdOptions( string argument, ParsedArguments result ) {
 		foreach ( var option in argument ) {
