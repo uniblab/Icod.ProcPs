@@ -27,3 +27,4 @@ jobs:
       - run: dotnet clean Icod.ProcPs.sln -c Release
       - run: dotnet restore Icod.ProcPs.sln
       - run: dotnet build Icod.ProcPs.sln -c Release --no-restore -p:ContinuousIntegrationBuild=true
+      - run: dotnet test Icod.ProcPs.sln -c Release --no-build --no-restore
