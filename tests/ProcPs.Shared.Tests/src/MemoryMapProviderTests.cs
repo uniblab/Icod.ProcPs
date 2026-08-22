@@ -4,7 +4,9 @@ using Icod.CommandFramework.Processes;
 using Icod.ProcPs.Shared;
 using Xunit;
 
+/// <summary>Contains tests for memory map provider.</summary>
 public sealed class MemoryMapProviderTests {
+	/// <summary>Verifies that linux provider fixture runs on every host and replaces invalid utf8.</summary>
 	[Fact]
 	public async Task LinuxProviderFixtureRunsOnEveryHostAndReplacesInvalidUtf8() {
 		var root = System.IO.Path.Combine( System.IO.Path.GetTempPath(), "icod-procps-pmap-" + Guid.NewGuid().ToString( "N" ) );
@@ -33,6 +35,7 @@ public sealed class MemoryMapProviderTests {
 		}
 	}
 
+	/// <summary>Verifies that linux provider rejects pid reuse after map read.</summary>
 	[Fact]
 	public async Task LinuxProviderRejectsPidReuseAfterMapRead() {
 		var root = System.IO.Path.Combine( System.IO.Path.GetTempPath(), "icod-procps-pmap-" + Guid.NewGuid().ToString( "N" ) );

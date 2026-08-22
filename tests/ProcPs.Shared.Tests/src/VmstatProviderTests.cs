@@ -3,7 +3,9 @@ namespace Icod.ProcPs.Shared.Tests;
 using Icod.ProcPs.Shared;
 using Xunit;
 
+/// <summary>Contains tests for vmstat provider.</summary>
 public sealed class VmstatProviderTests {
+	/// <summary>Verifies that system provider advertises platform specific capabilities.</summary>
 	[Fact]
 	public void SystemProviderAdvertisesPlatformSpecificCapabilities() {
 		var provider = SystemProcVmstatProvider.Instance;
@@ -17,6 +19,7 @@ public sealed class VmstatProviderTests {
 		}
 	}
 
+	/// <summary>Verifies that native provider produces memory and cpu on supported primary platforms.</summary>
 	[Fact]
 	public async Task NativeProviderProducesMemoryAndCpuOnSupportedPrimaryPlatforms() {
 		if ( !OperatingSystem.IsLinux() && !OperatingSystem.IsWindows() && !OperatingSystem.IsMacOS() ) return;
@@ -25,6 +28,7 @@ public sealed class VmstatProviderTests {
 		Assert.True( snapshot.System.Cpu.HasValue || snapshot.System.CpuActivity.HasValue );
 	}
 
+	/// <summary>Verifies that darwin provider carries mach paging counters when available.</summary>
 	[Fact]
 	public async Task DarwinProviderCarriesMachPagingCountersWhenAvailable() {
 		if ( !OperatingSystem.IsMacOS() ) return;
@@ -34,6 +38,7 @@ public sealed class VmstatProviderTests {
 		Assert.True( 0UL < snapshot.Paging.Value.PageSizeBytes );
 	}
 
+	/// <summary>Verifies that linux provider carries exact procfs vmstat provenance.</summary>
 	[Fact]
 	public async Task LinuxProviderCarriesExactProcfsVmstatProvenance() {
 		if ( !OperatingSystem.IsLinux() ) return;

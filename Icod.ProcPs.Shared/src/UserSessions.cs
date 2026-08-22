@@ -604,7 +604,9 @@ public sealed class WindowsProcLoginSessionProvider : IProcLoginSessionProvider 
 	}
 }
 
+/// <summary>Provides a controlled unsupported result when login-session accounting is unavailable.</summary>
 internal sealed class UnsupportedProcLoginSessionProvider : IProcLoginSessionProvider {
+	/// <summary>Returns an unsupported login-session observation asynchronously.</summary>
 	public Task<ProcObservedValue<IReadOnlyList<ProcLoginSession>>> GetSessionsAsync( CancellationToken cancellationToken = default ) {
 		cancellationToken.ThrowIfCancellationRequested();
 		return Task.FromResult( ProcObservedValue<IReadOnlyList<ProcLoginSession>>.Missing(

@@ -3,7 +3,9 @@ namespace Icod.ProcPs.Pmap.Tests;
 using Icod.ProcPs.Shared;
 using Xunit;
 
+/// <summary>Contains tests for command.</summary>
 public sealed class CommandTests {
+	/// <summary>Verifies that basic mode prints mappings and total.</summary>
 	[Fact]
 	public async Task BasicModePrintsMappingsAndTotal() {
 		using var output = new MemoryStream();
@@ -23,6 +25,7 @@ public sealed class CommandTests {
 		Assert.EndsWith( $" total               12K{Environment.NewLine}", text );
 	}
 
+	/// <summary>Verifies that show path and kernel name control mapping presentation.</summary>
 	[Fact]
 	public async Task ShowPathAndKernelNameControlMappingPresentation() {
 		var maps = TestSupport.Maps(
@@ -41,6 +44,7 @@ public sealed class CommandTests {
 		Assert.Contains( "[vdso]", TestSupport.Text( named ), StringComparison.Ordinal );
 	}
 
+	/// <summary>Verifies that quiet suppresses footer but not process banner.</summary>
 	[Fact]
 	public async Task QuietSuppressesFooterButNotProcessBanner() {
 		using var output = new MemoryStream();
@@ -54,6 +58,7 @@ public sealed class CommandTests {
 		Assert.DoesNotContain( " total ", TestSupport.Text( output ), StringComparison.Ordinal );
 	}
 
+	/// <summary>Verifies that range selects only overlapping mappings.</summary>
 	[Fact]
 	public async Task RangeSelectsOnlyOverlappingMappings() {
 		using var output = new MemoryStream();
@@ -67,6 +72,7 @@ public sealed class CommandTests {
 		Assert.DoesNotContain( "two", TestSupport.Text( output ), StringComparison.Ordinal );
 	}
 
+	/// <summary>Verifies that device mode prints offsets devices and totals.</summary>
 	[Fact]
 	public async Task DeviceModePrintsOffsetsDevicesAndTotals() {
 		using var output = new MemoryStream();
@@ -83,6 +89,7 @@ public sealed class CommandTests {
 		Assert.EndsWith( $"mapped: 12K    writeable/private: 8K    shared: 4K{Environment.NewLine}", text );
 	}
 
+	/// <summary>Verifies that extended mode uses smaps rss and dirty fields.</summary>
 	[Fact]
 	public async Task ExtendedModeUsesSmapsRssAndDirtyFields() {
 		using var output = new MemoryStream();
@@ -99,6 +106,7 @@ public sealed class CommandTests {
 		Assert.Contains( "total kB", text, StringComparison.Ordinal );
 	}
 
+	/// <summary>Verifies that dynamic modes preserve kernel detail field policy.</summary>
 	[Fact]
 	public async Task DynamicModesPreserveKernelDetailFieldPolicy() {
 		var metrics = new[] {
@@ -121,6 +129,7 @@ public sealed class CommandTests {
 		Assert.Contains( "VmFlags", TestSupport.Text( all ), StringComparison.Ordinal );
 	}
 
+	/// <summary>Verifies that utf8 mapping names round trip.</summary>
 	[Fact]
 	public async Task Utf8MappingNamesRoundTrip() {
 		using var output = new MemoryStream();
@@ -129,6 +138,7 @@ public sealed class CommandTests {
 		Assert.Contains( "/tmp/naïve-世界.so", TestSupport.Text( output ), StringComparison.Ordinal );
 	}
 
+	/// <summary>Verifies that vanished process contributes procps missing status bit.</summary>
 	[Fact]
 	public async Task VanishedProcessContributesProcpsMissingStatusBit() {
 		using var output = new MemoryStream();
@@ -139,6 +149,7 @@ public sealed class CommandTests {
 		Assert.Equal( string.Empty, TestSupport.Text( error ) );
 	}
 
+	/// <summary>Verifies that unsupported maps produce controlled diagnostic after banner.</summary>
 	[Fact]
 	public async Task UnsupportedMapsProduceControlledDiagnosticAfterBanner() {
 		using var output = new MemoryStream();
@@ -149,6 +160,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"pmap: cannot examine PID 101: no complete map API{Environment.NewLine}", TestSupport.Text( error ) );
 	}
 
+	/// <summary>Verifies that access denied map produces privilege diagnostic.</summary>
 	[Fact]
 	public async Task AccessDeniedMapProducesPrivilegeDiagnostic() {
 		using var error = new MemoryStream();
@@ -157,6 +169,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"pmap: cannot examine PID 101: permission denied by fixture{Environment.NewLine}", TestSupport.Text( error ) );
 	}
 
+	/// <summary>Verifies that proc pid operand and mode conflicts follow profile.</summary>
 	[Fact]
 	public async Task ProcPidOperandAndModeConflictsFollowProfile() {
 		using var output = new MemoryStream();
@@ -170,6 +183,7 @@ public sealed class CommandTests {
 		Assert.Contains( "mutually exclusive", TestSupport.Text( error ), StringComparison.Ordinal );
 	}
 
+	/// <summary>Verifies that help uses host newlines without cr lf doubling.</summary>
 	[Fact]
 	public async Task HelpUsesHostNewlinesWithoutCrLfDoubling() {
 		using var output = new MemoryStream();
@@ -178,6 +192,7 @@ public sealed class CommandTests {
 		Assert.StartsWith( $"{Environment.NewLine}Usage:{Environment.NewLine} pmap [options]", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that smaps parser preserves metrics flags and utf8 name.</summary>
 	[Fact]
 	public void SmapsParserPreservesMetricsFlagsAndUtf8Name() {
 		var text = string.Join( "\r\n", new[] {
@@ -199,6 +214,7 @@ public sealed class CommandTests {
 		Assert.Equal( "rd wr mr mw me ac sd", parsed.Regions[ 0 ].VmFlags );
 	}
 
+	/// <summary>Verifies that system map provider advertises linux only equivalent semantics.</summary>
 	[Fact]
 	public async Task SystemMapProviderAdvertisesLinuxOnlyEquivalentSemantics() {
 		var process = await SystemProcProcessProvider.Instance.GetProcessAsync( Environment.ProcessId );

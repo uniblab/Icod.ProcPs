@@ -3,7 +3,9 @@ namespace Icod.ProcPs.Pwdx.Tests;
 using Icod.ProcPs.Shared;
 using Xunit;
 
+/// <summary>Contains tests for command.</summary>
 public sealed class CommandTests {
+	/// <summary>Verifies that prints working directories for multiple targets.</summary>
 	[Fact]
 	public async Task PrintsWorkingDirectoriesForMultipleTargets() {
 		using var output = new MemoryStream();
@@ -17,6 +19,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"101: /one{Environment.NewLine}202: /two{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that proc operand is accepted and preserved in output.</summary>
 	[Fact]
 	public async Task ProcOperandIsAcceptedAndPreservedInOutput() {
 		using var output = new MemoryStream();
@@ -30,6 +33,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"/proc/101: /srv{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that vanished target does not prevent later targets.</summary>
 	[Fact]
 	public async Task VanishedTargetDoesNotPreventLaterTargets() {
 		using var output = new MemoryStream();
@@ -46,6 +50,7 @@ public sealed class CommandTests {
 		Assert.Contains( $"101: No such process{Environment.NewLine}", TestSupport.Text( error ), StringComparison.Ordinal );
 	}
 
+	/// <summary>Verifies that unsupported working directory is controlled failure.</summary>
 	[Fact]
 	public async Task UnsupportedWorkingDirectoryIsControlledFailure() {
 		using var error = new MemoryStream();
@@ -59,6 +64,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"101: not supported here{Environment.NewLine}", TestSupport.Text( error ) );
 	}
 
+	/// <summary>Verifies that invalid target fails immediately.</summary>
 	[Fact]
 	public async Task InvalidTargetFailsImmediately() {
 		using var error = new MemoryStream();
@@ -67,6 +73,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"pwdx: invalid process id: not-a-pid{Environment.NewLine}", TestSupport.Text( error ) );
 	}
 
+	/// <summary>Verifies that help uses host newlines without cr lf doubling.</summary>
 	[Fact]
 	public async Task HelpUsesHostNewlinesWithoutCrLfDoubling() {
 		using var output = new MemoryStream();

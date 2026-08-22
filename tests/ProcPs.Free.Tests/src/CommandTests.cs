@@ -5,7 +5,9 @@ using Icod.CommandFramework.Host;
 using Icod.ProcPs.Shared;
 using Xunit;
 
+/// <summary>Contains tests for command.</summary>
 public sealed class CommandTests {
+	/// <summary>Verifies that default output uses procps derived memory values.</summary>
 	[Fact]
 	public async Task DefaultOutputUsesProcpsDerivedMemoryValues() {
 		var result = await InvokeAsync( [], new FakeMetricsProvider( SampleMemory() ) );
@@ -18,6 +20,7 @@ public sealed class CommandTests {
 		] );
 		Assert.Equal( expected, result.Output );
 	}
+	/// <summary>Verifies that neutral memory fields render without linux meminfo keys.</summary>
 	[Fact]
 	public void NeutralMemoryFieldsRenderWithoutLinuxMeminfoKeys() {
 		static ulong KiB( ulong value ) => value * 1024UL;
@@ -41,6 +44,7 @@ public sealed class CommandTests {
 		Assert.Equal( expected, output );
 	}
 
+	/// <summary>Verifies that wide lo hi total and committed columns are rendered.</summary>
 	[Fact]
 	public async Task WideLoHiTotalAndCommittedColumnsAreRendered() {
 		var result = await InvokeAsync( [ "--wide", "--lohi", "--total", "--committed" ], new FakeMetricsProvider( SampleMemory() ) );
@@ -52,6 +56,7 @@ public sealed class CommandTests {
 		Assert.Contains( "Total:          1500         900         500", result.Output );
 		Assert.Contains( "Comm:           1500        1000         500", result.Output );
 	}
+	/// <summary>Verifies that size scaling matches procps rules.</summary>
 	[Theory]
 	[InlineData( 1024UL, 0, false, false, "1" )]
 	[InlineData( 1024UL, 1, false, false, "1024" )]
@@ -62,6 +67,7 @@ public sealed class CommandTests {
 	[InlineData( 1152921504606846976UL, 0, false, true, "1024Pi" )]
 	public void SizeScalingMatchesProcpsRules( ulong bytes, int exponent, bool si, bool human, string expected ) => Assert.Equal( expected, Command.FormatSize( bytes, exponent, si, human ) );
 
+	/// <summary>Verifies that later help option wins over permuted operand.</summary>
 	[Fact]
 	public async Task LaterHelpOptionWinsOverPermutedOperand() {
 		var result = await InvokeAsync( [ "operand", "--help" ], new FakeMetricsProvider( SampleMemory() ) );
@@ -69,6 +75,7 @@ public sealed class CommandTests {
 		Assert.StartsWith( $"{Environment.NewLine}Usage:{Environment.NewLine} free [options]", result.Output );
 		Assert.Equal( string.Empty, result.Error );
 	}
+	/// <summary>Verifies that synchronous version entry point remains available.</summary>
 	[Fact]
 	public void SynchronousVersionEntryPointRemainsAvailable() {
 		using var output = new StringWriter();
@@ -78,6 +85,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"free from procps-ng 4.0.6{Environment.NewLine}", output.ToString() );
 		Assert.Equal( string.Empty, error.ToString() );
 	}
+	/// <summary>Verifies that invalid mem available falls back to mem free.</summary>
 	[Fact]
 	public void InvalidMemAvailableFallsBackToMemFree() {
 		static ulong KiB( ulong value ) => value * 1024UL;
@@ -91,6 +99,7 @@ public sealed class CommandTests {
 		Assert.Equal( new[] { "Mem:", "1000", "700", "300", "0", "0", "300" }, memoryFields );
 	}
 
+	/// <summary>Verifies that extra operand prints usage without invented diagnostic.</summary>
 	[Fact]
 	public async Task ExtraOperandPrintsUsageWithoutInventedDiagnostic() {
 		var result = await InvokeAsync( [ "operand" ], new FakeMetricsProvider( SampleMemory() ) );
@@ -99,12 +108,14 @@ public sealed class CommandTests {
 		Assert.StartsWith( $"{Environment.NewLine}Usage:{Environment.NewLine} free [options]", result.Error );
 	}
 
+	/// <summary>Verifies that multiple unit options are rejected.</summary>
 	[Fact]
 	public async Task MultipleUnitOptionsAreRejected() {
 		var result = await InvokeAsync( [ "-m", "--giga" ], new FakeMetricsProvider( SampleMemory() ) );
 		Assert.Equal( 1, result.Status );
 		Assert.Equal( $"free: Multiple unit options don't make sense.{Environment.NewLine}", result.Error );
 	}
+	/// <summary>Verifies that line mode uses single line summary.</summary>
 	[Fact]
 	public async Task LineModeUsesSingleLineSummary() {
 		var result = await InvokeAsync( [ "--line" ], new FakeMetricsProvider( SampleMemory() ) );
@@ -115,6 +126,7 @@ public sealed class CommandTests {
 		Assert.Contains( "MemFree", result.Output );
 		Assert.Equal( 1, result.Output.Count( character => '\n' == character ) );
 	}
+	/// <summary>Verifies that repeat count samples again and uses requested delay.</summary>
 	[Fact]
 	public async Task RepeatCountSamplesAgainAndUsesRequestedDelay() {
 		var provider = new FakeMetricsProvider( SampleMemory() );
@@ -126,6 +138,7 @@ public sealed class CommandTests {
 		Assert.Equal( TimeSpan.FromMilliseconds( 250 ), delays[ 0 ] );
 		Assert.Contains( string.Concat( Environment.NewLine, Environment.NewLine, "               total" ), result.Output );
 	}
+	/// <summary>Verifies that unsupported memory is a controlled failure.</summary>
 	[Fact]
 	public async Task UnsupportedMemoryIsAControlledFailure() {
 		var provider = new FakeMetricsProvider( ProcObservedValue<ProcMemoryInfo>.Missing( ProcObservationAvailability.Unsupported, "portable provider" ) );
@@ -133,6 +146,7 @@ public sealed class CommandTests {
 		Assert.Equal( 1, result.Status );
 		Assert.Contains( "not available on this platform", result.Error );
 	}
+	/// <summary>Verifies that linux procfs memory retains exact provenance.</summary>
 	[Fact]
 	public async Task LinuxProcfsMemoryRetainsExactProvenance() {
 		var root = CreateTempDirectory();
@@ -146,6 +160,7 @@ public sealed class CommandTests {
 			Assert.Equal( 1024UL, observation.Value.Fields[ "MemFree" ] );
 		} finally { Directory.Delete( root, recursive: true ); }
 	}
+	/// <summary>Verifies that comma repeat interval matches procps parser.</summary>
 	[Fact]
 	public async Task CommaRepeatIntervalMatchesProcpsParser() {
 		var provider = new FakeMetricsProvider( SampleMemory() );
@@ -155,6 +170,7 @@ public sealed class CommandTests {
 		Assert.Single( delays );
 		Assert.Equal( TimeSpan.FromMilliseconds( 250 ), delays[ 0 ] );
 	}
+	/// <summary>Verifies that ambiguous long option reports possibilities.</summary>
 	[Fact]
 	public async Task AmbiguousLongOptionReportsPossibilities() {
 		var result = await InvokeAsync( [ "--s" ], new FakeMetricsProvider( SampleMemory() ) );

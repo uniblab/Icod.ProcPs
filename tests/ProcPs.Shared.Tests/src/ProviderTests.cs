@@ -5,7 +5,9 @@ using System.Globalization;
 using Icod.CommandFramework.Processes;
 using Xunit;
 
+/// <summary>Contains tests for provider.</summary>
 public sealed class ProviderTests {
+	/// <summary>Verifies that fixture proc root produces detailed snapshot.</summary>
 	[Fact]
 	public async Task FixtureProcRootProducesDetailedSnapshot() {
 		var root = System.IO.Path.Combine( System.IO.Path.GetTempPath(), "icod-procps-" + Guid.NewGuid().ToString( "N" ) );
@@ -35,6 +37,7 @@ public sealed class ProviderTests {
 		}
 	}
 
+	/// <summary>Verifies that system provider can observe current process.</summary>
 	[Fact]
 	public async Task SystemProviderCanObserveCurrentProcess() {
 		var provider = SystemProcProcessProvider.Instance;
@@ -43,6 +46,7 @@ public sealed class ProviderTests {
 		Assert.Equal( Environment.ProcessId, observed.Value.ProcessId );
 		Assert.True( observed.Value.CommandName.HasValue );
 	}
+	/// <summary>Verifies that system process provider selects the primary platform backend.</summary>
 	[Fact]
 	public void SystemProcessProviderSelectsThePrimaryPlatformBackend() {
 		var capabilities = SystemProcProcessProvider.Instance.Capabilities;
@@ -60,6 +64,7 @@ public sealed class ProviderTests {
 		}
 	}
 
+	/// <summary>Verifies that portable provider does not mislabel platform session as posix session.</summary>
 	[Fact]
 	public async Task PortableProviderDoesNotMislabelPlatformSessionAsPosixSession() {
 		var provider = new DotNetProcProcessProvider( SystemProcessInspector.Instance );
@@ -71,6 +76,7 @@ public sealed class ProviderTests {
 		Assert.False( observed.Value.PlatformSessionId.HasValue );
 	}
 
+	/// <summary>Verifies that windows provider uses native parent and platform session when running on windows.</summary>
 	[Fact]
 	public async Task WindowsProviderUsesNativeParentAndPlatformSessionWhenRunningOnWindows() {
 		if ( !OperatingSystem.IsWindows() ) return;
@@ -87,6 +93,7 @@ public sealed class ProviderTests {
 		Assert.False( observed.Value.SessionId.HasValue );
 	}
 
+	/// <summary>Verifies that mac os provider uses darwin and posix metadata when running on mac os.</summary>
 	[Fact]
 	public async Task MacOsProviderUsesDarwinAndPosixMetadataWhenRunningOnMacOs() {
 		if ( !OperatingSystem.IsMacOS() ) return;

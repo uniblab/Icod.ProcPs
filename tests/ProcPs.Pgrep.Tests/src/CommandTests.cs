@@ -2,7 +2,9 @@ namespace Icod.ProcPs.Pgrep.Tests;
 
 using Xunit;
 
+/// <summary>Contains tests for command.</summary>
 public sealed class CommandTests {
+	/// <summary>Verifies that matches gnu extended pattern and prints pid.</summary>
 	[Fact]
 	public async Task MatchesGnuExtendedPatternAndPrintsPid() {
 		var provider = new FakeProcessProvider(
@@ -23,6 +25,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"101{Environment.NewLine}202{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that newest breaks equal start time by larger pid.</summary>
 	[Fact]
 	public async Task NewestBreaksEqualStartTimeByLargerPid() {
 		var provider = new FakeProcessProvider(
@@ -43,6 +46,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"202{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that selection criteria are anded and environment selectors are ored.</summary>
 	[Fact]
 	public async Task SelectionCriteriaAreAndedAndEnvironmentSelectorsAreOred() {
 		var process = TestSupport.Process( 101, "worker", 10, parent: 44, uid: 1000 );
@@ -61,6 +65,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"101{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that full listing uses shell quote without changing pattern target.</summary>
 	[Fact]
 	public async Task FullListingUsesShellQuoteWithoutChangingPatternTarget() {
 		var process = TestSupport.Process( 101, "worker", 10, arguments: [ "worker", "two words", "a'b" ] );
@@ -79,6 +84,7 @@ public sealed class CommandTests {
 		Assert.Contains( "'a'\\''b'", TestSupport.Text( output ), StringComparison.Ordinal );
 	}
 
+	/// <summary>Verifies that count returns no match status when zero.</summary>
 	[Fact]
 	public async Task CountReturnsNoMatchStatusWhenZero() {
 		using var output = new MemoryStream();
@@ -96,6 +102,7 @@ public sealed class CommandTests {
 	}
 
 
+	/// <summary>Verifies that newest alone counts as selection criterion.</summary>
 	[Fact]
 	public async Task NewestAloneCountsAsSelectionCriterion() {
 		using var output = new MemoryStream();
@@ -115,6 +122,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"202{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that zero process group and session mean current process context.</summary>
 	[Fact]
 	public async Task ZeroProcessGroupAndSessionMeanCurrentProcessContext() {
 		using var output = new MemoryStream();
@@ -135,6 +143,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"101{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that pid file may be read from standard input.</summary>
 	[Fact]
 	public async Task PidFileMayBeReadFromStandardInput() {
 		using var input = new MemoryStream( System.Text.Encoding.UTF8.GetBytes( "101\n" ) );
@@ -153,6 +162,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"101{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that environment list uses or semantics.</summary>
 	[Fact]
 	public async Task EnvironmentListUsesOrSemantics() {
 		var process = TestSupport.Process( 101, "worker", 10 );
@@ -171,6 +181,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"101{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that require handler uses selected signal disposition.</summary>
 	[Fact]
 	public async Task RequireHandlerUsesSelectedSignalDisposition() {
 		var control = new FakeControl();
@@ -192,6 +203,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"202{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that multiple patterns are syntax error.</summary>
 	[Fact]
 	public async Task MultiplePatternsAreSyntaxError() {
 		using var error = new MemoryStream();

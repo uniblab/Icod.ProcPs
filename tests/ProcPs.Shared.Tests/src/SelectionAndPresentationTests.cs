@@ -5,7 +5,9 @@ using Icod.CommandFramework.Host;
 using Icod.CommandFramework.Processes;
 using Xunit;
 
+/// <summary>Contains tests for selection and presentation.</summary>
 public sealed class SelectionAndPresentationTests {
+	/// <summary>Verifies that selection uses or within criterion and and across criteria.</summary>
 	[Fact]
 	public void SelectionUsesOrWithinCriterionAndAndAcrossCriteria() {
 		var first = Snapshot( 10, 1, 1000, "alpha" );
@@ -21,12 +23,14 @@ public sealed class SelectionAndPresentationTests {
 		Assert.Equal( 10, selected[ 0 ].ProcessId );
 	}
 
+	/// <summary>Verifies that selection grammar parses lists and states.</summary>
 	[Fact]
 	public void SelectionGrammarParsesListsAndStates() {
 		Assert.Equal( new[] { 1, 2, 3 }, ProcSelectionGrammar.ParseIdentifiers( "1,2 3" ).OrderBy( value => value ) );
 		Assert.Equal( new[] { ProcProcessState.Running, ProcProcessState.Sleeping }, ProcSelectionGrammar.ParseStates( "RS" ).OrderBy( value => value ) );
 	}
 
+	/// <summary>Verifies that relationship index collects children by parent pid.</summary>
 	[Fact]
 	public void RelationshipIndexCollectsChildrenByParentPid() {
 		var index = ProcProcessRelations.BuildChildrenIndex( new[] { Snapshot( 10, 1, 0, "a" ), Snapshot( 11, 1, 0, "b" ), Snapshot( 12, 2, 0, "c" ) } );
@@ -34,6 +38,7 @@ public sealed class SelectionAndPresentationTests {
 		Assert.Equal( 12, Assert.Single( index[ 2 ] ).ProcessId );
 	}
 
+	/// <summary>Verifies that sorter is stable across equal keys.</summary>
 	[Fact]
 	public void SorterIsStableAcrossEqualKeys() {
 		var first = Snapshot( 11, 1, 1000, "same" );
@@ -42,6 +47,7 @@ public sealed class SelectionAndPresentationTests {
 		Assert.Equal( new[] { 11, 10 }, sorted.Select( process => process.ProcessId ) );
 	}
 
+	/// <summary>Verifies that personalities recognize compatibility names.</summary>
 	[Theory]
 	[InlineData( "linux", ProcPersonality.Linux )]
 	[InlineData( "sysv", ProcPersonality.Posix )]
@@ -53,6 +59,7 @@ public sealed class SelectionAndPresentationTests {
 		Assert.Equal( expected, actual );
 	}
 
+	/// <summary>Verifies that screen builder uses catalog and configured sort.</summary>
 	[Fact]
 	public void ScreenBuilderUsesCatalogAndConfiguredSort() {
 		var configuration = new ProcDisplayConfiguration(

@@ -4,7 +4,9 @@ using Icod.ProcPs.Shared;
 using System.Text;
 using Xunit;
 
+/// <summary>Contains tests for linux proc parsers.</summary>
 public sealed class LinuxProcParsersTests {
+	/// <summary>Verifies that process stat preserves right parenthesis in command name.</summary>
 	[Fact]
 	public void ProcessStatPreservesRightParenthesisInCommandName() {
 		var record = LinuxProcParsers.ParseProcessStat( "123 (weird ) name) S 1 123 123 0 456 0 0 0 0 0 10 20 0 0 20 5 3 0 777 4096 2" );
@@ -21,6 +23,7 @@ public sealed class LinuxProcParsersTests {
 		Assert.Equal( 2L, record.ResidentSetPages );
 	}
 
+	/// <summary>Verifies that status parses identity and pid namespace columns.</summary>
 	[Fact]
 	public void StatusParsesIdentityAndPidNamespaceColumns() {
 		var record = LinuxProcParsers.ParseProcessStatus( "Name:\tfixture\nUid:\t1000\t1001\t1002\t1003\nGid:\t2000\t2001\t2002\t2003\nNSpid:\t42\t7\n" );
@@ -31,12 +34,14 @@ public sealed class LinuxProcParsersTests {
 		Assert.Equal( new[] { 42, 7 }, record.NamespaceProcessIds );
 	}
 
+	/// <summary>Verifies that null delimited utf8 preserves arguments.</summary>
 	[Fact]
 	public void NullDelimitedUtf8PreservesArguments() {
 		var bytes = Encoding.UTF8.GetBytes( "command\0two words\0--flag\0" );
 		Assert.Equal( new[] { "command", "two words", "--flag" }, LinuxProcParsers.ParseNullDelimitedUtf8( bytes ) );
 	}
 
+	/// <summary>Verifies that mem info converts kibibytes to bytes.</summary>
 	[Fact]
 	public void MemInfoConvertsKibibytesToBytes() {
 		var values = LinuxProcParsers.ParseMemInfo( "MemTotal: 2 kB\nHugePages_Total: 4\nHugepagesize: 2048 kB\n" );
@@ -45,6 +50,7 @@ public sealed class LinuxProcParsersTests {
 		Assert.Equal( 2UL * 1024UL * 1024UL, values[ "Hugepagesize" ] );
 	}
 
+	/// <summary>Verifies that memory map parser retains path with spaces.</summary>
 	[Fact]
 	public void MemoryMapParserRetainsPathWithSpaces() {
 		var entry = LinuxProcParsers.ParseMemoryMapLine( "00400000-00452000 r-xp 00000000 08:02 123 /tmp/file with spaces" );

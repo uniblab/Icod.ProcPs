@@ -5,7 +5,9 @@ using Icod.CommandFramework.Host;
 using Icod.ProcPs.Shared;
 using Xunit;
 
+/// <summary>Contains tests for command.</summary>
 public sealed class CommandTests {
+	/// <summary>Verifies that header tracks active wide and timestamp modes.</summary>
 	[Fact]
 	public void HeaderTracksActiveWideAndTimestampModes() {
 		var normal = Command.RenderDefaultHeader();
@@ -17,6 +19,7 @@ public sealed class CommandTests {
 		Assert.Contains( "timestamp", alternate );
 	}
 
+	/// <summary>Verifies that unit conversion matches procps unit families.</summary>
 	[Theory]
 	[InlineData( 1_048_576UL, 'b', 1_048_576UL )]
 	[InlineData( 1_000_000UL, 'k', 1000UL )]
@@ -25,6 +28,7 @@ public sealed class CommandTests {
 	[InlineData( 1_048_576UL, 'M', 1UL )]
 	public void UnitConversionMatchesProcpsUnitFamilies( ulong bytes, char unit, ulong expected ) => Assert.Equal( expected, Command.ConvertBytes( bytes, unit ) );
 
+	/// <summary>Verifies that default report uses since boot rates for first row.</summary>
 	[Fact]
 	public async Task DefaultReportUsesSinceBootRatesForFirstRow() {
 		var result = await InvokeAsync( [], new FakeProvider( FullSnapshot( interrupts: 1000, contextSwitches: 2000, pageIn: 500, pageOut: 600, swapIn: 10, swapOut: 20, uptimeSeconds: 100 ) ) );
@@ -42,6 +46,7 @@ public sealed class CommandTests {
 	}
 
 
+	/// <summary>Verifies that initial context switch rate uses cpu divisor while interrupts use uptime.</summary>
 	[Fact]
 	public async Task InitialContextSwitchRateUsesCpuDivisorWhileInterruptsUseUptime() {
 		var result = await InvokeAsync( [], new FakeProvider( FullSnapshot( interrupts: 1000, contextSwitches: 1000, uptimeSeconds: 10 ) ) );
@@ -51,6 +56,7 @@ public sealed class CommandTests {
 		Assert.Equal( "10", fields[ 11 ] );
 	}
 
+	/// <summary>Verifies that guest ticks remain in cpu divisor before user subtraction.</summary>
 	[Fact]
 	public async Task GuestTicksRemainInCpuDivisorBeforeUserSubtraction() {
 		var cpu = new ProcCpuTimes( 100, 0, 0, 0, 0, 0, 0, 0, 50, 0 );
@@ -61,6 +67,7 @@ public sealed class CommandTests {
 		Assert.Equal( "50", fields[ 17 ] );
 	}
 
+	/// <summary>Verifies that linux idle debt matches procps backward idle handling.</summary>
 	[Fact]
 	public async Task LinuxIdleDebtMatchesProcpsBackwardIdleHandling() {
 		var before = new ProcCpuTimes( 100, 0, 0, 100, 0, 0, 0, 0, 0, 0 );
@@ -78,6 +85,7 @@ public sealed class CommandTests {
 		Assert.Equal( "50", secondFields[ 14 ] );
 	}
 
+	/// <summary>Verifies that no first waits then uses counter deltas.</summary>
 	[Fact]
 	public async Task NoFirstWaitsThenUsesCounterDeltas() {
 		var provider = new FakeProvider(
@@ -97,6 +105,7 @@ public sealed class CommandTests {
 		Assert.Equal( "20", fields[ 11 ] );
 	}
 
+	/// <summary>Verifies that delay and count produce requested number of rows.</summary>
 	[Fact]
 	public async Task DelayAndCountProduceRequestedNumberOfRows() {
 		var provider = new FakeProvider( FullSnapshot(), FullSnapshot(), FullSnapshot() );
@@ -109,6 +118,7 @@ public sealed class CommandTests {
 		Assert.Equal( 5, result.Output.Split( Environment.NewLine, StringSplitOptions.RemoveEmptyEntries ).Length );
 	}
 
+	/// <summary>Verifies that partial platform renders known fields and explicit placeholders.</summary>
 	[Fact]
 	public async Task PartialPlatformRendersKnownFieldsAndExplicitPlaceholders() {
 		var memory = ProcObservedValue<ProcMemoryInfo>.Available( new ProcMemoryInfo( 8UL * 1024, 2UL * 1024, 3UL * 1024 ), ProcObservationSource.WindowsNativeApi, ObservationFidelity.Approximated );
@@ -124,6 +134,7 @@ public sealed class CommandTests {
 		Assert.Equal( "70", fields[ ^4 ] );
 	}
 
+	/// <summary>Verifies that unsupported specialized mode is controlled.</summary>
 	[Fact]
 	public async Task UnsupportedSpecializedModeIsControlled() {
 		var result = await InvokeAsync( [ "--disk" ], new FakeProvider( ProcVmstatCapabilities.Memory | ProcVmstatCapabilities.Cpu, FullSnapshot() ) );
@@ -132,6 +143,7 @@ public sealed class CommandTests {
 		Assert.Equal( string.Empty, result.Output );
 	}
 
+	/// <summary>Verifies that fork mode uses cumulative process count.</summary>
 	[Fact]
 	public async Task ForkModeUsesCumulativeProcessCount() {
 		var result = await InvokeAsync( [ "--forks" ], new FakeProvider( FullSnapshot( forks: 12345 ) ) );
@@ -139,6 +151,7 @@ public sealed class CommandTests {
 		Assert.Equal( string.Concat( "        12345 forks", Environment.NewLine ), result.Output );
 	}
 
+	/// <summary>Verifies that disk and partition modes use parsed rows.</summary>
 	[Fact]
 	public async Task DiskAndPartitionModesUseParsedRows() {
 		var snapshot = FullSnapshot();
@@ -153,6 +166,7 @@ public sealed class CommandTests {
 	}
 
 
+	/// <summary>Verifies that disk and slab one header modes suppress repeated headers.</summary>
 	[Fact]
 	public async Task DiskAndSlabOneHeaderModesSuppressRepeatedHeaders() {
 		static Task NoDelay( TimeSpan _, CancellationToken __ ) => Task.CompletedTask;
@@ -164,6 +178,7 @@ public sealed class CommandTests {
 		Assert.Equal( 1, CountOccurrences( slab.Output, "Cache                       Num" ) );
 	}
 
+	/// <summary>Verifies that partition and slab ignore timestamp option like procps.</summary>
 	[Fact]
 	public async Task PartitionAndSlabIgnoreTimestampOptionLikeProcps() {
 		var partition = await InvokeAsync( [ "--partition", "sda1", "--timestamp" ], new FakeProvider( FullSnapshot() ) );
@@ -174,6 +189,7 @@ public sealed class CommandTests {
 		Assert.DoesNotContain( "2026-08-07", slab.Output );
 	}
 
+	/// <summary>Verifies that slab mode sorts cache names.</summary>
 	[Fact]
 	public async Task SlabModeSortsCacheNames() {
 		var result = await InvokeAsync( [ "--slabs" ], new FakeProvider( FullSnapshot() ) );
@@ -184,6 +200,7 @@ public sealed class CommandTests {
 		Assert.True( alpha < zeta );
 	}
 
+	/// <summary>Verifies that statistics mode includes kernel totals.</summary>
 	[Fact]
 	public async Task StatisticsModeIncludesKernelTotals() {
 		var result = await InvokeAsync( [ "--stats" ], new FakeProvider( FullSnapshot( forks: 123 ) ) );
@@ -194,6 +211,7 @@ public sealed class CommandTests {
 	}
 
 
+	/// <summary>Verifies that statistics retain raw user and nice cpu ticks.</summary>
 	[Fact]
 	public async Task StatisticsRetainRawUserAndNiceCpuTicks() {
 		var cpu = new ProcCpuTimes( 100, 20, 30, 40, 5, 2, 3, 4, 50, 5 );
@@ -203,6 +221,7 @@ public sealed class CommandTests {
 		Assert.Contains( string.Concat( "           20 nice user cpu ticks", Environment.NewLine ), result.Output );
 	}
 
+	/// <summary>Verifies that unit option uses first argument character like procps.</summary>
 	[Fact]
 	public async Task UnitOptionUsesFirstArgumentCharacterLikeProcps() {
 		var accepted = await InvokeAsync( [ "--stats", "-SKiB" ], new FakeProvider( FullSnapshot() ) );
@@ -212,6 +231,7 @@ public sealed class CommandTests {
 		Assert.Contains( "-S requires k, K, m or M (default is KiB)", rejected.Error );
 	}
 
+	/// <summary>Verifies that conflicting report modes print usage.</summary>
 	[Fact]
 	public async Task ConflictingReportModesPrintUsage() {
 		var result = await InvokeAsync( [ "--disk", "--stats" ], new FakeProvider( FullSnapshot() ) );
@@ -219,6 +239,7 @@ public sealed class CommandTests {
 		Assert.StartsWith( string.Concat( Environment.NewLine, "Usage:", Environment.NewLine, " vmstat" ), result.Error );
 	}
 
+	/// <summary>Verifies that later help option wins over permuted operand.</summary>
 	[Fact]
 	public async Task LaterHelpOptionWinsOverPermutedOperand() {
 		var result = await InvokeAsync( [ "1", "--help" ], new FakeProvider( FullSnapshot() ) );
@@ -227,6 +248,7 @@ public sealed class CommandTests {
 		Assert.Equal( string.Empty, result.Error );
 	}
 
+	/// <summary>Verifies that version matches pinned procps release.</summary>
 	[Fact]
 	public async Task VersionMatchesPinnedProcpsRelease() {
 		var result = await InvokeAsync( [ "--version" ], new FakeProvider( FullSnapshot() ) );
@@ -234,6 +256,7 @@ public sealed class CommandTests {
 		Assert.Equal( string.Concat( "vmstat from procps-ng 4.0.6", Environment.NewLine ), result.Output );
 	}
 
+	/// <summary>Verifies that linux provider parses stat disk and partition fixtures.</summary>
 	[Fact]
 	public async Task LinuxProviderParsesStatDiskAndPartitionFixtures() {
 		var root = CreateTempDirectory();
@@ -256,9 +279,11 @@ public sealed class CommandTests {
 		} finally { Directory.Delete( root, recursive: true ); }
 	}
 
+	/// <summary>Verifies that counter delta handles wraparound.</summary>
 	[Fact]
 	public void CounterDeltaHandlesWraparound() => Assert.Equal( 4UL, ProcCounterMath.Delta( uint.MaxValue - 1UL, 2UL, 32 ) );
 
+	/// <summary>Verifies that cancellation returns shell compatible status.</summary>
 	[Fact]
 	public async Task CancellationReturnsShellCompatibleStatus() {
 		using var source = new CancellationTokenSource();

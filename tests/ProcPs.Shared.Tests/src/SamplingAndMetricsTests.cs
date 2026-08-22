@@ -3,12 +3,15 @@ namespace Icod.ProcPs.Shared.Tests;
 using Icod.ProcPs.Shared;
 using Xunit;
 
+/// <summary>Contains tests for sampling and metrics.</summary>
 public sealed class SamplingAndMetricsTests {
+	/// <summary>Verifies that counter delta handles wraparound.</summary>
 	[Fact]
 	public void CounterDeltaHandlesWraparound() {
 		Assert.Equal( 11UL, ProcCounterMath.Delta( 250, 5, 8 ) );
 	}
 
+	/// <summary>Verifies that cpu busy percent excludes idle delta.</summary>
 	[Fact]
 	public void CpuBusyPercentExcludesIdleDelta() {
 		var before = new ProcCpuTimes( 10, 0, 10, 80, 0, 0, 0, 0, 0, 0 );
@@ -16,6 +19,7 @@ public sealed class SamplingAndMetricsTests {
 		Assert.Equal( 20d, ProcCpuMath.BusyPercent( before, after ), 6 );
 	}
 
+	/// <summary>Verifies that load average parser reads runnable and last pid.</summary>
 	[Fact]
 	public void LoadAverageParserReadsRunnableAndLastPid() {
 		var load = LinuxProcSystemMetricsProvider.ParseLoadAverage( "0.10 0.20 0.30 2/100 4321\n" );
@@ -25,6 +29,7 @@ public sealed class SamplingAndMetricsTests {
 		Assert.Equal( 4321, load.LastProcessId );
 	}
 
+	/// <summary>Verifies that cpu parser does not double count guest fields in total.</summary>
 	[Fact]
 	public void CpuParserDoesNotDoubleCountGuestFieldsInTotal() {
 		var cpu = LinuxProcSystemMetricsProvider.ParseCpu( "cpu 1 2 3 4 5 6 7 8 9 10\n" );
@@ -33,6 +38,7 @@ public sealed class SamplingAndMetricsTests {
 		Assert.Equal( 10UL, cpu.GuestNice );
 	}
 
+	/// <summary>Verifies that linux provider observes user sessions when running on linux.</summary>
 	[Fact]
 	public async Task LinuxProviderObservesUserSessionsWhenRunningOnLinux() {
 		if ( !OperatingSystem.IsLinux() ) return;
@@ -42,6 +48,7 @@ public sealed class SamplingAndMetricsTests {
 		Assert.True( snapshot.UserSessions.HasValue, snapshot.UserSessions.Diagnostic );
 		Assert.True( 0 <= snapshot.UserSessions.Value.Count );
 	}
+	/// <summary>Verifies that system metric provider selects the primary platform backend.</summary>
 	[Fact]
 	public void SystemMetricProviderSelectsThePrimaryPlatformBackend() {
 		var capabilities = SystemProcSystemMetricsProvider.Instance.Capabilities;
@@ -58,6 +65,7 @@ public sealed class SamplingAndMetricsTests {
 		}
 	}
 
+	/// <summary>Verifies that linux memory info also populates neutral fields.</summary>
 	[Fact]
 	public void LinuxMemoryInfoAlsoPopulatesNeutralFields() {
 		var memory = new ProcMemoryInfo( new Dictionary<string, ulong> {
@@ -78,6 +86,7 @@ public sealed class SamplingAndMetricsTests {
 		Assert.Equal( 300UL, memory.SwapFreeBytes );
 	}
 
+	/// <summary>Verifies that windows system provider uses native metrics when running on windows.</summary>
 	[Fact]
 	public async Task WindowsSystemProviderUsesNativeMetricsWhenRunningOnWindows() {
 		if ( !OperatingSystem.IsWindows() ) return;
@@ -97,6 +106,7 @@ public sealed class SamplingAndMetricsTests {
 		Assert.Equal( ProcObservationAvailability.Unsupported, snapshot.LoadAverages.Availability );
 	}
 
+	/// <summary>Verifies that mac os system provider uses native metrics when running on mac os.</summary>
 	[Fact]
 	public async Task MacOsSystemProviderUsesNativeMetricsWhenRunningOnMacOs() {
 		if ( !OperatingSystem.IsMacOS() ) return;

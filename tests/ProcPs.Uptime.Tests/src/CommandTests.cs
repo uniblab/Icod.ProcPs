@@ -5,7 +5,9 @@ using Icod.CommandFramework.Host;
 using Icod.ProcPs.Shared;
 using Xunit;
 
+/// <summary>Contains tests for command.</summary>
 public sealed class CommandTests {
+	/// <summary>Verifies that standard output matches procps layout.</summary>
 	[Fact]
 	public async Task StandardOutputMatchesProcpsLayout() {
 		var provider = CreateProvider( TimeSpan.FromSeconds( 93784 ), 2, new ProcLoadAverage( 1.25, 2.5, 3.75, 1, 10, 99 ) );
@@ -14,6 +16,7 @@ public sealed class CommandTests {
 		Assert.Equal( $" 12:34:56 up 1 day,  2:03,  2 users,  load average: 1.25, 2.50, 3.75{Environment.NewLine}", result.Output );
 		Assert.Equal( string.Empty, result.Error );
 	}
+	/// <summary>Verifies that standard output accepts neutral load averages.</summary>
 	[Fact]
 	public async Task StandardOutputAcceptsNeutralLoadAverages() {
 		var snapshot = new ProcSystemSnapshot {
@@ -27,6 +30,7 @@ public sealed class CommandTests {
 		Assert.Equal( string.Empty, result.Error );
 	}
 
+	/// <summary>Verifies that pretty uses procps decomposition rules.</summary>
 	[Fact]
 	public async Task PrettyUsesProcpsDecompositionRules() {
 		var provider = CreateProvider( TimeSpan.FromSeconds( 93784 ), 0, new ProcLoadAverage( 0, 0, 0, 0, 0, 0 ) );
@@ -35,6 +39,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"up 1 day, 2 hours, 3 minutes{Environment.NewLine}", result.Output );
 		Assert.Equal( "up 60 minutes", Command.FormatPretty( 3600 ) );
 	}
+	/// <summary>Verifies that since uses selected container uptime.</summary>
 	[Fact]
 	public async Task SinceUsesSelectedContainerUptime() {
 		var provider = CreateProvider( TimeSpan.FromHours( 10 ), 1, new ProcLoadAverage( 0, 0, 0, 0, 0, 0 ), TimeSpan.FromHours( 2 ) );
@@ -44,6 +49,7 @@ public sealed class CommandTests {
 		Assert.True( provider.ContainerUptimeRequested );
 	}
 
+	/// <summary>Verifies that since applies historical local offset.</summary>
 	[Fact]
 	public async Task SinceAppliesHistoricalLocalOffset() {
 		var daylightStart = TimeZoneInfo.TransitionTime.CreateFloatingDateRule( new DateTime( 1, 1, 1, 2, 0, 0 ), 3, 2, DayOfWeek.Sunday );
@@ -55,6 +61,7 @@ public sealed class CommandTests {
 		Assert.Equal( 0, result.Status );
 		Assert.Equal( $"2026-11-01 00:00:00{Environment.NewLine}", result.Output );
 	}
+	/// <summary>Verifies that later help option wins over permuted operand.</summary>
 	[Fact]
 	public async Task LaterHelpOptionWinsOverPermutedOperand() {
 		var provider = CreateProvider( TimeSpan.FromMinutes( 1 ), 0, new ProcLoadAverage( 0, 0, 0, 0, 0, 0 ) );
@@ -63,6 +70,7 @@ public sealed class CommandTests {
 		Assert.StartsWith( $"{Environment.NewLine}Usage:{Environment.NewLine} uptime [options]", result.Output );
 		Assert.Equal( string.Empty, result.Error );
 	}
+	/// <summary>Verifies that synchronous version entry point remains available.</summary>
 	[Fact]
 	public void SynchronousVersionEntryPointRemainsAvailable() {
 		using var output = new StringWriter();
@@ -73,6 +81,7 @@ public sealed class CommandTests {
 		Assert.Equal( string.Empty, error.ToString() );
 	}
 
+	/// <summary>Verifies that extra operand prints usage without invented diagnostic.</summary>
 	[Fact]
 	public async Task ExtraOperandPrintsUsageWithoutInventedDiagnostic() {
 		var provider = CreateProvider( TimeSpan.FromMinutes( 1 ), 0, new ProcLoadAverage( 0, 0, 0, 0, 0, 0 ) );
@@ -82,6 +91,7 @@ public sealed class CommandTests {
 		Assert.StartsWith( $"{Environment.NewLine}Usage:{Environment.NewLine} uptime [options]", result.Error );
 	}
 
+	/// <summary>Verifies that raw uses system uptime even after container option.</summary>
 	[Fact]
 	public async Task RawUsesSystemUptimeEvenAfterContainerOption() {
 		var provider = CreateProvider( TimeSpan.FromSeconds( 123.5 ), 3, new ProcLoadAverage( 1, 2, 3, 0, 0, 0 ), TimeSpan.FromSeconds( 4 ) );
@@ -90,6 +100,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"1700000000 123.500000 3 1.00 2.00 3.00{Environment.NewLine}", result.Output );
 		Assert.False( provider.ContainerUptimeRequested );
 	}
+	/// <summary>Verifies that standard tolerates unavailable user count.</summary>
 	[Fact]
 	public async Task StandardToleratesUnavailableUserCount() {
 		var snapshot = new ProcSystemSnapshot {
@@ -101,6 +112,7 @@ public sealed class CommandTests {
 		Assert.Equal( 0, result.Status );
 		Assert.Contains( ", ? users,  load average: 0.10, 0.20, 0.30", result.Output );
 	}
+	/// <summary>Verifies that raw requires users like upstream.</summary>
 	[Fact]
 	public async Task RawRequiresUsersLikeUpstream() {
 		var snapshot = new ProcSystemSnapshot { Uptime = Available( new ProcUptimeInfo( TimeSpan.FromSeconds( 1 ), null ) ), LoadAverage = Available( new ProcLoadAverage( 0, 0, 0, 0, 0, 0 ) ), UserSessions = ProcObservedValue<ProcUserSessionInfo>.Missing( ProcObservationAvailability.Unsupported ) };
@@ -108,6 +120,7 @@ public sealed class CommandTests {
 		Assert.Equal( 1, result.Status );
 		Assert.Equal( $"uptime: procps_users{Environment.NewLine}", result.Error );
 	}
+	/// <summary>Verifies that reports controlled container limitation.</summary>
 	[Fact]
 	public async Task ReportsControlledContainerLimitation() {
 		var provider = new FakeMetricsProvider( new ProcSystemSnapshot { Uptime = Available( new ProcUptimeInfo( TimeSpan.FromMinutes( 1 ), null ) ) } ) { Container = ProcObservedValue<ProcUptimeInfo>.Missing( ProcObservationAvailability.Unsupported, "not available" ) };
@@ -115,6 +128,7 @@ public sealed class CommandTests {
 		Assert.Equal( 1, result.Status );
 		Assert.Contains( "Cannot get container uptime", result.Error );
 	}
+	/// <summary>Verifies that linux procfs uptime retains exact provenance.</summary>
 	[Fact]
 	public async Task LinuxProcfsUptimeRetainsExactProvenance() {
 		var root = CreateTempDirectory();
@@ -127,6 +141,7 @@ public sealed class CommandTests {
 			Assert.Equal( 123.5, observation.Value.Uptime.TotalSeconds, 6 );
 		} finally { Directory.Delete( root, recursive: true ); }
 	}
+	/// <summary>Verifies that linux container uptime is marked derived.</summary>
 	[Fact]
 	public async Task LinuxContainerUptimeIsMarkedDerived() {
 		if ( !OperatingSystem.IsLinux() ) return;

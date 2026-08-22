@@ -64,9 +64,12 @@ public interface ISysctlBackend {
 internal sealed class SystemSysctlBackend : ISysctlBackend {
 	private const string ProcRoot = "/proc/sys";
 	private static readonly char[] GlobCharacters = [ '*', '?', '[' ];
+	/// <summary>Gets the shared system instance.</summary>
 	internal static SystemSysctlBackend Instance { get; } = new();
 	private SystemSysctlBackend() { }
+	/// <summary>Gets whether Linux <c>/proc/sys</c> access is supported on this host.</summary>
 	public bool IsSupported => OperatingSystem.IsLinux() && Directory.Exists( ProcRoot );
+	/// <summary>Gets the diagnostic used when Linux <c>/proc/sys</c> access is unavailable.</summary>
 	public string UnsupportedReason {
 		get {
 			if ( !OperatingSystem.IsLinux() ) {
@@ -75,6 +78,7 @@ internal sealed class SystemSysctlBackend : ISysctlBackend {
 			return "Linux procfs /proc/sys is unavailable";
 		}
 	}
+	/// <summary>Reads a kernel parameter value asynchronously.</summary>
 	public async Task<string> ReadValueAsync( string key, CancellationToken cancellationToken = default ) {
 		ArgumentNullException.ThrowIfNull( key ); EnsureSupported(); var path = ResolveProcPath( key );
 		if ( Directory.Exists( path ) ) { throw new SysctlBackendException( SysctlBackendFailureKind.IsDirectory, "Is a directory" ); }
@@ -86,6 +90,7 @@ internal sealed class SystemSysctlBackend : ISysctlBackend {
 		} catch ( UnauthorizedAccessException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.PermissionDenied, "Permission denied", exception ); }
 		catch ( IOException exception ) { throw ClassifyIoException( exception ); }
 	}
+	/// <summary>Writes a kernel parameter value asynchronously, or validates it in dry-run mode.</summary>
 	public async Task WriteValueAsync( string key, string value, bool dryRun, CancellationToken cancellationToken = default ) {
 		ArgumentNullException.ThrowIfNull( key ); ArgumentNullException.ThrowIfNull( value ); EnsureSupported(); var path = ResolveProcPath( key );
 		if ( Directory.Exists( path ) ) { throw new SysctlBackendException( SysctlBackendFailureKind.IsDirectory, "Is a directory" ); }
@@ -97,6 +102,7 @@ internal sealed class SystemSysctlBackend : ISysctlBackend {
 		} catch ( UnauthorizedAccessException exception ) { throw new SysctlBackendException( SysctlBackendFailureKind.PermissionDenied, "Permission denied", exception ); }
 		catch ( IOException exception ) { throw ClassifyIoException( exception ); }
 	}
+	/// <summary>Enumerates readable kernel parameter keys asynchronously.</summary>
 	public Task<IReadOnlyList<string>> EnumerateKeysAsync( CancellationToken cancellationToken = default ) {
 		EnsureSupported(); cancellationToken.ThrowIfCancellationRequested(); var keys = new List<string>(); var pending = new Stack<string>(); pending.Push( ProcRoot );
 		while ( 0 < pending.Count ) {
@@ -110,6 +116,7 @@ internal sealed class SystemSysctlBackend : ISysctlBackend {
 		}
 		keys.Sort( StringComparer.Ordinal ); return Task.FromResult<IReadOnlyList<string>>( keys );
 	}
+	/// <summary>Expands a configuration-file glob asynchronously.</summary>
 	public Task<IReadOnlyList<string>> ExpandConfigurationFilesAsync( string pattern, CancellationToken cancellationToken = default ) {
 		ArgumentNullException.ThrowIfNull( pattern ); cancellationToken.ThrowIfCancellationRequested();
 		if ( 0 > pattern.IndexOfAny( GlobCharacters ) ) { return Task.FromResult<IReadOnlyList<string>>( [ pattern ] ); }
@@ -121,12 +128,15 @@ internal sealed class SystemSysctlBackend : ISysctlBackend {
 		} catch ( UnauthorizedAccessException ) { }
 		matches.Sort( StringComparer.Ordinal ); if ( 0 == matches.Count ) { matches.Add( pattern ); } return Task.FromResult<IReadOnlyList<string>>( matches );
 	}
+	/// <summary>Enumerates <c>.conf</c> files in a configuration directory asynchronously.</summary>
 	public Task<IReadOnlyList<string>> EnumerateConfigurationFilesAsync( string directory, CancellationToken cancellationToken = default ) {
 		ArgumentNullException.ThrowIfNull( directory ); cancellationToken.ThrowIfCancellationRequested(); if ( !Directory.Exists( directory ) ) { return Task.FromResult<IReadOnlyList<string>>( [] ); }
 		try { var files = Directory.EnumerateFiles( directory, "*.conf", SearchOption.TopDirectoryOnly ).OrderBy( static path => GetPortableFileName( path ), StringComparer.Ordinal ).ToArray(); return Task.FromResult<IReadOnlyList<string>>( files ); }
 		catch ( UnauthorizedAccessException ) { return Task.FromResult<IReadOnlyList<string>>( [] ); } catch ( IOException ) { return Task.FromResult<IReadOnlyList<string>>( [] ); }
 	}
+	/// <summary>Determines asynchronously whether a configuration file exists.</summary>
 	public Task<bool> ConfigurationFileExistsAsync( string path, CancellationToken cancellationToken = default ) { ArgumentNullException.ThrowIfNull( path ); cancellationToken.ThrowIfCancellationRequested(); return Task.FromResult( File.Exists( path ) ); }
+	/// <summary>Reads all lines from a sysctl configuration file asynchronously.</summary>
 	public async Task<IReadOnlyList<string>> ReadConfigurationFileAsync( string path, CancellationToken cancellationToken = default ) {
 		ArgumentNullException.ThrowIfNull( path ); cancellationToken.ThrowIfCancellationRequested();
 		try { return await File.ReadAllLinesAsync( path, cancellationToken ).ConfigureAwait( false ); }

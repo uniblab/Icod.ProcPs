@@ -4,7 +4,9 @@ using Icod.CommandFramework.Host;
 using Icod.CommandFramework.Processes;
 using Icod.ProcPs.Shared;
 
+/// <summary>Provides reusable test fixtures and helpers.</summary>
 internal static class TestSupport {
+	/// <summary>Performs the process operation.</summary>
 	internal static ProcProcessSnapshot Process(
 		int pid,
 		string name,
@@ -40,20 +42,27 @@ internal static class TestSupport {
 		StartTimeTicks = Value( start ),
 		LifetimeStable = Value( true )
 	};
+	/// <summary>Performs the value operation.</summary>
 	internal static ProcObservedValue<T> Value<T>( T value ) => ProcObservedValue<T>.Available(
 		value,
 		ProcObservationSource.Configuration,
 		ObservationFidelity.Exact
 	);
+	/// <summary>Performs the text operation.</summary>
 	internal static string Text( MemoryStream stream ) => System.Text.Encoding.UTF8.GetString( stream.ToArray() );
 }
 
+/// <summary>Provides a test double for process provider.</summary>
 internal sealed class FakeProcessProvider : IProcProcessProvider {
 	private readonly IReadOnlyList<ProcProcessSnapshot> processes;
+	/// <summary>Initializes a new instance of the <see cref="FakeProcessProvider"/> type.</summary>
 	internal FakeProcessProvider( params ProcProcessSnapshot[] processes ) => this.processes = processes;
+	/// <summary>Gets the capabilities exposed by this provider.</summary>
 	public ProcProcessCapabilities Capabilities => ProcProcessCapabilities.Enumeration | ProcProcessCapabilities.Identity;
+	/// <summary>Gets processes asynchronously.</summary>
 	public Task<ProcProcessCollection> GetProcessesAsync( CancellationToken cancellationToken = default )
 		=> Task.FromResult( new ProcProcessCollection( this.processes ) );
+	/// <summary>Gets process asynchronously.</summary>
 	public Task<ProcObservedValue<ProcProcessSnapshot>> GetProcessAsync( int processId, CancellationToken cancellationToken = default ) {
 		var process = this.processes.FirstOrDefault( candidate => candidate.ProcessId == processId );
 		return Task.FromResult(
@@ -62,12 +71,15 @@ internal sealed class FakeProcessProvider : IProcProcessProvider {
 				: TestSupport.Value( process )
 		);
 	}
+	/// <summary>Gets memory maps asynchronously.</summary>
 	public Task<ProcObservedValue<IReadOnlyList<ProcMemoryMapEntry>>> GetMemoryMapsAsync( int processId, CancellationToken cancellationToken = default )
 		=> Task.FromResult( ProcObservedValue<IReadOnlyList<ProcMemoryMapEntry>>.Missing( ProcObservationAvailability.Unsupported ) );
 }
 
+/// <summary>Provides a test double for supplement provider.</summary>
 internal sealed class FakeSupplementProvider : IProcMatchSupplementProvider {
 	private readonly Dictionary<int, ProcMatchSupplement> supplements = [];
+	/// <summary>Performs the add operation.</summary>
 	internal FakeSupplementProvider Add( int pid, double ageSeconds = 120, params string[] environment ) {
 		this.supplements[ pid ] = new ProcMatchSupplement {
 			ThreadGroupId = pid,
@@ -76,6 +88,7 @@ internal sealed class FakeSupplementProvider : IProcMatchSupplementProvider {
 		};
 		return this;
 	}
+	/// <summary>Gets candidates asynchronously.</summary>
 	public Task<IReadOnlyList<ProcMatchCandidate>> GetCandidatesAsync(
 		IReadOnlyList<ProcProcessSnapshot> processes,
 		bool includeLightweightTasks,
@@ -95,18 +108,30 @@ internal sealed class FakeSupplementProvider : IProcMatchSupplementProvider {
 	}
 }
 
+/// <summary>Provides a test double for control.</summary>
 internal sealed class FakeControl : IProcMatchControl {
+	/// <summary>Performs the method operation.</summary>
 	internal List<(int Pid, int Signal, int? Queue)> Signals { get; } = [];
+	/// <summary>Gets waits.</summary>
 	internal List<int> Waits { get; } = [];
+	/// <summary>Gets signal failures.</summary>
 	internal HashSet<int> SignalFailures { get; } = [];
+	/// <summary>Gets vanished waits.</summary>
 	internal HashSet<int> VanishedWaits { get; } = [];
+	/// <summary>Gets releases.</summary>
 	internal List<int> Releases { get; } = [];
+	/// <summary>Gets vanished releases.</summary>
 	internal HashSet<int> VanishedReleases { get; } = [];
+	/// <summary>Gets release failures.</summary>
 	internal HashSet<int> ReleaseFailures { get; } = [];
+	/// <summary>Gets or sets cancel waits.</summary>
 	internal bool CancelWaits { get; set; }
+	/// <summary>Parses signal.</summary>
 	public ProcessOperationResult<ProcessSignal> ParseSignal( string text ) => ProcessSignalCatalog.Parse( text );
+	/// <summary>Observes disposition.</summary>
 	public ProcessOperationResult<ProcessSignalDisposition> ObserveDisposition( ProcProcessSnapshot process, ProcessSignal signal )
 		=> ProcessOperationResult<ProcessSignalDisposition>.Success( ProcessSignalDisposition.Caught );
+	/// <summary>Performs the signal async operation.</summary>
 	public Task<ProcessOperationResult> SignalAsync( ProcProcessSnapshot process, ProcessSignal signal, int? queuedValue = null, CancellationToken cancellationToken = default ) {
 		this.Signals.Add( ( process.ProcessId, signal.Number, queuedValue ) );
 		return Task.FromResult(
@@ -115,12 +140,14 @@ internal sealed class FakeControl : IProcMatchControl {
 				: ProcessOperationResult.Success()
 		);
 	}
+	/// <summary>Performs the wait async operation.</summary>
 	public Task<ProcessOperationResult<ProcessTermination>> WaitAsync( ProcProcessSnapshot process, CancellationToken cancellationToken = default ) {
 		this.Waits.Add( process.ProcessId );
 		if ( this.CancelWaits ) return Task.FromResult( ProcessOperationResult<ProcessTermination>.Failure( ProcessOperationStatus.Canceled, "canceled" ) );
 		if ( this.VanishedWaits.Contains( process.ProcessId ) ) return Task.FromResult( ProcessOperationResult<ProcessTermination>.Failure( ProcessOperationStatus.Vanished, "vanished" ) );
 		return Task.FromResult( ProcessOperationResult<ProcessTermination>.Success( ProcessTermination.Exited( 0 ) ) );
 	}
+	/// <summary>Performs the release operation.</summary>
 	public ProcessOperationResult Release( ProcProcessSnapshot process ) {
 		this.Releases.Add( process.ProcessId );
 		if ( this.VanishedReleases.Contains( process.ProcessId ) ) return ProcessOperationResult.Failure( ProcessOperationStatus.Vanished, "vanished" );
@@ -129,7 +156,10 @@ internal sealed class FakeControl : IProcMatchControl {
 	}
 }
 
+/// <summary>Provides a numeric test implementation of accounts.</summary>
 internal sealed class NumericAccounts : IProcAccountResolver {
+	/// <summary>Attempts to resolve user.</summary>
 	public bool TryResolveUser( string text, out uint id ) => uint.TryParse( text, out id );
+	/// <summary>Attempts to resolve group.</summary>
 	public bool TryResolveGroup( string text, out uint id ) => uint.TryParse( text, out id );
 }

@@ -3,7 +3,9 @@ namespace Icod.ProcPs.Pkill.Tests;
 using Xunit;
 using Icod.CommandFramework.Processes;
 
+/// <summary>Contains tests for command.</summary>
 public sealed class CommandTests {
+	/// <summary>Verifies that signal spelling and queue value reach shared control.</summary>
 	[Fact]
 	public async Task SignalSpellingAndQueueValueReachSharedControl() {
 		var control = new FakeControl();
@@ -22,6 +24,7 @@ public sealed class CommandTests {
 		Assert.Equal( "USR1", ProcessSignalCatalog.Translate( delivered.Signal ).Value!.Name );
 	}
 
+	/// <summary>Verifies that partial signal failure still succeeds when one target was signalled.</summary>
 	[Fact]
 	public async Task PartialSignalFailureStillSucceedsWhenOneTargetWasSignalled() {
 		var control = new FakeControl();
@@ -43,6 +46,7 @@ public sealed class CommandTests {
 		Assert.Contains( "202", TestSupport.Text( error ), StringComparison.Ordinal );
 	}
 
+	/// <summary>Verifies that count reports matched targets not successful signals.</summary>
 	[Fact]
 	public async Task CountReportsMatchedTargetsNotSuccessfulSignals() {
 		var control = new FakeControl();
@@ -65,6 +69,7 @@ public sealed class CommandTests {
 	}
 
 
+	/// <summary>Verifies that short mrelease requests release after successful signal.</summary>
 	[Fact]
 	public async Task ShortMreleaseRequestsReleaseAfterSuccessfulSignal() {
 		var control = new FakeControl();
@@ -80,6 +85,7 @@ public sealed class CommandTests {
 		Assert.Equal( new[] { 101 }, control.Releases );
 	}
 
+	/// <summary>Verifies that mrelease may be combined with queued signal.</summary>
 	[Fact]
 	public async Task MreleaseMayBeCombinedWithQueuedSignal() {
 		var control = new FakeControl();
@@ -97,6 +103,7 @@ public sealed class CommandTests {
 		Assert.Equal( new[] { 101 }, control.Releases );
 	}
 
+	/// <summary>Verifies that vanished mrelease does not downgrade successful kill.</summary>
 	[Fact]
 	public async Task VanishedMreleaseDoesNotDowngradeSuccessfulKill() {
 		var control = new FakeControl();
@@ -112,6 +119,7 @@ public sealed class CommandTests {
 		Assert.Equal( 0, status );
 	}
 
+	/// <summary>Verifies that no matches returns one and does not signal.</summary>
 	[Fact]
 	public async Task NoMatchesReturnsOneAndDoesNotSignal() {
 		var control = new FakeControl();

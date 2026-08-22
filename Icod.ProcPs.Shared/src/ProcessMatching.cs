@@ -7,23 +7,45 @@ using System.Text;
 using Icod.CommandFramework.Processes;
 using Icod.CommandFramework.RegularExpressions;
 
-public enum ProcMatchCommandMode { Pgrep, Pkill, PidWait }
+/// <summary>Identifies the pgrep, pkill, or pidwait command profile.</summary>
+public enum ProcMatchCommandMode {
+	/// <summary>Selects the pgrep matching-and-listing profile.</summary>
+	Pgrep,
+	/// <summary>Selects the pkill matching-and-signalling profile.</summary>
+	Pkill,
+	/// <summary>Selects the pidwait matching-and-waiting profile.</summary>
+	PidWait }
+/// <summary>Defines process signal, wait, and memory-release operations used by process-matching commands.</summary>
 public interface IProcMatchControl {
+	/// <summary>Parses a signal name or number.</summary>
 	ProcessOperationResult<ProcessSignal> ParseSignal( string text );
+	/// <summary>Observes the selected signal disposition for a process.</summary>
 	ProcessOperationResult<ProcessSignalDisposition> ObserveDisposition( ProcProcessSnapshot process, ProcessSignal signal );
+	/// <summary>Sends a signal to a process asynchronously.</summary>
 	Task<ProcessOperationResult> SignalAsync( ProcProcessSnapshot process, ProcessSignal signal, int? queuedValue = null, CancellationToken cancellationToken = default );
+	/// <summary>Waits asynchronously for a process to terminate.</summary>
 	Task<ProcessOperationResult<ProcessTermination>> WaitAsync( ProcProcessSnapshot process, CancellationToken cancellationToken = default );
+	/// <summary>Requests release of a terminated process's memory where supported.</summary>
 	ProcessOperationResult Release( ProcProcessSnapshot process );
 }
+/// <summary>Provides system process-control operations for the process-matching commands.</summary>
 public sealed class SystemProcMatchControl : IProcMatchControl {
 	private readonly ProcProcessControlAdapter adapter; private readonly IProcessSignalProvider signals;
+	/// <summary>Gets the shared system instance.</summary>
 	public static SystemProcMatchControl Instance { get; } = new();
+	/// <summary>Initializes a new instance of the <see cref="SystemProcMatchControl"/> type.</summary>
 	public SystemProcMatchControl() : this( ProcProcessControlAdapter.CreateSystem(), SystemProcessSignalProvider.Instance ) { }
+	/// <summary>Initializes a new instance of the <see cref="SystemProcMatchControl"/> type.</summary>
 	public SystemProcMatchControl( ProcProcessControlAdapter adapter, IProcessSignalProvider signals ) { ArgumentNullException.ThrowIfNull( adapter ); ArgumentNullException.ThrowIfNull( signals ); this.adapter = adapter; this.signals = signals; }
+	/// <summary>Parses a signal name or number.</summary>
 	public ProcessOperationResult<ProcessSignal> ParseSignal( string text ) => this.signals.ParseSignal( text );
+	/// <summary>Observes the selected signal disposition for a process.</summary>
 	public ProcessOperationResult<ProcessSignalDisposition> ObserveDisposition( ProcProcessSnapshot process, ProcessSignal signal ) { ArgumentNullException.ThrowIfNull( process ); ArgumentNullException.ThrowIfNull( signal ); return this.signals.ObserveDisposition( process.Identity, signal ); }
+	/// <summary>Sends a signal to a process asynchronously.</summary>
 	public Task<ProcessOperationResult> SignalAsync( ProcProcessSnapshot process, ProcessSignal signal, int? queuedValue = null, CancellationToken cancellationToken = default ) => this.adapter.SignalAsync( process, signal, queuedValue, cancellationToken );
+	/// <summary>Waits asynchronously for a process to terminate.</summary>
 	public Task<ProcessOperationResult<ProcessTermination>> WaitAsync( ProcProcessSnapshot process, CancellationToken cancellationToken = default ) => this.adapter.WaitAsync( process, cancellationToken );
+	/// <summary>Requests release of a terminated process's memory where supported.</summary>
 	public ProcessOperationResult Release( ProcProcessSnapshot process ) => LinuxProcessMemoryRelease.TryRelease( process.Identity.ProcessId );
 	private static class LinuxProcessMemoryRelease {
 		private const long SysPidFdOpen = 434, SysProcessMRelease = 448;
@@ -33,21 +55,42 @@ public sealed class SystemProcMatchControl : IProcMatchControl {
 		private static ProcessOperationResult FailureFromErrno( string operation ) { var error = Marshal.GetLastPInvokeError(); var status = error switch { 1 or 13 => ProcessOperationStatus.AccessDenied, 3 => ProcessOperationStatus.Vanished, 22 or 38 or 95 => ProcessOperationStatus.Unsupported, _ => ProcessOperationStatus.Failed }; return ProcessOperationResult.Failure( status, $"{operation} failed with errno {error}.", error ); }
 	}
 }
+/// <summary>Contains supplementary process attributes used by advanced matching criteria.</summary>
 public sealed class ProcMatchSupplement {
+	/// <summary>Gets the thread-group identifier associated with the candidate.</summary>
 	public int ThreadGroupId { get; init; }
+	/// <summary>Gets the observed process age.</summary>
 	public ProcObservedValue<TimeSpan> Elapsed { get; init; } = ProcObservedValue<TimeSpan>.Missing( ProcObservationAvailability.Unavailable );
+	/// <summary>Gets the observed process environment.</summary>
 	public ProcObservedValue<IReadOnlyList<string>> Environment { get; init; } = ProcObservedValue<IReadOnlyList<string>>.Missing( ProcObservationAvailability.Unavailable );
+	/// <summary>Gets parsed Linux /proc status fields.</summary>
 	public ProcObservedValue<IReadOnlyDictionary<string,string>> LinuxStatusFields { get; init; } = ProcObservedValue<IReadOnlyDictionary<string,string>>.Missing( ProcObservationAvailability.Unsupported );
+	/// <summary>Gets the observed process security label.</summary>
 	public ProcObservedValue<string> SecurityLabel { get; init; } = ProcObservedValue<string>.Missing( ProcObservationAvailability.Unsupported );
 }
+/// <summary>Pairs a process snapshot with supplementary matching observations.</summary>
 public sealed class ProcMatchCandidate {
+	/// <summary>Gets the process snapshot.</summary>
 	public ProcProcessSnapshot Process { get; }
+	/// <summary>Gets the supplementary matching observations.</summary>
 	public ProcMatchSupplement Supplement { get; }
+	/// <summary>Initializes a new instance of the <see cref="ProcMatchCandidate"/> type.</summary>
 	public ProcMatchCandidate( ProcProcessSnapshot process, ProcMatchSupplement supplement ) { ArgumentNullException.ThrowIfNull( process ); ArgumentNullException.ThrowIfNull( supplement ); this.Process = process; this.Supplement = supplement; }
 }
-public interface IProcMatchSupplementProvider { Task<IReadOnlyList<ProcMatchCandidate>> GetCandidatesAsync( IReadOnlyList<ProcProcessSnapshot> processes, bool includeLightweightTasks, CancellationToken cancellationToken = default ); }
+/// <summary>Defines supplementary process observations used by process-matching commands.</summary>
+public interface IProcMatchSupplementProvider {
+	/// <summary>Builds matching candidates and supplementary observations asynchronously.</summary>
+	Task<IReadOnlyList<ProcMatchCandidate>> GetCandidatesAsync( IReadOnlyList<ProcProcessSnapshot> processes, bool includeLightweightTasks, CancellationToken cancellationToken = default ); }
+/// <summary>Provides host supplementary process observations used by process-matching commands.</summary>
 public sealed class SystemProcMatchSupplementProvider : IProcMatchSupplementProvider {
-	private readonly string procRoot; public static SystemProcMatchSupplementProvider Instance { get; } = new(); public SystemProcMatchSupplementProvider() : this( "/proc" ) { } public SystemProcMatchSupplementProvider( string procRoot ) { ArgumentException.ThrowIfNullOrWhiteSpace( procRoot ); this.procRoot = procRoot; }
+	private readonly string procRoot;
+	/// <summary>Gets the shared system instance.</summary>
+	public static SystemProcMatchSupplementProvider Instance { get; } = new();
+	/// <summary>Initializes a new instance of the <see cref="SystemProcMatchSupplementProvider"/> type.</summary>
+	public SystemProcMatchSupplementProvider() : this( "/proc" ) { }
+	/// <summary>Initializes a new instance of the <see cref="SystemProcMatchSupplementProvider"/> type.</summary>
+	public SystemProcMatchSupplementProvider( string procRoot ) { ArgumentException.ThrowIfNullOrWhiteSpace( procRoot ); this.procRoot = procRoot; }
+	/// <summary>Builds matching candidates and supplementary observations asynchronously.</summary>
 	public async Task<IReadOnlyList<ProcMatchCandidate>> GetCandidatesAsync( IReadOnlyList<ProcProcessSnapshot> processes, bool includeLightweightTasks, CancellationToken cancellationToken = default ) {
 		ArgumentNullException.ThrowIfNull( processes ); if ( includeLightweightTasks && !OperatingSystem.IsLinux() ) throw new PlatformNotSupportedException( "Lightweight-thread selection is available only from Linux procfs." ); var candidates = new List<ProcMatchCandidate>();
 		foreach ( var process in processes ) { cancellationToken.ThrowIfCancellationRequested(); var supplement = await ObserveProcessAsync( process, cancellationToken ).ConfigureAwait( false ); candidates.Add( new ProcMatchCandidate( process, supplement ) ); if ( includeLightweightTasks ) foreach ( var task in await ReadLinuxTasksAsync( process, supplement, cancellationToken ).ConfigureAwait( false ) ) if ( task.Process.ProcessId != process.ProcessId ) candidates.Add( task ); }
@@ -76,20 +119,31 @@ public sealed class SystemProcMatchSupplementProvider : IProcMatchSupplementProv
 	private static ProcObservedValue<T> Exact<T>( T value ) => ProcObservedValue<T>.Available( value, ProcObservationSource.LinuxProcfs, Icod.CommandFramework.Host.ObservationFidelity.Exact );
 	private static ProcObservedValue<uint> OptionalExact( uint? value ) => value.HasValue ? Exact( value.Value ) : ProcObservedValue<uint>.Missing( ProcObservationAvailability.Unavailable );
 }
-public interface IProcAccountResolver { bool TryResolveUser( string text, out uint id ); bool TryResolveGroup( string text, out uint id ); }
+/// <summary>Defines user and group name-to-identifier resolution.</summary>
+public interface IProcAccountResolver {
+	/// <summary>Attempts to resolve a user name or numeric identifier.</summary>
+	bool TryResolveUser( string text, out uint id );
+	/// <summary>Attempts to resolve a group name or numeric identifier.</summary>
+	bool TryResolveGroup( string text, out uint id ); }
+/// <summary>Provides host user and group account resolution.</summary>
 public sealed class SystemProcAccountResolver : IProcAccountResolver {
+	/// <summary>Gets the shared system instance.</summary>
 	public static SystemProcAccountResolver Instance { get; } = new();
+	/// <summary>Attempts to resolve a user name or numeric identifier.</summary>
 	public bool TryResolveUser( string text, out uint id ) { if ( uint.TryParse( text, NumberStyles.None, CultureInfo.InvariantCulture, out id ) ) return true; if ( OperatingSystem.IsWindows() ) return false; if ( NativeUnixAccounts.TryResolveUser( text, out id ) ) return true; return TryResolveFile( text, "/etc/passwd", 2, out id ); }
+	/// <summary>Attempts to resolve a group name or numeric identifier.</summary>
 	public bool TryResolveGroup( string text, out uint id ) { if ( uint.TryParse( text, NumberStyles.None, CultureInfo.InvariantCulture, out id ) ) return true; if ( OperatingSystem.IsWindows() ) return false; if ( NativeUnixAccounts.TryResolveGroup( text, out id ) ) return true; return TryResolveFile( text, "/etc/group", 2, out id ); }
 	private static bool TryResolveFile( string text, string file, int numericField, out uint id ) { try { foreach ( var line in File.ReadLines( file ) ) { if ( line.Length == 0 || '#' == line[0] ) continue; var fields = line.Split( ':' ); if ( numericField >= fields.Length || !string.Equals( fields[0], text, StringComparison.Ordinal ) ) continue; return uint.TryParse( fields[numericField], NumberStyles.None, CultureInfo.InvariantCulture, out id ); } } catch ( IOException ) { } catch ( UnauthorizedAccessException ) { } id = 0; return false; }
 	private static class NativeUnixAccounts { [StructLayout( LayoutKind.Sequential )] private struct Passwd { public IntPtr Name; public IntPtr Password; public uint UserId; public uint GroupId; public IntPtr Gecos; public IntPtr Home; public IntPtr Shell; } [StructLayout( LayoutKind.Sequential )] private struct Group { public IntPtr Name; public IntPtr Password; public uint GroupId; public IntPtr Members; } [DllImport( "libc", EntryPoint = "getpwnam", CharSet = CharSet.Ansi )] private static extern IntPtr getpwnam( string name ); [DllImport( "libc", EntryPoint = "getgrnam", CharSet = CharSet.Ansi )] private static extern IntPtr getgrnam( string name ); public static bool TryResolveUser( string text, out uint id ) { try { var pointer = getpwnam( text ); if ( IntPtr.Zero != pointer ) { id = Marshal.PtrToStructure<Passwd>( pointer ).UserId; return true; } } catch ( Exception exception ) when ( exception is DllNotFoundException or EntryPointNotFoundException or MarshalDirectiveException ) { } id = 0; return false; } public static bool TryResolveGroup( string text, out uint id ) { try { var pointer = getgrnam( text ); if ( IntPtr.Zero != pointer ) { id = Marshal.PtrToStructure<Group>( pointer ).GroupId; return true; } } catch ( Exception exception ) when ( exception is DllNotFoundException or EntryPointNotFoundException or MarshalDirectiveException ) { } id = 0; return false; } }
 }
 
+/// <summary>Implements the shared pgrep, pkill, and pidwait matching engine.</summary>
 public static class ProcMatchCommand {
 	private const int Success = 0, NoMatch = 1, SyntaxError = 2, FatalError = 3;
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
 	private static readonly string[] DefaultNamespaces = [ "ipc", "mnt", "net", "pid", "user", "uts" ];
 	private static readonly HashSet<string> SupportedNamespaces = new( DefaultNamespaces, StringComparer.Ordinal );
+	/// <summary>Runs the command asynchronously.</summary>
 	public static async Task<int> RunAsync( ProcMatchCommandMode mode, string[] args, Stream? stdin = null, Stream? stdout = null, Stream? stderr = null, IProcProcessProvider? processProvider = null, IProcMatchControl? control = null, IProcMatchSupplementProvider? supplements = null, IProcAccountResolver? accountResolver = null, Func<int>? currentProcessIdProvider = null, CancellationToken cancellationToken = default ) {
 		ArgumentNullException.ThrowIfNull( args ); var matchControl = control ?? SystemProcMatchControl.Instance; var parsed = Parse( mode, args, matchControl, accountResolver ?? SystemProcAccountResolver.Instance );
 		if ( null != parsed.Error ) { if ( 0 < parsed.Error.Length ) await WriteLineAsync( stderr, $"{ProgramName( mode )}: {parsed.Error}", cancellationToken ).ConfigureAwait( false ); if ( parsed.ShowUsageOnError ) await WriteAsync( stderr, NormalizeLineEndings( Usage( mode ) ), cancellationToken ).ConfigureAwait( false ); return parsed.ErrorStatus; }

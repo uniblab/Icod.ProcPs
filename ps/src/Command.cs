@@ -19,15 +19,19 @@ public interface IProcPsAccountResolver : IProcAccountResolver {
 public sealed class SystemProcPsAccountResolver : IProcPsAccountResolver {
 	/// <summary>Gets the singleton system resolver.</summary>
 	public static SystemProcPsAccountResolver Instance { get; } = new();
+	/// <summary>Resolves a user name or numeric identifier to its user identifier.</summary>
 	public bool TryResolveUser( string text, out uint id ) {
 		ArgumentNullException.ThrowIfNull( text );
 		return SystemProcAccountResolver.Instance.TryResolveUser( text, out id );
 	}
+	/// <summary>Resolves a group name or numeric identifier to its group identifier.</summary>
 	public bool TryResolveGroup( string text, out uint id ) {
 		ArgumentNullException.ThrowIfNull( text );
 		return SystemProcAccountResolver.Instance.TryResolveGroup( text, out id );
 	}
+	/// <summary>Resolves a user identifier to a display name.</summary>
 	public bool TryGetUserName( uint id, out string name ) => TryResolveUnixName( "/etc/passwd", id, out name );
+	/// <summary>Resolves a group identifier to a display name.</summary>
 	public bool TryGetGroupName( uint id, out string name ) => TryResolveUnixName( "/etc/group", id, out name );
 	private static bool TryResolveUnixName( string path, uint id, out string name ) {
 		if ( OperatingSystem.IsWindows() ) {
@@ -52,6 +56,7 @@ public sealed class SystemProcPsAccountResolver : IProcPsAccountResolver {
 	}
 }
 
+/// <summary>Implements the procps-ng 4.0.6 <c>ps</c> command.</summary>
 public static class Command {
 	private const int Success = 0; private const int Failure = 1; private const int Cancelled = 130; private const int DefaultWidth = 80;
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
@@ -107,6 +112,7 @@ Output:
  --help                    display this help and exit
  --version                 output version information and exit
 """;
+	/// <summary>Runs <c>ps</c> synchronously.</summary>
 	public static int Run( string[] args, TextWriter? stdout = null, TextWriter? stderr = null ) {
 		ArgumentNullException.ThrowIfNull( args );
 		using var output = new MemoryStream();
@@ -116,6 +122,7 @@ Output:
 		( stderr ?? Console.Error ).Write( Utf8.GetString( error.ToArray() ) );
 		return status;
 	}
+	/// <summary>Runs <c>ps</c> asynchronously with injectable ProcPs providers.</summary>
 	public static async Task<int> RunAsync( string[] args, Stream? stdout = null, Stream? stderr = null, IProcProcessProvider? processProvider = null, IProcSystemMetricsProvider? metricsProvider = null, IProcMatchSupplementProvider? supplementProvider = null, IProcPsAccountResolver? accountResolver = null, Func<int>? currentProcessIdProvider = null, IReadOnlyDictionary<string, string?>? environment = null, Func<DateTimeOffset>? nowProvider = null, CancellationToken cancellationToken = default ) {
 		ArgumentNullException.ThrowIfNull( args );
 		var hostEnvironment = environment ?? ReadPersonalityEnvironment();

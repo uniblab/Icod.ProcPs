@@ -3,7 +3,9 @@ namespace Icod.ProcPs.PidOf.Tests;
 using Icod.ProcPs.Shared;
 using Xunit;
 
+/// <summary>Contains tests for command.</summary>
 public sealed class CommandTests {
+	/// <summary>Verifies that matches executable identity and prints descending pids.</summary>
 	[Fact]
 	public async Task MatchesExecutableIdentityAndPrintsDescendingPids() {
 		var first = TestSupport.Process( 101, "worker", arguments: [ "worker" ] );
@@ -19,6 +21,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"202 101{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that executable identity still works when platform cannot observe command line.</summary>
 	[Fact]
 	public async Task ExecutableIdentityStillWorksWhenPlatformCannotObserveCommandLine() {
 		var process = TestSupport.Process( 101, "worker", commandLineAvailable: false );
@@ -33,6 +36,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"101{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that single shot and custom separator follow pidof profile.</summary>
 	[Fact]
 	public async Task SingleShotAndCustomSeparatorFollowPidofProfile() {
 		using var output = new MemoryStream();
@@ -46,6 +50,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"202{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that scripts too matches interpreter script argument.</summary>
 	[Fact]
 	public async Task ScriptsTooMatchesInterpreterScriptArgument() {
 		var script = TestSupport.Process( 101, "job.py", arguments: [ "/usr/bin/python3", "/srv/job.py" ] );
@@ -60,6 +65,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"101{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that omit pid and parent macro exclude matches.</summary>
 	[Fact]
 	public async Task OmitPidAndParentMacroExcludeMatches() {
 		using var output = new MemoryStream();
@@ -74,6 +80,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"303{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that check root filters only when privileged.</summary>
 	[Fact]
 	public async Task CheckRootFiltersOnlyWhenPrivileged() {
 		var current = TestSupport.Process( Environment.ProcessId, "pidof" );
@@ -91,6 +98,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"101{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that lightweight mode uses supplemented tasks.</summary>
 	[Fact]
 	public async Task LightweightModeUsesSupplementedTasks() {
 		var process = TestSupport.Process( 101, "leader" );
@@ -107,6 +115,7 @@ public sealed class CommandTests {
 		Assert.Equal( $"102{Environment.NewLine}", TestSupport.Text( output ) );
 	}
 
+	/// <summary>Verifies that reused process is not reported from stale snapshot.</summary>
 	[Fact]
 	public async Task ReusedProcessIsNotReportedFromStaleSnapshot() {
 		using var output = new MemoryStream();
@@ -120,6 +129,7 @@ public sealed class CommandTests {
 		Assert.Empty( output.ToArray() );
 	}
 
+	/// <summary>Verifies that quiet match writes nothing and no match is failure.</summary>
 	[Fact]
 	public async Task QuietMatchWritesNothingAndNoMatchIsFailure() {
 		using var output = new MemoryStream();
@@ -141,6 +151,7 @@ public sealed class CommandTests {
 		Assert.Equal( 1, status );
 	}
 
+	/// <summary>Verifies that help uses host newlines without cr lf doubling.</summary>
 	[Fact]
 	public async Task HelpUsesHostNewlinesWithoutCrLfDoubling() {
 		using var output = new MemoryStream();

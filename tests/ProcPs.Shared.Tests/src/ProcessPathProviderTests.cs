@@ -3,7 +3,9 @@ namespace Icod.ProcPs.Shared.Tests;
 using Icod.ProcPs.Shared;
 using Xunit;
 
+/// <summary>Contains tests for process path provider.</summary>
 public sealed class ProcessPathProviderTests {
+	/// <summary>Verifies that system provider observes current executable without weakening identity.</summary>
 	[Fact]
 	public async Task SystemProviderObservesCurrentExecutableWithoutWeakeningIdentity() {
 		var process = await SystemProcProcessProvider.Instance.GetProcessAsync( Environment.ProcessId );
@@ -14,6 +16,7 @@ public sealed class ProcessPathProviderTests {
 		Assert.False( string.IsNullOrWhiteSpace( observed.Value.ExecutablePath.Value ) );
 	}
 
+	/// <summary>Verifies that current working directory capability matches supported platform policy.</summary>
 	[Fact]
 	public async Task CurrentWorkingDirectoryCapabilityMatchesSupportedPlatformPolicy() {
 		var process = await SystemProcProcessProvider.Instance.GetProcessAsync( Environment.ProcessId );
