@@ -28,6 +28,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.W", "w\Icod.Pro
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Sysctl", "sysctl\Icod.ProcPs.Sysctl.csproj", "{BC5F085C-0739-5A60-AF5E-203772F38FF8}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Router", "procps\Icod.ProcPs.Router.csproj", "{AA7A35FE-111C-498E-8E87-7801E1AB09FD}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Shared.Tests", "tests\ProcPs.Shared.Tests\Icod.ProcPs.Shared.Tests.csproj", "{87390BF1-93C3-58EE-9128-D698E2273A14}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Pgrep.Tests", "tests\ProcPs.Pgrep.Tests\Icod.ProcPs.Pgrep.Tests.csproj", "{CC72FCAB-4FE5-569E-B0FA-3B2AD6843807}"
@@ -141,6 +143,12 @@ Global
 		{BC5F085C-0739-5A60-AF5E-203772F38FF8}.Release|Any CPU.Build.0 = Release|Any CPU
 		{BC5F085C-0739-5A60-AF5E-203772F38FF8}.Staging|Any CPU.ActiveCfg = Staging|Any CPU
 		{BC5F085C-0739-5A60-AF5E-203772F38FF8}.Staging|Any CPU.Build.0 = Staging|Any CPU
+		{AA7A35FE-111C-498E-8E87-7801E1AB09FD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA7A35FE-111C-498E-8E87-7801E1AB09FD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA7A35FE-111C-498E-8E87-7801E1AB09FD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA7A35FE-111C-498E-8E87-7801E1AB09FD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA7A35FE-111C-498E-8E87-7801E1AB09FD}.Staging|Any CPU.ActiveCfg = Staging|Any CPU
+		{AA7A35FE-111C-498E-8E87-7801E1AB09FD}.Staging|Any CPU.Build.0 = Staging|Any CPU
 		{87390BF1-93C3-58EE-9128-D698E2273A14}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{87390BF1-93C3-58EE-9128-D698E2273A14}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{87390BF1-93C3-58EE-9128-D698E2273A14}.Release|Any CPU.ActiveCfg = Release|Any CPU
