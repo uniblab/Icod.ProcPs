@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<LangVersion>13.0</LangVersion>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<GenerateDocumentationFile>true</GenerateDocumentationFile>
+		<OutputPath>..\bin\$(Configuration)\</OutputPath>
+		<AssemblyName>procps</AssemblyName>
+		<RootNamespace>Icod.ProcPs.Router</RootNamespace>
+		<Version>0.9.0-Alpha-1</Version>
+		<AssemblyVersion>0.9.0.0</AssemblyVersion>
+	</PropertyGroup>
+	<PropertyGroup>
+		<PackageVersion>0.9.0-Alpha-1</PackageVersion>
+		<PackAsTool>true</PackAsTool>
+		<ToolCommandName>procps</ToolCommandName>
+		<PackageId>Icod.ProcPs</PackageId>
+		<Authors>Timothy J. Bruce</Authors>
+		<Description>Managed procps-ng 4.0.6 command router for the Icod.ProcPs suite.</Description>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageProjectUrl>https://github.com/uniblab/Icod.ProcPs</PackageProjectUrl>
+		<RepositoryType>git</RepositoryType>
+		<RepositoryUrl>https://github.com/uniblab/Icod.ProcPs</RepositoryUrl>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+		<PackageReleaseNotes>Initial Icod.ProcPs multi-command tool distribution.</PackageReleaseNotes>
+		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;sysctl;process;linux;cli;tool;icod;system-monitoring;dotnet</PackageTags>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(PlatformTarget)' == '' ">
+		<PlatformTarget>AnyCPU</PlatformTarget>
+	</PropertyGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\free\Icod.ProcPs.Free.csproj" />
+		<ProjectReference Include="..\pgrep\Icod.ProcPs.Pgrep.csproj" />
+		<ProjectReference Include="..\pidof\Icod.ProcPs.PidOf.csproj" />
+		<ProjectReference Include="..\pidwait\Icod.ProcPs.PidWait.csproj" />
+		<ProjectReference Include="..\pkill\Icod.ProcPs.Pkill.csproj" />
+		<ProjectReference Include="..\pmap\Icod.ProcPs.Pmap.csproj" />
+		<ProjectReference Include="..\ps\Icod.ProcPs.Ps.csproj" />
+		<ProjectReference Include="..\pwdx\Icod.ProcPs.Pwdx.csproj" />
+		<ProjectReference Include="..\sysctl\Icod.ProcPs.Sysctl.csproj" />
+		<ProjectReference Include="..\uptime\Icod.ProcPs.Uptime.csproj" />
+		<ProjectReference Include="..\vmstat\Icod.ProcPs.Vmstat.csproj" />
+		<ProjectReference Include="..\w\Icod.ProcPs.W.csproj" />
+	</ItemGroup>
+	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+		<ErrorReport>prompt</ErrorReport>
+		<WarningLevel>2</WarningLevel>
+		<DebugSymbols>true</DebugSymbols>
+		<DebugType>full</DebugType>
+		<Optimize>false</Optimize>
+		<DefineConstants>DEBUG;TRACE</DefineConstants>
+		<SignAssembly>false</SignAssembly>
+		<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)' == 'Staging' ">
+		<ErrorReport>prompt</ErrorReport>
+		<WarningLevel>3</WarningLevel>
+		<DebugSymbols>true</DebugSymbols>
+		<DebugType>full</DebugType>
+		<Optimize>false</Optimize>
+		<DefineConstants>TRACE</DefineConstants>
+		<SignAssembly>false</SignAssembly>
+		<TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+	</PropertyGroup>
+	<PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+		<ErrorReport>prompt</ErrorReport>
+		<WarningLevel>4</WarningLevel>
+		<DebugType>pdbonly</DebugType>
+		<Optimize>true</Optimize>
+		<SignAssembly>false</SignAssembly>
+		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+		<WarningsNotAsErrors>CS1591</WarningsNotAsErrors>
+	</PropertyGroup>
+	<ItemGroup>
+		<Content Include="README.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>$(AssemblyName).README.md</TargetPath>
+			<Pack>true</Pack>
+			<PackagePath>\</PackagePath>
+		</Content>
+		<Content Include="..\LICENSE">
+			<Link>LICENSE</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>$(AssemblyName).LICENSE.txt</TargetPath>
+			<Pack>true</Pack>
+			<PackagePath>\</PackagePath>
+		</Content>
+	</ItemGroup>
+</Project>

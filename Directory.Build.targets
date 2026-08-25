@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup Condition="'$(OutputType)' == 'Exe' and '$(PackAsTool)' != 'true'">
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>
