@@ -1,6 +1,7 @@
 namespace Icod.ProcPs.Shared.Tests;
 
 using Icod.ProcPs.Shared;
+using Icod.Timing;
 using Xunit;
 
 /// <summary>Contains tests for sampling and metrics.</summary>
@@ -9,6 +10,17 @@ public sealed class SamplingAndMetricsTests {
 	[Fact]
 	public void CounterDeltaHandlesWraparound() {
 		Assert.Equal( 11UL, ProcCounterMath.Delta( 250, 5, 8 ) );
+	}
+
+	/// <summary>Verifies that the sampler accepts the standalone timing package contracts.</summary>
+	[Fact]
+	public void SamplerAcceptsStandaloneTimingContracts() {
+		var sampler = new ProcSampler(
+			SystemMonotonicClock.Instance,
+			MonotonicPeriodicScheduler.Instance
+		);
+
+		Assert.NotNull( sampler );
 	}
 
 	/// <summary>Verifies that cpu busy percent excludes idle delta.</summary>
