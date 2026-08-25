@@ -1,7 +1,7 @@
 namespace Icod.ProcPs.Shared;
 
 using System.Runtime.CompilerServices;
-using Icod.CommandFramework.Time;
+using Icod.Timing;
 
 /// <summary>Provides counter-delta calculations with explicit unsigned wraparound semantics.</summary>
 public static class ProcCounterMath {
@@ -57,11 +57,11 @@ public sealed class ProcSamplingWindow<T> {
 	}
 }
 
-/// <summary>Samples ProcPs providers over the shared monotonic clock and fixed-rate scheduler.</summary>
+/// <summary>Samples ProcPs providers over standalone monotonic clock and fixed-rate scheduler contracts.</summary>
 public sealed class ProcSampler {
 	private readonly IMonotonicClock _clock;
 	private readonly IPeriodicScheduler _scheduler;
-	/// <summary>Initializes a sampler over injectable cross-suite time contracts.</summary>
+	/// <summary>Initializes a sampler over injectable timing contracts.</summary>
 	public ProcSampler( IMonotonicClock clock, IPeriodicScheduler scheduler ) {
 		ArgumentNullException.ThrowIfNull( clock );
 		ArgumentNullException.ThrowIfNull( scheduler );
@@ -83,7 +83,7 @@ public sealed class ProcSampler {
 		}
 		throw new ArgumentOutOfRangeException( nameof( interval ) );
 	}
-	/// <summary>Refreshes a provider at a fixed monotonic cadence.</summary>
+	/// <summary>Refreshes a provider at a fixed monotonic cadence while skipping overdue refresh positions.</summary>
 	public async IAsyncEnumerable<ProcTimedSample<T>> RefreshAsync<T>(
 		Func<CancellationToken, Task<T>> capture,
 		TimeSpan interval,
@@ -91,7 +91,12 @@ public sealed class ProcSampler {
 		[EnumeratorCancellation] CancellationToken cancellationToken = default
 	) {
 		ArgumentNullException.ThrowIfNull( capture );
-		await foreach ( var tick in this._scheduler.ScheduleAsync( interval, fireImmediately, cancellationToken ).ConfigureAwait( false ) ) {
+		await foreach ( var tick in this._scheduler.ScheduleAsync(
+			interval,
+			fireImmediately,
+			cancellationToken,
+			missedTickPolicy: PeriodicMissedTickPolicy.SkipMissed
+		).ConfigureAwait( false ) ) {
 			var value = await capture( cancellationToken ).ConfigureAwait( false );
 			yield return new ProcTimedSample<T>( this._clock.GetTimestamp(), value, tick );
 		}

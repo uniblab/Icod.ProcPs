@@ -7,13 +7,14 @@ observation providers, conservative fallback observations for other platforms,
 process selection, the shared pgrep/pkill/pidwait matching grammar, system metrics, vmstat-specific cumulative counters and disk observations, sampling calculations, personalities,
 sorting, and reusable screen-state models.
 
-Cross-suite mechanics are provided by the published `Icod.CommandFramework`
-package: process identities and reuse tokens, process/process-group/session
-targets, launching, arbitrary waiting, signal delivery (including queued
-values), priority changes, monotonic clocks, periodic scheduling, status
-translation, processor-resource facts, and terminal primitives. ProcPs code
-consumes those neutral contracts rather than creating a parallel process-control
-layer.
+Cross-suite process and host mechanics are provided by the published
+`Icod.CommandFramework` package: process identities and reuse tokens,
+process/process-group/session targets, launching, arbitrary waiting, signal
+delivery (including queued values), priority changes, status translation,
+processor-resource facts, and terminal primitives. Monotonic elapsed-time and
+periodic scheduling primitives are provided by the standalone `Icod.Timing`
+package. ProcPs code consumes those neutral contracts rather than creating
+parallel process-control or timing layers.
 
 Linux `/proc` is the authoritative procps-ng data source. The neutral models do
 not require non-Linux systems to pretend that Linux-only counters exist:
