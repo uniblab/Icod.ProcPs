@@ -11,6 +11,7 @@ using PsCommand = Icod.ProcPs.Ps.Command;
 using PwdxCommand = Icod.ProcPs.Pwdx.Command;
 using SlabTopCommand = Icod.ProcPs.SlabTop.Command;
 using SysctlCommand = Icod.ProcPs.Sysctl.Command;
+using TopCommand = Icod.ProcPs.Top.Command;
 using UptimeCommand = Icod.ProcPs.Uptime.Command;
 using VmstatCommand = Icod.ProcPs.Vmstat.Command;
 using WCommand = Icod.ProcPs.W.Command;
@@ -35,6 +36,7 @@ Commands:
  pwdx      report process working directories
  slabtop   display Linux slab-cache information in real time
  sysctl    read or write Linux runtime kernel parameters
+ top       display dynamic process and system activity
  uptime    report system uptime, user count, and load averages
  vmstat    report virtual-memory and system activity
  w         show logged-in users and what they are doing
@@ -90,6 +92,7 @@ Run 'procps COMMAND --help' for command-specific help.
 			"pwdx" => await PwdxCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"slabtop" => await SlabTopCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"sysctl" => await SysctlCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
+			"top" => await TopCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"uptime" => await UptimeCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"vmstat" => await VmstatCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"w" => await WCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
@@ -131,6 +134,7 @@ Run 'procps COMMAND --help' for command-specific help.
 			"pwdx" or
 			"slabtop" or
 			"sysctl" or
+			"top" or
 			"uptime" or
 			"vmstat" or
 			"w" or

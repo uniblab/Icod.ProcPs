@@ -152,6 +152,7 @@ $projects = [ordered]@{
     'pwdx' = 'pwdx/Icod.ProcPs.Pwdx.csproj'
     'slabtop' = 'slabtop/Icod.ProcPs.SlabTop.csproj'
     'sysctl' = 'sysctl/Icod.ProcPs.Sysctl.csproj'
+    'top' = 'top/Icod.ProcPs.Top.csproj'
     'uptime' = 'uptime/Icod.ProcPs.Uptime.csproj'
     'vmstat' = 'vmstat/Icod.ProcPs.Vmstat.csproj'
     'w' = 'w/Icod.ProcPs.W.csproj'

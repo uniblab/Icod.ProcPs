@@ -2,35 +2,42 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<LangVersion>13.0</LangVersion>
-		<OutputType>Library</OutputType>
+		<OutputType>Exe</OutputType>
 		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
 		<OutputPath>..\bin\$(Configuration)\</OutputPath>
-		<AssemblyName>Icod.ProcPs.Shared</AssemblyName>
-		<RootNamespace>Icod.ProcPs.Shared</RootNamespace>
-		<Version>1.0.0-Alpha-5</Version>
+		<AssemblyName>top</AssemblyName>
+		<RootNamespace>Icod.ProcPs.Top</RootNamespace>
 	</PropertyGroup>
-	<PropertyGroup>
-		<PackageVersion>1.0.0-Alpha-5</PackageVersion>
-		<PackageReleaseNotes>Add reusable account display resolution for the top presentation engine.</PackageReleaseNotes>
-		<Authors>Timothy J. Bruce</Authors>
-		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
-		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<IncludeContentInPack>true</IncludeContentInPack>
-		<IncludeSymbols>True</IncludeSymbols>
-		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
-	</PropertyGroup>
-	<ItemGroup>
-		<PackageReference Include="Icod.CommandFramework" Version="1.2.1" />
-		<PackageReference Include="Icod.Processes" Version="1.0.0" />
-		<PackageReference Include="Icod.Timing" Version="1.0.0" />
-	</ItemGroup>
 	<PropertyGroup Condition=" '$(PlatformTarget)' == '' ">
 		<PlatformTarget>AnyCPU</PlatformTarget>
 	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Icod.DCurses" Version="0.1.0-Alpha-14" />
+		<PackageReference Include="Icod.Host" Version="1.0.0" />
+		<PackageReference Include="Icod.Processes" Version="1.0.0" />
+		<PackageReference Include="Icod.Timing" Version="1.0.0" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\Icod.ProcPs.Shared\Icod.ProcPs.Shared.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+		<Content Include="README.md">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>$(AssemblyName).README.md</TargetPath>
+			<Pack>true</Pack>
+			<PackagePath>\</PackagePath>
+		</Content>
+		<Content Include="..\LICENSE">
+			<Link>LICENSE</Link>
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+			<TargetPath>$(AssemblyName).LICENSE.txt</TargetPath>
+			<Pack>true</Pack>
+			<PackagePath>\</PackagePath>
+		</Content>
+	</ItemGroup>
 	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
 		<ErrorReport>prompt</ErrorReport>
 		<WarningLevel>2</WarningLevel>
@@ -60,19 +67,4 @@
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 		<WarningsNotAsErrors>CS1591</WarningsNotAsErrors>
 	</PropertyGroup>
-	<ItemGroup>
-		<Content Include="README.md">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<TargetPath>$(AssemblyName).README.md</TargetPath>
-			<Pack>true</Pack>
-			<PackagePath>\</PackagePath>
-		</Content>
-
-		<Content Include="LICENSE">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<TargetPath>$(AssemblyName).LICENSE.txt</TargetPath>
-			<Pack>true</Pack>
-			<PackagePath>\</PackagePath>
-		</Content>
-	</ItemGroup>
 </Project>

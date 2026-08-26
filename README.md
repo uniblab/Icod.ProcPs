@@ -5,7 +5,7 @@ procps-ng 4.0.6.
 
 The repository provides familiar process- and system-observation commands such
 as `ps`, `pgrep`, `pkill`, `free`, `uptime`, `vmstat`, `w`, `watch`, `slabtop`,
-and `sysctl`, while factoring common ProcPs behavior into the reusable
+`top`, and `sysctl`, while factoring common ProcPs behavior into the reusable
 `Icod.ProcPs.Shared` library.
 
 The implementation targets .NET 10 and C# 13 and is designed for Windows,
@@ -27,6 +27,7 @@ reported as unavailable rather than synthesized from unrelated metrics.
 | [`pmap`](pmap/README.md) | Report process memory maps and Linux `smaps` detail. |
 | [`ps`](ps/README.md) | Report a snapshot of current processes, including ProcPs-style selection, formatting, sorting, personalities, and thread views. |
 | [`slabtop`](slabtop/README.md) | Display Linux slab-cache information in real time or as a one-shot report. |
+| [`top`](top/README.md) | Display dynamic process and system activity in batch or interactive mode. |
 | [`uptime`](uptime/README.md) | Report system uptime, user count, and load averages. |
 | [`vmstat`](vmstat/README.md) | Report virtual-memory, CPU, process, paging, disk, and system activity. |
 | [`w`](w/README.md) | Show logged-in users and what their sessions are doing. |

@@ -34,6 +34,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Watch", "watch\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.SlabTop", "slabtop\Icod.ProcPs.SlabTop.csproj", "{A52B0B6A-4E0F-4C8C-9C77-58C33DB2C1D4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Top", "top\Icod.ProcPs.Top.csproj", "{7B1205F9-F5AA-4F79-A4A7-6C486E504F04}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Shared.Tests", "tests\ProcPs.Shared.Tests\Icod.ProcPs.Shared.Tests.csproj", "{87390BF1-93C3-58EE-9128-D698E2273A14}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Pgrep.Tests", "tests\ProcPs.Pgrep.Tests\Icod.ProcPs.Pgrep.Tests.csproj", "{CC72FCAB-4FE5-569E-B0FA-3B2AD6843807}"
@@ -247,6 +249,12 @@ Global
 		{A52B0B6A-4E0F-4C8C-9C77-58C33DB2C1D4}.Release|Any CPU.Build.0 = Release|Any CPU
 		{A52B0B6A-4E0F-4C8C-9C77-58C33DB2C1D4}.Staging|Any CPU.ActiveCfg = Staging|Any CPU
 		{A52B0B6A-4E0F-4C8C-9C77-58C33DB2C1D4}.Staging|Any CPU.Build.0 = Staging|Any CPU
+		{7B1205F9-F5AA-4F79-A4A7-6C486E504F04}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7B1205F9-F5AA-4F79-A4A7-6C486E504F04}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7B1205F9-F5AA-4F79-A4A7-6C486E504F04}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7B1205F9-F5AA-4F79-A4A7-6C486E504F04}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7B1205F9-F5AA-4F79-A4A7-6C486E504F04}.Staging|Any CPU.ActiveCfg = Staging|Any CPU
+		{7B1205F9-F5AA-4F79-A4A7-6C486E504F04}.Staging|Any CPU.Build.0 = Staging|Any CPU
 		{18884980-D17F-4801-9F4F-C9DA2FA297FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{18884980-D17F-4801-9F4F-C9DA2FA297FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{18884980-D17F-4801-9F4F-C9DA2FA297FF}.Release|Any CPU.ActiveCfg = Release|Any CPU

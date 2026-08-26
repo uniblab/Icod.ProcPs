@@ -10,11 +10,11 @@
 		<OutputPath>..\bin\$(Configuration)\</OutputPath>
 		<AssemblyName>procps</AssemblyName>
 		<RootNamespace>Icod.ProcPs.Router</RootNamespace>
-		<Version>0.9.0-Alpha-4</Version>
+		<Version>0.9.0-Alpha-5</Version>
 		<AssemblyVersion>0.9.0.0</AssemblyVersion>
 	</PropertyGroup>
 	<PropertyGroup>
-		<PackageVersion>0.9.0-Alpha-4</PackageVersion>
+		<PackageVersion>0.9.0-Alpha-5</PackageVersion>
 		<PackAsTool>true</PackAsTool>
 		<ToolCommandName>procps</ToolCommandName>
 		<PackageId>Icod.ProcPs</PackageId>
@@ -27,8 +27,8 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>Add the DCurses-backed slabtop command and exact Linux slab-cache observation provider.</PackageReleaseNotes>
-		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;watch;slabtop;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
+		<PackageReleaseNotes>Add the DCurses-backed top dynamic process monitor.</PackageReleaseNotes>
+		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;watch;slabtop;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<icon>icon.png</icon>
 	</PropertyGroup>
 	<PropertyGroup Condition=" '$(PlatformTarget)' == '' ">
@@ -45,6 +45,7 @@
 		<ProjectReference Include="..\pwdx\Icod.ProcPs.Pwdx.csproj" />
 		<ProjectReference Include="..\slabtop\Icod.ProcPs.SlabTop.csproj" />
 		<ProjectReference Include="..\sysctl\Icod.ProcPs.Sysctl.csproj" />
+		<ProjectReference Include="..\top\Icod.ProcPs.Top.csproj" />
 		<ProjectReference Include="..\uptime\Icod.ProcPs.Uptime.csproj" />
 		<ProjectReference Include="..\vmstat\Icod.ProcPs.Vmstat.csproj" />
 		<ProjectReference Include="..\w\Icod.ProcPs.W.csproj" />
