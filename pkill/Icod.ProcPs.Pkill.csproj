@@ -36,7 +36,7 @@
 		<PlatformTarget>AnyCPU</PlatformTarget>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Icod.CommandFramework" Version="1.2.1" />
+		<PackageReference Include="Icod.CommandFramework" Version="2.0.0" />
 		<ProjectReference Include="..\Icod.ProcPs.Shared\Icod.ProcPs.Shared.csproj" />
 		<Compile Include="..\build\GnuProcMatchPatternCompiler.cs" Link="GnuProcMatchPatternCompiler.cs" />
 	</ItemGroup>
