@@ -277,6 +277,191 @@ public sealed class SlabTopCommandTests {
 		Assert.Equal( 0, terminal.OpenCount );
 	}
 
+	[Fact]
+	public async Task OnceModeDoesNotOpenInteractiveTerminal() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new SlabTopTerminalDimensions( 80, 25 )
+		);
+		FakeSlabProvider provider = new( AvailableSlabs() );
+
+		CommandResult result = await RunCoreAsync(
+			[ "--once" ],
+			terminal,
+			clock,
+			provider
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, provider.CaptureCount );
+		Assert.Equal( 0, terminal.OpenCount );
+		Assert.False( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task InitialUnusableGeometryFailsBeforeSamplingAndDisposes() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new SlabTopTerminalDimensions( 39, 9 )
+		);
+		FakeSlabProvider provider = new( AvailableSlabs() );
+
+		CommandResult result = await RunInteractiveAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			provider
+		);
+
+		Assert.Equal( 1, result.ExitCode );
+		Assert.Contains( "too small", result.Stderr, StringComparison.Ordinal );
+		Assert.Equal( 1, terminal.OpenCount );
+		Assert.Equal( 0, provider.CaptureCount );
+		Assert.Empty( terminal.Frames );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task ResizeToUnusableGeometryFailsWithoutResamplingAndDisposes() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new SlabTopTerminalDimensions( 80, 12 )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent(
+				SlabTopTerminalEventKind.Resize,
+				new SlabTopTerminalDimensions( 39, 8 )
+			)
+		);
+		FakeSlabProvider provider = new( AvailableSlabs() );
+
+		CommandResult result = await RunInteractiveAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			provider
+		);
+
+		Assert.Equal( 1, result.ExitCode );
+		Assert.Contains( "too small", result.Stderr, StringComparison.Ordinal );
+		Assert.Equal( 1, provider.CaptureCount );
+		Assert.Single( terminal.Frames );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task InteractiveProviderFailureIsControlledAndDisposes() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new SlabTopTerminalDimensions( 90, 14 )
+		);
+		ProcObservedValue<IReadOnlyList<ProcSlabCacheEntry>> unavailable =
+			ProcObservedValue<IReadOnlyList<ProcSlabCacheEntry>>.Missing(
+				ProcObservationAvailability.AccessDenied,
+				"slabinfo permission denied"
+			);
+		FakeSlabProvider provider = new( unavailable );
+
+		CommandResult result = await RunInteractiveAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			provider
+		);
+
+		Assert.Equal( 1, result.ExitCode );
+		Assert.Contains(
+			"slabinfo permission denied",
+			result.Stderr,
+			StringComparison.Ordinal
+		);
+		Assert.Equal( 1, provider.CaptureCount );
+		Assert.Empty( terminal.Frames );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task CaptureTimeCountsAgainstRefreshInterval() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new SlabTopTerminalDimensions( 90, 14 )
+		);
+		terminal.Events.Enqueue( new ScheduledTerminalEvent( SlabTopTerminalEventKind.Interrupt ) );
+		FakeSlabProvider provider = new( AvailableSlabs() ) {
+			CaptureAction = () => clock.Advance( TimeSpan.FromSeconds( 1 ) )
+		};
+
+		CommandResult result = await RunInteractiveAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			provider
+		);
+
+		Assert.Equal( 130, result.ExitCode );
+		Assert.Single( terminal.Waits );
+		Assert.Equal( TimeSpan.FromSeconds( 2 ), terminal.Waits[ 0 ] );
+		Assert.Equal( 1, provider.CaptureCount );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task CallerCancellationDuringWaitReturnsCanceledAndDisposes() {
+		using CancellationTokenSource cancellation = new();
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new SlabTopTerminalDimensions( 90, 14 )
+		) {
+			BeforeRead = cancellation.Cancel
+		};
+		FakeSlabProvider provider = new( AvailableSlabs() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			provider,
+			cancellation.Token
+		);
+
+		Assert.Equal( 130, result.ExitCode );
+		Assert.Equal( 1, provider.CaptureCount );
+		Assert.Single( terminal.Frames );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task InputEventsDoNotForceResampleOrExit() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new SlabTopTerminalDimensions( 90, 14 )
+		);
+		terminal.Events.Enqueue( new ScheduledTerminalEvent( SlabTopTerminalEventKind.Input ) );
+		terminal.Events.Enqueue( new ScheduledTerminalEvent( SlabTopTerminalEventKind.Interrupt ) );
+		FakeSlabProvider provider = new( AvailableSlabs() );
+
+		CommandResult result = await RunInteractiveAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			provider
+		);
+
+		Assert.Equal( 130, result.ExitCode );
+		Assert.Equal( 1, provider.CaptureCount );
+		Assert.Single( terminal.Frames );
+		Assert.Equal( 2, terminal.Waits.Count );
+		Assert.Equal( 0, terminal.RepaintCount );
+		Assert.True( terminal.Disposed );
+	}
+
 	private static ProcObservedValue<IReadOnlyList<ProcSlabCacheEntry>> AvailableSlabs() {
 		IReadOnlyList<ProcSlabCacheEntry> entries = [
 			new ProcSlabCacheEntry(
@@ -319,7 +504,8 @@ public sealed class SlabTopCommandTests {
 		IReadOnlyList<string> args,
 		FakeTerminal terminal,
 		FakeClock clock,
-		FakeSlabProvider provider
+		FakeSlabProvider provider,
+		CancellationToken cancellationToken = default
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		ArgumentNullException.ThrowIfNull( terminal );
@@ -334,7 +520,7 @@ public sealed class SlabTopCommandTests {
 			provider,
 			new FakeTerminalFactory( terminal ),
 			clock,
-			CancellationToken.None
+			cancellationToken
 		);
 		return new CommandResult(
 			exitCode,
@@ -364,12 +550,14 @@ public sealed class SlabTopCommandTests {
 		}
 
 		internal int CaptureCount { get; private set; }
+		internal Action? CaptureAction { get; set; }
 
 		public Task<ProcObservedValue<IReadOnlyList<ProcSlabCacheEntry>>> GetSlabsAsync(
 			CancellationToken cancellationToken = default
 		) {
 			cancellationToken.ThrowIfCancellationRequested();
 			this.CaptureCount++;
+			this.CaptureAction?.Invoke();
 			if ( 0 < this.values.Count ) {
 				this.last = this.values.Dequeue();
 			}
@@ -456,6 +644,7 @@ public sealed class SlabTopCommandTests {
 		internal int OpenCount { get; set; }
 		internal int RepaintCount { get; private set; }
 		internal bool Disposed { get; private set; }
+		internal Action? BeforeRead { get; set; }
 
 		public SlabTopTerminalDimensions GetDimensions() {
 			return this.dimensions;
@@ -468,6 +657,9 @@ public sealed class SlabTopCommandTests {
 			if ( TimeSpan.Zero > timeout ) {
 				throw new ArgumentOutOfRangeException( nameof( timeout ) );
 			}
+			Action? beforeRead = this.BeforeRead;
+			this.BeforeRead = null;
+			beforeRead?.Invoke();
 			cancellationToken.ThrowIfCancellationRequested();
 			this.Waits.Add( timeout );
 			if ( 0 < this.Events.Count ) {

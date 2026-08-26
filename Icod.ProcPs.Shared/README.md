@@ -35,6 +35,7 @@ The primary provider matrix is:
 | Process memory maps | `/proc/PID/maps` and `/proc/PID/smaps` | explicitly unsupported until a complete address-space contract is implemented | explicitly unsupported until a complete address-space contract is implemented |
 | Memory / swap | `/proc/meminfo` | `GetPerformanceInfo` + `EnumPageFilesW` | Mach VM statistics + `hw.memsize` + `vm.swapusage` |
 | vmstat paging / block I/O | `/proc/vmstat` + `/proc/diskstats` + sysfs partition identity | explicitly unavailable when no defensible native equivalent is exposed | Mach page/swap counters; Linux disk modes remain unsupported |
+| Slab allocator | `/proc/slabinfo`, including exact `slabdata` counts | unsupported | unsupported |
 | CPU activity | `/proc/stat` | `GetSystemTimes` | Mach `host_statistics` |
 | Load average | `/proc/loadavg` | unsupported: no native Unix load-average metric | `getloadavg()` |
 | Uptime | `/proc/uptime` | `GetTickCount64` | `kern.boottime` |
@@ -49,6 +50,31 @@ instead of being invented as zero.
 A final portable provider remains for platforms without one of the dedicated
 backends. It intentionally exposes only observations whose semantics are
 portable enough to defend.
+
+## Slab allocator observation
+
+`ProcSlabCacheEntry` is the neutral record consumed by `slabtop`. It preserves
+the cache name, active and total object counts, object size, objects per slab,
+pages per slab, and the kernel's explicit active and total slab counts. The
+constructor rejects impossible active/total relationships and zero slab geometry
+so invalid observations cannot enter the reporting layer silently.
+
+`IProcSlabProvider` is the injectable observation contract.
+`SystemProcSlabProvider` selects `LinuxProcSlabProvider` on Linux and otherwise
+returns an explicit `Unsupported` observation. The Linux provider reads
+`/proc/slabinfo`, marks successful observations as `LinuxProcfs` with exact
+fidelity, and maps access, availability, and malformed-data failures into the
+normal `ProcObservedValue<T>` contract.
+
+`ProcKernelMemoryParsers.ParseSlabInfo` parses the complete slabinfo text. It
+requires the core numeric fields and the `slabdata` active/total slab counts; it
+does not approximate slab counts from object totals. The parser is public so
+fixture-backed consumers and tests can validate authoritative kernel text
+without requiring the host running the test to be Linux.
+
+Presentation and terminal lifecycle do not live in this library. Interactive
+`slabtop` consumes these observations and delegates the live screen to
+`Icod.DCurses`; monotonic refresh deadlines come from `Icod.Timing`.
 
 ## Batch 59 process-matching family
 
