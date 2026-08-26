@@ -48,7 +48,8 @@ public static class Command {
 			accountResolver,
 			currentProcessIdProvider,
 			cancellationToken,
-			versionText: VersionText
+			versionText: VersionText,
+			patternCompiler: global::Icod.ProcPs.GnuProcMatchPatternCompiler.Instance
 		);
 	}
 }

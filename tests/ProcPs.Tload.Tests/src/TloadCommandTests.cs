@@ -334,7 +334,7 @@ public sealed class TloadCommandTests {
 		);
 		Assert.Equal( 0, version.ExitCode );
 		Assert.Equal(
-			$"Icod.ProcPs.Tload (0.9.0-Alpha-6) inspired by procps-ng 4.0.6{Environment.NewLine}",
+			$"Icod.ProcPs.Tload (0.9.0-Alpha-7) inspired by procps-ng 4.0.6{Environment.NewLine}",
 			version.Stdout
 		);
 		Assert.Equal( string.Empty, version.Stderr );
@@ -354,7 +354,7 @@ public sealed class TloadCommandTests {
 
 		Assert.Equal( 0, status );
 		Assert.Equal(
-			$"Icod.ProcPs.Tload (0.9.0-Alpha-6) inspired by procps-ng 4.0.6{Environment.NewLine}",
+			$"Icod.ProcPs.Tload (0.9.0-Alpha-7) inspired by procps-ng 4.0.6{Environment.NewLine}",
 			Encoding.UTF8.GetString( output.ToArray() )
 		);
 		Assert.Equal( string.Empty, Encoding.UTF8.GetString( error.ToArray() ) );

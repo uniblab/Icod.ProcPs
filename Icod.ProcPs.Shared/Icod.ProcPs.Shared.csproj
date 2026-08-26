@@ -10,11 +10,11 @@
 		<OutputPath>..\bin\$(Configuration)\</OutputPath>
 		<AssemblyName>Icod.ProcPs.Shared</AssemblyName>
 		<RootNamespace>Icod.ProcPs.Shared</RootNamespace>
-		<Version>1.0.0-Alpha-6</Version>
+		<Version>1.0.0-Alpha-7</Version>
 	</PropertyGroup>
 	<PropertyGroup>
-		<PackageVersion>1.0.0-Alpha-6</PackageVersion>
-		<PackageReleaseNotes>Add exact Linux huge-page pool and process hugetlb observation contracts for hugetop.</PackageReleaseNotes>
+		<PackageVersion>1.0.0-Alpha-7</PackageVersion>
+		<PackageReleaseNotes>Decouple command-specific GNU regular-expression support from Icod.ProcPs.Shared.</PackageReleaseNotes>
 		<Authors>Timothy J. Bruce</Authors>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
@@ -24,7 +24,6 @@
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Icod.CommandFramework" Version="1.2.1" />
 		<PackageReference Include="Icod.Processes" Version="1.0.0" />
 		<PackageReference Include="Icod.Timing" Version="1.0.0" />
 	</ItemGroup>

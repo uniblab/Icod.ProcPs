@@ -77,7 +77,7 @@ public sealed class CommandTests {
 		using var error = new StringWriter();
 		var status = Command.Run( [ "--version" ], output, error );
 		Assert.Equal( 0, status );
-		Assert.Equal( $"Icod.ProcPs.Uptime (0.9.0-Alpha-6) inspired by procps-ng 4.0.6{Environment.NewLine}", output.ToString() );
+		Assert.Equal( $"Icod.ProcPs.Uptime (0.9.0-Alpha-7) inspired by procps-ng 4.0.6{Environment.NewLine}", output.ToString() );
 		Assert.Equal( string.Empty, error.ToString() );
 	}
 
