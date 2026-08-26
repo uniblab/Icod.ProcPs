@@ -195,9 +195,10 @@ workflow grants `packages: write` only to the GitHub Packages publication job an
 
 ### Publishing a version
 
-First update `Version` and `PackageVersion` together in the `procps` router
-project, merge that change to `main`, and ensure normal CI is green. Then tag
-that exact commit and push the tag:
+First update `IcodProcPsSuiteVersion` in `Directory.Build.targets` together with
+`Version` and `PackageVersion` in the `procps` router project, merge that change
+to `main`, and ensure normal CI is green. Then tag that exact commit and push the
+tag:
 
 ```text
 git switch main
@@ -215,14 +216,26 @@ recovering a partially completed release.
 
 ## Versioning
 
-The installable tool version is controlled by `Version` and `PackageVersion` in:
+The suite release version is recorded in two places:
 
 ```text
-procps/Icod.ProcPs.Router.csproj
+Directory.Build.targets                         IcodProcPsSuiteVersion
+procps/Icod.ProcPs.Router.csproj                Version / PackageVersion
 ```
 
-Update both values together when preparing a suite release. The independent
-`Icod.ProcPs.Shared` package keeps its own package version.
+`IcodProcPsSuiteVersion` supplies assembly version metadata to every standalone
+historical command. Their version output is therefore derived from the same
+suite version used by release archives:
+
+```text
+Icod.ProcPs.X (VERSION) inspired by procps-ng 4.0.6
+```
+
+Keep all three values aligned when preparing a suite release. Distribution
+verification and release-archive smoke tests compare every standalone and routed
+command's version output against the router package version and fail on a
+mismatch. The independent `Icod.ProcPs.Shared` package keeps its own package
+version.
 
 ## Licensing
 

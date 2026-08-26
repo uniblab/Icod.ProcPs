@@ -60,6 +60,10 @@ public sealed class SystemProcPsAccountResolver : IProcPsAccountResolver {
 public static class Command {
 	private const int Success = 0; private const int Failure = 1; private const int Cancelled = 130; private const int DefaultWidth = 80;
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.Ps",
+		typeof( Command ).Assembly
+	);
 	private static readonly IReadOnlyDictionary<string, ProcReportFieldDefinition> FieldCatalog = ProcReportFieldCatalog.Aliases;
 	private static readonly string[] DefaultFields = [ "pid", "tty", "time", "comm" ];
 	private static readonly string[] BsdDefaultFields = [ "pid", "tty", "stat", "time", "command" ];
@@ -136,7 +140,7 @@ Output:
 			return Success;
 		}
 		if ( parsed.ShowVersion ) {
-			await WriteLineAsync( stdout, "ps from procps-ng 4.0.6", cancellationToken ).ConfigureAwait( false );
+			await WriteLineAsync( stdout, VersionText, cancellationToken ).ConfigureAwait( false );
 			return Success;
 		}
 		if ( parsed.ShowFieldList ) {

@@ -1,5 +1,12 @@
 <Project>
+  <PropertyGroup>
+    <IcodProcPsSuiteVersion>0.9.0-Alpha-6</IcodProcPsSuiteVersion>
+  </PropertyGroup>
   <PropertyGroup Condition="'$(OutputType)' == 'Exe' and '$(PackAsTool)' != 'true'">
+    <Version>$(IcodProcPsSuiteVersion)</Version>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
+  <ItemGroup Condition="'$(OutputType)' == 'Exe' and '$(PackAsTool)' != 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)build/ProcCommandVersion.cs" Link="ProcCommandVersion.cs" />
+  </ItemGroup>
 </Project>

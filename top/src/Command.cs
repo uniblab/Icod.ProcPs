@@ -84,7 +84,10 @@ public static class Command {
 	private const int MinimumRows = 7;
 	private const int DefaultBatchWidth = 512;
 	private const int MaximumMonitoredProcessIds = 20;
-	private const string VersionText = "top from procps-ng 4.0.6";
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.Top",
+		typeof( Command ).Assembly
+	);
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
 	private const string Usage = """
 Usage:

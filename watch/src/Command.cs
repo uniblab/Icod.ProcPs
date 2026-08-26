@@ -3,7 +3,6 @@
 namespace Icod.ProcPs.Watch;
 
 using System.Globalization;
-using System.Reflection;
 using System.Text;
 using Icod.DCurses;
 using Icod.Processes;
@@ -18,6 +17,10 @@ public static class Command {
 	private const double MinimumIntervalSeconds = 0.1;
 	private const double MaximumIntervalSeconds = 31.0 * 24.0 * 60.0 * 60.0;
 	private static readonly TimeSpan DefaultInterval = TimeSpan.FromSeconds( 2 );
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.Watch",
+		typeof( Command ).Assembly
+	);
 
 	/// <summary>Runs the <c>watch</c> command synchronously.</summary>
 	/// <param name="args">Command-line arguments.</param>
@@ -102,7 +105,7 @@ public static class Command {
 		if ( parsed.Version ) {
 			await WriteTextAsync(
 				output,
-				$"watch (Icod.ProcPs) {GetVersionText()}{Environment.NewLine}",
+				$"{VersionText}{Environment.NewLine}",
 				cancellationToken
 			).ConfigureAwait( false );
 			return Success;
@@ -890,20 +893,6 @@ public static class Command {
 		" -v, --version               output version information and exit",
 		string.Empty
 	);
-
-	private static string GetVersionText() {
-		Assembly assembly = typeof( Command ).Assembly;
-		string? informationalVersion = assembly
-			.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-			?.InformationalVersion;
-		if ( !string.IsNullOrWhiteSpace( informationalVersion ) ) {
-			int metadataSeparator = informationalVersion.IndexOf( '+' );
-			return 0 <= metadataSeparator
-				? informationalVersion[ ..metadataSeparator ]
-				: informationalVersion;
-		}
-		return assembly.GetName().Version?.ToString( 3 ) ?? "unknown";
-	}
 
 	private static DateTimeOffset GetCurrentTime() => DateTimeOffset.Now;
 

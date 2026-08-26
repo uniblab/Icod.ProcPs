@@ -9,7 +9,10 @@ using Icod.ProcPs.Shared;
 /// <summary>Implements procps-ng 4.0.6 <c>uptime</c>.</summary>
 public static class Command {
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
-	private const string VersionText = "uptime from procps-ng 4.0.6";
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.Uptime",
+		typeof( Command ).Assembly
+	);
 	private const string HelpText = """
 
 Usage:

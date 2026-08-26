@@ -15,7 +15,10 @@ public static class Command {
 	private const int DefaultUserWidth = 8;
 	private const int DefaultFromWidth = 16;
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
-	private const string VersionText = "w from procps-ng 4.0.6";
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.W",
+		typeof( Command ).Assembly
+	);
 	private const string HelpText = """
 
 Usage:

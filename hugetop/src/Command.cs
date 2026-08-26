@@ -15,7 +15,10 @@ public static class Command {
 	private const int MinimumColumns = 20;
 	private const int MinimumRows = 5;
 	private static readonly TimeSpan DefaultDelay = TimeSpan.FromSeconds( 3 );
-	private const string VersionText = "hugetop from procps-ng 4.0.6";
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.HugeTop",
+		typeof( Command ).Assembly
+	);
 
 	/// <summary>Runs <c>hugetop</c> synchronously.</summary>
 	public static int Run(

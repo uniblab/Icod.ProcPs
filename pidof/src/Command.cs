@@ -8,6 +8,10 @@ using Icod.ProcPs.Shared;
 /// <summary>Implements procps-ng 4.0.6 <c>pidof</c> over the shared process-lookup engine.</summary>
 public static class Command {
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.PidOf",
+		typeof( Command ).Assembly
+	);
 
 	/// <summary>Runs <c>pidof</c> synchronously.</summary>
 	public static int Run( string[] args, TextWriter? stdout = null, TextWriter? stderr = null ) {
@@ -42,7 +46,8 @@ public static class Command {
 			supplements,
 			privilegedRootCheckProvider,
 			currentParentProcessIdProvider,
-			cancellationToken
+			cancellationToken,
+			versionText: VersionText
 		);
 	}
 }

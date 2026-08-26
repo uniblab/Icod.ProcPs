@@ -161,6 +161,25 @@ $projects = [ordered]@{
     'procps' = 'procps/Icod.ProcPs.Router.csproj'
 }
 
+$productNames = [ordered]@{
+    'free' = 'Icod.ProcPs.Free'
+    'pgrep' = 'Icod.ProcPs.Pgrep'
+    'pidof' = 'Icod.ProcPs.PidOf'
+    'pidwait' = 'Icod.ProcPs.PidWait'
+    'pkill' = 'Icod.ProcPs.Pkill'
+    'pmap' = 'Icod.ProcPs.Pmap'
+    'ps' = 'Icod.ProcPs.Ps'
+    'pwdx' = 'Icod.ProcPs.Pwdx'
+    'slabtop' = 'Icod.ProcPs.SlabTop'
+    'hugetop' = 'Icod.ProcPs.HugeTop'
+    'sysctl' = 'Icod.ProcPs.Sysctl'
+    'top' = 'Icod.ProcPs.Top'
+    'uptime' = 'Icod.ProcPs.Uptime'
+    'vmstat' = 'Icod.ProcPs.Vmstat'
+    'w' = 'Icod.ProcPs.W'
+    'watch' = 'Icod.ProcPs.Watch'
+}
+
 foreach ($path in @($publishRoot, $stageDirectory)) {
     if (Test-Path -LiteralPath $path) {
         Remove-Item -LiteralPath $path -Recurse -Force
@@ -221,7 +240,7 @@ try {
             $expectedOutput = if ('procps' -eq $commandName) {
                 "procps (Icod.ProcPs) $Version"
             } else {
-                ''
+                "$($productNames[$commandName]) ($Version) inspired by procps-ng 4.0.6"
             }
             Invoke-Executable -Path $stagedExecutable -ExpectedOutput $expectedOutput
         }

@@ -245,7 +245,8 @@ public static class ProcProcessLookupCommand {
 		IProcMatchSupplementProvider? supplements = null,
 		Func<bool>? privilegedRootCheckProvider = null,
 		Func<int?>? currentParentProcessIdProvider = null,
-		CancellationToken cancellationToken = default
+		CancellationToken cancellationToken = default,
+		string? versionText = null
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		var parsed = ParsePidOf( args );
@@ -259,7 +260,7 @@ public static class ProcProcessLookupCommand {
 			return Success;
 		}
 		if ( parsed.ShowVersion ) {
-			await WriteLineAsync( stdout, "pidof from procps-ng 4.0.6", cancellationToken ).ConfigureAwait( false );
+			await WriteLineAsync( stdout, versionText ?? "pidof from procps-ng 4.0.6", cancellationToken ).ConfigureAwait( false );
 			return Success;
 		}
 		if ( 0 == parsed.Programs.Count ) return Failure;
@@ -347,7 +348,8 @@ public static class ProcProcessLookupCommand {
 		Stream? stderr = null,
 		IProcProcessProvider? processProvider = null,
 		IProcProcessPathProvider? pathProvider = null,
-		CancellationToken cancellationToken = default
+		CancellationToken cancellationToken = default,
+		string? versionText = null
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		var parsed = ParsePwdx( args );
@@ -361,7 +363,7 @@ public static class ProcProcessLookupCommand {
 			return Success;
 		}
 		if ( parsed.ShowVersion ) {
-			await WriteLineAsync( stdout, "pwdx from procps-ng 4.0.6", cancellationToken ).ConfigureAwait( false );
+			await WriteLineAsync( stdout, versionText ?? "pwdx from procps-ng 4.0.6", cancellationToken ).ConfigureAwait( false );
 			return Success;
 		}
 		if ( 0 == parsed.Targets.Count ) {

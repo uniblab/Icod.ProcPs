@@ -12,6 +12,10 @@ public static class Command {
 	private const int Failure = 1;
 	private const int MissingProcessStatus = 42;
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.Pmap",
+		typeof( Command ).Assembly
+	);
 	private static readonly HashSet<string> CompactExtendedExcludedFields = new( StringComparer.Ordinal ) { "AnonHugePages", "KernelPageSize", "MMUPageSize", "Shared_Dirty", "Private_Dirty", "Shared_Clean", "Private_Clean" };
 	private const string Usage = """
 
@@ -65,7 +69,7 @@ Options:
 			return Success;
 		}
 		if ( options.ShowVersion ) {
-			await WriteLineAsync( stdout, "pmap from procps-ng 4.0.6", cancellationToken ).ConfigureAwait( false );
+			await WriteLineAsync( stdout, VersionText, cancellationToken ).ConfigureAwait( false );
 			return Success;
 		}
 		foreach ( var warning in options.Warnings )

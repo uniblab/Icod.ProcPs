@@ -273,7 +273,7 @@ public sealed class SlabTopCommandTests {
 			provider
 		);
 		Assert.Equal( 0, version.ExitCode );
-		Assert.Contains( "procps-ng 4.0.6", version.Stdout, StringComparison.Ordinal );
+		Assert.Contains( "Icod.ProcPs.SlabTop (0.9.0-Alpha-6) inspired by procps-ng 4.0.6", version.Stdout, StringComparison.Ordinal );
 		Assert.Equal( 0, terminal.OpenCount );
 	}
 

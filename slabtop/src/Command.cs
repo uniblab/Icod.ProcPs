@@ -13,7 +13,10 @@ public static class Command {
 	private const int Failure = 1;
 	private const int Canceled = 130;
 	private static readonly TimeSpan DefaultDelay = TimeSpan.FromSeconds( 3 );
-	private const string VersionText = "slabtop from procps-ng 4.0.6";
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.SlabTop",
+		typeof( Command ).Assembly
+	);
 
 	/// <summary>Runs <c>slabtop</c> synchronously.</summary>
 	public static int Run(
