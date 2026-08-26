@@ -1,6 +1,6 @@
 namespace Icod.ProcPs.Shared.Tests;
 
-using Icod.CommandFramework.Processes;
+using Icod.Processes;
 using Icod.ProcPs.Shared;
 using Xunit;
 
@@ -29,7 +29,7 @@ public sealed class MemoryMapProviderTests {
 			var region = Assert.Single( observed.Value.Regions );
 			Assert.Equal( "/tmp/na?me.so", region.Map.Path );
 			Assert.Equal( ProcObservationSource.LinuxProcfs, observed.Source );
-			Assert.Equal( Icod.CommandFramework.Host.ObservationFidelity.Exact, observed.Fidelity );
+			Assert.Equal( ProcObservationFidelity.Exact, observed.Fidelity );
 		} finally {
 			Directory.Delete( root, true );
 		}

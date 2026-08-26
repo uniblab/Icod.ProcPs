@@ -2,7 +2,7 @@ namespace Icod.ProcPs.Shared;
 
 using System.Globalization;
 using System.Text;
-using Icod.CommandFramework.Processes;
+using Icod.Processes;
 
 /// <summary>Describes one numeric Linux <c>/proc/PID/smaps</c> detail field.</summary>
 public sealed class ProcMemoryMapMetric {
@@ -200,7 +200,7 @@ public sealed class LinuxProcMemoryMapProvider : IProcMemoryMapProvider {
 			if ( null != process.Identity.ReuseToken && !process.Identity.Equals( after.Value ) ) {
 				return ProcObservedValue<ProcMemoryMapSet>.Missing( ProcObservationAvailability.Reused, $"Process identifier {process.ProcessId} was reused during memory-map observation." );
 			}
-			return ProcObservedValue<ProcMemoryMapSet>.Available( maps, ProcObservationSource.LinuxProcfs, Icod.CommandFramework.Host.ObservationFidelity.Exact );
+			return ProcObservedValue<ProcMemoryMapSet>.Available( maps, ProcObservationSource.LinuxProcfs, ObservationFidelity.Exact );
 		} catch ( UnauthorizedAccessException exception ) {
 			return ProcObservedValue<ProcMemoryMapSet>.Missing( ProcObservationAvailability.AccessDenied, exception.Message );
 		} catch ( DirectoryNotFoundException exception ) {

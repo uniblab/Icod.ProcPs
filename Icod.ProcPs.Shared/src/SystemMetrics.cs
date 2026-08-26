@@ -2,7 +2,6 @@ namespace Icod.ProcPs.Shared;
 
 using System.Globalization;
 using System.Runtime.InteropServices;
-using Icod.CommandFramework.Host;
 
 /// <summary>Represents cumulative procps-style CPU time counters.</summary>
 public sealed class ProcCpuTimes {

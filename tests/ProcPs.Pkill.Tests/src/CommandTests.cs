@@ -1,7 +1,7 @@
 namespace Icod.ProcPs.Pkill.Tests;
 
 using Xunit;
-using Icod.CommandFramework.Processes;
+using Icod.Processes;
 
 /// <summary>Contains tests for command.</summary>
 public sealed class CommandTests {

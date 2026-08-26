@@ -1,9 +1,9 @@
 namespace Icod.ProcPs.W.Tests;
 
 using System.Text;
-using Icod.CommandFramework.Host;
-using Icod.CommandFramework.Processes;
+using Icod.Processes;
 using Icod.ProcPs.Shared;
+using ObservationFidelity = Icod.ProcPs.Shared.ProcObservationFidelity;
 using Xunit;
 using Tool = Icod.ProcPs.W.Command;
 

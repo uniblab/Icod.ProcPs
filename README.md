@@ -55,11 +55,11 @@ It provides the common ProcPs model and behavior for:
 - provenance and observation-fidelity metadata so callers can distinguish
   exact, equivalent, approximated, unavailable, and unsupported data.
 
-Cross-suite process-control and host abstractions are supplied by
-`Icod.CommandFramework`, while monotonic elapsed-time and periodic scheduling
-primitives are supplied by `Icod.Timing`. `Icod.ProcPs.Shared` consumes those
-neutral contracts rather than duplicating process launching, waiting, signal
-delivery, terminal primitives, clocks, or scheduling infrastructure.
+Cross-suite process-control abstractions are supplied by `Icod.Processes`,
+while monotonic elapsed-time and periodic scheduling primitives are supplied by
+`Icod.Timing`. `Icod.ProcPs.Shared` owns its observation-fidelity policy and
+consumes `Icod.CommandFramework.RegularExpressions` only for the managed
+GNU/POSIX regular-expression engine.
 
 ## Platform model
 
@@ -106,9 +106,10 @@ The project therefore follows several rules:
 3. Preserve provenance and fidelity for observed values.
 4. Prefer an explicit unsupported/unavailable result to a plausible-looking but
    semantically incorrect value.
-5. Keep neutral process and host mechanics in `Icod.CommandFramework`,
-   neutral timing mechanics in `Icod.Timing`, and ProcPs-specific policy in
-   `Icod.ProcPs.Shared`.
+5. Keep neutral process-control mechanics in `Icod.Processes`, neutral timing
+   mechanics in `Icod.Timing`, managed GNU/POSIX regular expressions in
+   `Icod.CommandFramework.RegularExpressions`, and ProcPs-specific observation
+   policy in `Icod.ProcPs.Shared`.
 
 This means that some commands or modes are naturally more portable than others.
 For example, `ps`, `pgrep`, `pkill`, `free`, and uptime-related observations can

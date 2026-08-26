@@ -1,6 +1,18 @@
 namespace Icod.ProcPs.Shared;
 
-using Icod.CommandFramework.Host;
+/// <summary>Describes how faithfully a ProcPs observation represents its authoritative source semantics.</summary>
+public enum ProcObservationFidelity {
+	/// <summary>The value is obtained from the authoritative source with matching semantics.</summary>
+	Exact,
+	/// <summary>The value comes from a different platform source whose semantics are demonstrably equivalent.</summary>
+	Equivalent,
+	/// <summary>The value is a documented approximation and may differ from the authoritative semantics.</summary>
+	Approximated,
+	/// <summary>The value is synthesized from other observations rather than exposed directly.</summary>
+	Synthesized,
+	/// <summary>No defensible value is available on the current host or with the current privileges.</summary>
+	Unavailable
+}
 
 /// <summary>Identifies the source from which a ProcPs observation was obtained.</summary>
 public enum ProcObservationSource {

@@ -7,14 +7,15 @@ observation providers, conservative fallback observations for other platforms,
 process selection, the shared pgrep/pkill/pidwait matching grammar, system metrics, vmstat-specific cumulative counters and disk observations, sampling calculations, personalities,
 sorting, and reusable screen-state models.
 
-Cross-suite process and host mechanics are provided by the published
-`Icod.CommandFramework` package: process identities and reuse tokens,
+Cross-suite process-control mechanics are provided by the published
+`Icod.Processes` package: process identities and reuse tokens,
 process/process-group/session targets, launching, arbitrary waiting, signal
-delivery (including queued values), priority changes, status translation,
-processor-resource facts, and terminal primitives. Monotonic elapsed-time and
-periodic scheduling primitives are provided by the standalone `Icod.Timing`
-package. ProcPs code consumes those neutral contracts rather than creating
-parallel process-control or timing layers.
+delivery (including queued values), priority changes, and status translation.
+Monotonic elapsed-time and periodic scheduling primitives are provided by the
+standalone `Icod.Timing` package. GNU/POSIX regular-expression matching remains
+provided by `Icod.CommandFramework.RegularExpressions`; it is the only
+CommandFramework subsystem consumed by this library. ProcPs owns observation
+provenance and semantic-fidelity policy, including `ProcObservationFidelity`.
 
 Linux `/proc` is the authoritative procps-ng data source. The neutral models do
 not require non-Linux systems to pretend that Linux-only counters exist:
@@ -22,7 +23,7 @@ Linux-specific CPU, `/proc/loadavg`, `vmstat`, slab, huge-page, namespace, and
 container fields remain separately available where applicable, while common CPU
 activity (including native counter width), load averages, memory, swap, commit,
 uptime, and session observations carry their own provenance and
-`ObservationFidelity`.
+`ProcObservationFidelity`.
 
 The primary provider matrix is:
 

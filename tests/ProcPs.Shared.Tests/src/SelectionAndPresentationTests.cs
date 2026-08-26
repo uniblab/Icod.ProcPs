@@ -1,8 +1,8 @@
 namespace Icod.ProcPs.Shared.Tests;
 
 using Icod.ProcPs.Shared;
-using Icod.CommandFramework.Host;
-using Icod.CommandFramework.Processes;
+using Icod.Processes;
+using ObservationFidelity = Icod.ProcPs.Shared.ProcObservationFidelity;
 using Xunit;
 
 /// <summary>Contains tests for selection and presentation.</summary>

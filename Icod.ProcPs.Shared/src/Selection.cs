@@ -1,6 +1,6 @@
 namespace Icod.ProcPs.Shared;
 
-using Icod.CommandFramework.Processes;
+using Icod.Processes;
 
 /// <summary>Models ProcPs process-selection criteria with OR semantics inside a criterion and AND semantics between criteria.</summary>
 public sealed class ProcProcessSelection {

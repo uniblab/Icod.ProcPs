@@ -1,8 +1,7 @@
 namespace Icod.ProcPs.Shared;
 
 using System.Runtime.InteropServices;
-using Icod.CommandFramework.Host;
-using Icod.CommandFramework.Processes;
+using Icod.Processes;
 
 /// <summary>Augments the portable .NET process surface with documented Windows-native process metadata.</summary>
 public sealed class WindowsProcProcessProvider : IProcProcessProvider {

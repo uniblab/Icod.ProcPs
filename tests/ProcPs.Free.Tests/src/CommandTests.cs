@@ -1,8 +1,8 @@
 namespace Icod.ProcPs.Free.Tests;
 
 using System.Text;
-using Icod.CommandFramework.Host;
 using Icod.ProcPs.Shared;
+using ObservationFidelity = Icod.ProcPs.Shared.ProcObservationFidelity;
 using Xunit;
 
 /// <summary>Contains tests for command.</summary>

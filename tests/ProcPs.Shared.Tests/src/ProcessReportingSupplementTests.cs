@@ -1,6 +1,6 @@
 namespace Icod.ProcPs.Shared.Tests;
 
-using Icod.CommandFramework.Processes;
+using Icod.Processes;
 using Xunit;
 
 /// <summary>Exercises shared observations added for ProcPs process-reporting commands.</summary>
