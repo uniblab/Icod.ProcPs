@@ -2,17 +2,34 @@
 
 namespace Icod.ProcPs.W;
 
-/// <summary>Provides the procps-ng compatible <c>w</c> executable entry point.</summary>
+/// <summary>
+/// Provides the executable entry point for the procps-ng-compatible <c>w</c> command for showing logged-in users and their session activity.
+/// </summary>
 public static class Program {
-	/// <summary>Runs the <c>w</c> command.</summary>
-	/// <param name="args">Command-line arguments.</param>
-	/// <returns>A task whose result is the process exit status.</returns>
-	public static Task<int> Main( string[] args ) {
+	/// <summary>
+	/// Runs the <c>w</c> command using the process console and converts a console interrupt into a cancellation request.
+	/// </summary>
+	/// <param name="args">The command-line arguments supplied to <c>w</c>.</param>
+	/// <returns>A task whose result is the command exit status.</returns>
+	public static async Task<int> Main( string[] args ) {
 		ArgumentNullException.ThrowIfNull( args );
-		return Command.RunAsync(
-			args,
-			stdout: Console.OpenStandardOutput(),
-			stderr: Console.OpenStandardError()
-		);
+		using var cancellation = new CancellationTokenSource();
+		ConsoleCancelEventHandler handler = ( _, eventArgs ) => {
+			eventArgs.Cancel = true;
+			cancellation.Cancel();
+		};
+		Console.CancelKeyPress += handler;
+		try {
+			var stdout = Console.OpenStandardOutput();
+			var stderr = Console.OpenStandardError();
+			return await Command.RunAsync(
+				args,
+				stdout: stdout,
+				stderr: stderr,
+				cancellationToken: cancellation.Token
+			).ConfigureAwait( false );
+		} finally {
+			Console.CancelKeyPress -= handler;
+		}
 	}
 }
