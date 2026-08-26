@@ -10,6 +10,7 @@ using PmapCommand = Icod.ProcPs.Pmap.Command;
 using PsCommand = Icod.ProcPs.Ps.Command;
 using PwdxCommand = Icod.ProcPs.Pwdx.Command;
 using SlabTopCommand = Icod.ProcPs.SlabTop.Command;
+using HugeTopCommand = Icod.ProcPs.HugeTop.Command;
 using SysctlCommand = Icod.ProcPs.Sysctl.Command;
 using TopCommand = Icod.ProcPs.Top.Command;
 using UptimeCommand = Icod.ProcPs.Uptime.Command;
@@ -35,6 +36,7 @@ Commands:
  ps        report a snapshot of current processes
  pwdx      report process working directories
  slabtop   display Linux slab-cache information in real time
+ hugetop   display Linux huge-page pool and process usage in real time
  sysctl    read or write Linux runtime kernel parameters
  top       display dynamic process and system activity
  uptime    report system uptime, user count, and load averages
@@ -91,6 +93,7 @@ Run 'procps COMMAND --help' for command-specific help.
 			"ps" => await PsCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"pwdx" => await PwdxCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"slabtop" => await SlabTopCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
+			"hugetop" => await HugeTopCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"sysctl" => await SysctlCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"top" => await TopCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"uptime" => await UptimeCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
@@ -133,6 +136,7 @@ Run 'procps COMMAND --help' for command-specific help.
 			"ps" or
 			"pwdx" or
 			"slabtop" or
+			"hugetop" or
 			"sysctl" or
 			"top" or
 			"uptime" or

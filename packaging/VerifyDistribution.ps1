@@ -199,6 +199,7 @@ $commandNames = @(
     'ps',
     'pwdx',
     'slabtop',
+    'hugetop',
     'sysctl',
     'top',
     'uptime',

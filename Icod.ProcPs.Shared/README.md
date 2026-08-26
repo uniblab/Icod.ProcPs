@@ -6,9 +6,9 @@ procps field semantics, Linux `/proc` parsing, native Windows and macOS
 observation providers, conservative fallback observations for other platforms,
 process selection, reusable account name/display resolution, the shared
 pgrep/pkill/pidwait matching grammar, system metrics, exact Linux slab-cache
-observation and `/proc/slabinfo` parsing, vmstat-specific cumulative counters and
-disk observations, sampling calculations, personalities, sorting, and reusable
-screen-state models.
+observation and `/proc/slabinfo` parsing, exact Linux huge-page pool and process
+hugetlb observation, vmstat-specific cumulative counters and disk observations,
+sampling calculations, personalities, sorting, and reusable screen-state models.
 
 Cross-suite process-control mechanics are provided by the published
 `Icod.Processes` package: process identities and reuse tokens,
@@ -37,6 +37,7 @@ The primary provider matrix is:
 | Memory / swap | `/proc/meminfo` | `GetPerformanceInfo` + `EnumPageFilesW` | Mach VM statistics + `hw.memsize` + `vm.swapusage` |
 | vmstat paging / block I/O | `/proc/vmstat` + `/proc/diskstats` + sysfs partition identity | explicitly unavailable when no defensible native equivalent is exposed | Mach page/swap counters; Linux disk modes remain unsupported |
 | Slab allocator | `/proc/slabinfo`, including exact `slabdata` counts | unsupported | unsupported |
+| Huge pages | sysfs per-NUMA pools + detailed `/proc/PID/smaps` hugetlb accounting | unsupported | unsupported |
 | CPU activity | `/proc/stat` | `GetSystemTimes` | Mach `host_statistics` |
 | Load average | `/proc/loadavg` | unsupported: no native Unix load-average metric | `getloadavg()` |
 | Uptime | `/proc/uptime` | `GetTickCount64` | `kern.boottime` |
@@ -51,6 +52,26 @@ instead of being invented as zero.
 A final portable provider remains for platforms without one of the dedicated
 backends. It intentionally exposes only observations whose semantics are
 portable enough to defend.
+
+## Huge-page observation
+
+`ProcHugePagePool`, `ProcHugePageNode`, `ProcHugePageProcess`, and
+`ProcHugePageSnapshot` form the neutral model consumed by `hugetop`. Linux pool
+geometry comes from per-NUMA-node sysfs `hugepages-*kB` directories. Process
+attribution is derived only from the kernel's `Shared_Hugetlb` and
+`Private_Hugetlb` fields in detailed `/proc/PID/smaps` observations; ordinary
+RSS or virtual-memory counters are never substituted.
+
+`IProcHugePageProvider` is injectable for tests and alternate hosts.
+`SystemProcHugePageProvider` selects the exact Linux provider on Linux and
+returns an explicit `Unsupported` observation elsewhere. The Linux provider
+reuses `IProcProcessProvider` plus the reuse-protected `IProcMemoryMapProvider`,
+marks successful observations as `LinuxSysfs` with exact fidelity, and skips
+processes whose detailed maps cannot be observed without invalidating the
+independently captured system pool totals.
+
+Presentation and terminal lifecycle remain outside Shared. Interactive
+`hugetop` uses `Icod.DCurses`, while refresh deadlines use `Icod.Timing`.
 
 ## Slab allocator observation
 
