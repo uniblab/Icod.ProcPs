@@ -26,10 +26,15 @@ procps pkill   [args...]
 procps pmap    [args...]
 procps ps      [args...]
 procps pwdx    [args...]
+procps slabtop [args...]
+procps hugetop [args...]
 procps sysctl  [args...]
+procps tload   [args...]
+procps top     [args...]
 procps uptime  [args...]
 procps vmstat  [args...]
 procps w       [args...]
+procps watch   [args...]
 ```
 
 The router does not launch another process. It invokes the same managed command
@@ -59,15 +64,15 @@ The `Icod.ProcPs` NuGet tool package installs exactly one command:
 procps
 ```
 
-The package does not install twelve additional command shims. Select a ProcPs
+The package does not install seventeen additional command shims. Select a ProcPs
 command through the router's first argument.
 
 ### Traditional executables
 
 Version-tagged GitHub releases also provide conventional ZIP archives for
 Windows, Linux, and macOS on both x64 and ARM64. Each archive contains the
-twelve historical command entry points plus `procps`, the repository `LICENSE`,
-and the repository `README.md`. These archives are framework-dependent and
+seventeen historical command entry points plus `procps`, the repository
+`LICENSE`, and the repository `README.md`. These archives are framework-dependent and
 require the .NET 10 runtime.
 
 See `packaging/README.md` for the supported packaging, verification, and release
@@ -82,4 +87,5 @@ the GNU General Public License version 3 or later. The reusable
 ## SEE ALSO
 
 `free(1)`, `pgrep(1)`, `pidof(1)`, `pidwait(1)`, `pkill(1)`, `pmap(1)`,
-`ps(1)`, `pwdx(1)`, `sysctl(8)`, `uptime(1)`, `vmstat(8)`, `w(1)`
+`ps(1)`, `pwdx(1)`, `slabtop(1)`, `hugetop(1)`, `sysctl(8)`, `tload(1)`,
+`top(1)`, `uptime(1)`, `vmstat(8)`, `w(1)`, `watch(1)`

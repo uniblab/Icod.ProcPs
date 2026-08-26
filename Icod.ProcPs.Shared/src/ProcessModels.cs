@@ -1,7 +1,6 @@
 namespace Icod.ProcPs.Shared;
 
-using Icod.CommandFramework.Processes;
-using Icod.CommandFramework.Host;
+using Icod.Processes;
 
 /// <summary>Classifies the Linux/procps process state code.</summary>
 public enum ProcProcessState {

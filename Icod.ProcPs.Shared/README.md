@@ -4,17 +4,21 @@
 procps-ng 4.0.6 command set in this repository. It owns process enumeration,
 procps field semantics, Linux `/proc` parsing, native Windows and macOS
 observation providers, conservative fallback observations for other platforms,
-process selection, the shared pgrep/pkill/pidwait matching grammar, system metrics, vmstat-specific cumulative counters and disk observations, sampling calculations, personalities,
-sorting, and reusable screen-state models.
+process selection, reusable account name/display resolution, the shared
+pgrep/pkill/pidwait matching grammar, system metrics, exact Linux slab-cache
+observation and `/proc/slabinfo` parsing, exact Linux huge-page pool and process
+hugetlb observation, vmstat-specific cumulative counters and disk observations,
+sampling calculations, personalities, sorting, and reusable screen-state models.
 
-Cross-suite process and host mechanics are provided by the published
-`Icod.CommandFramework` package: process identities and reuse tokens,
+Cross-suite process-control mechanics are provided by the published
+`Icod.Processes` package: process identities and reuse tokens,
 process/process-group/session targets, launching, arbitrary waiting, signal
-delivery (including queued values), priority changes, status translation,
-processor-resource facts, and terminal primitives. Monotonic elapsed-time and
-periodic scheduling primitives are provided by the standalone `Icod.Timing`
-package. ProcPs code consumes those neutral contracts rather than creating
-parallel process-control or timing layers.
+delivery (including queued values), priority changes, and status translation.
+Monotonic elapsed-time and periodic scheduling primitives are provided by the
+standalone `Icod.Timing` package. GNU/POSIX regular-expression matching remains
+provided by `Icod.CommandFramework.RegularExpressions`; it is the only
+CommandFramework subsystem consumed by this library. ProcPs owns observation
+provenance and semantic-fidelity policy, including `ProcObservationFidelity`.
 
 Linux `/proc` is the authoritative procps-ng data source. The neutral models do
 not require non-Linux systems to pretend that Linux-only counters exist:
@@ -22,7 +26,7 @@ Linux-specific CPU, `/proc/loadavg`, `vmstat`, slab, huge-page, namespace, and
 container fields remain separately available where applicable, while common CPU
 activity (including native counter width), load averages, memory, swap, commit,
 uptime, and session observations carry their own provenance and
-`ObservationFidelity`.
+`ProcObservationFidelity`.
 
 The primary provider matrix is:
 
@@ -32,6 +36,8 @@ The primary provider matrix is:
 | Process memory maps | `/proc/PID/maps` and `/proc/PID/smaps` | explicitly unsupported until a complete address-space contract is implemented | explicitly unsupported until a complete address-space contract is implemented |
 | Memory / swap | `/proc/meminfo` | `GetPerformanceInfo` + `EnumPageFilesW` | Mach VM statistics + `hw.memsize` + `vm.swapusage` |
 | vmstat paging / block I/O | `/proc/vmstat` + `/proc/diskstats` + sysfs partition identity | explicitly unavailable when no defensible native equivalent is exposed | Mach page/swap counters; Linux disk modes remain unsupported |
+| Slab allocator | `/proc/slabinfo`, including exact `slabdata` counts | unsupported | unsupported |
+| Huge pages | sysfs per-NUMA pools + detailed `/proc/PID/smaps` hugetlb accounting | unsupported | unsupported |
 | CPU activity | `/proc/stat` | `GetSystemTimes` | Mach `host_statistics` |
 | Load average | `/proc/loadavg` | unsupported: no native Unix load-average metric | `getloadavg()` |
 | Uptime | `/proc/uptime` | `GetTickCount64` | `kern.boottime` |
@@ -46,6 +52,51 @@ instead of being invented as zero.
 A final portable provider remains for platforms without one of the dedicated
 backends. It intentionally exposes only observations whose semantics are
 portable enough to defend.
+
+## Huge-page observation
+
+`ProcHugePagePool`, `ProcHugePageNode`, `ProcHugePageProcess`, and
+`ProcHugePageSnapshot` form the neutral model consumed by `hugetop`. Linux pool
+geometry comes from per-NUMA-node sysfs `hugepages-*kB` directories. Process
+attribution is derived only from the kernel's `Shared_Hugetlb` and
+`Private_Hugetlb` fields in detailed `/proc/PID/smaps` observations; ordinary
+RSS or virtual-memory counters are never substituted.
+
+`IProcHugePageProvider` is injectable for tests and alternate hosts.
+`SystemProcHugePageProvider` selects the exact Linux provider on Linux and
+returns an explicit `Unsupported` observation elsewhere. The Linux provider
+reuses `IProcProcessProvider` plus the reuse-protected `IProcMemoryMapProvider`,
+marks successful observations as `LinuxSysfs` with exact fidelity, and skips
+processes whose detailed maps cannot be observed without invalidating the
+independently captured system pool totals.
+
+Presentation and terminal lifecycle remain outside Shared. Interactive
+`hugetop` uses `Icod.DCurses`, while refresh deadlines use `Icod.Timing`.
+
+## Slab allocator observation
+
+`ProcSlabCacheEntry` is the neutral record consumed by `slabtop`. It preserves
+the cache name, active and total object counts, object size, objects per slab,
+pages per slab, and the kernel's explicit active and total slab counts. The
+constructor rejects impossible active/total relationships and zero slab geometry
+so invalid observations cannot enter the reporting layer silently.
+
+`IProcSlabProvider` is the injectable observation contract.
+`SystemProcSlabProvider` selects `LinuxProcSlabProvider` on Linux and otherwise
+returns an explicit `Unsupported` observation. The Linux provider reads
+`/proc/slabinfo`, marks successful observations as `LinuxProcfs` with exact
+fidelity, and maps access, availability, and malformed-data failures into the
+normal `ProcObservedValue<T>` contract.
+
+`ProcKernelMemoryParsers.ParseSlabInfo` parses the complete slabinfo text. It
+requires the core numeric fields and the `slabdata` active/total slab counts; it
+does not approximate slab counts from object totals. The parser is public so
+fixture-backed consumers and tests can validate authoritative kernel text
+without requiring the host running the test to be Linux.
+
+Presentation and terminal lifecycle do not live in this library. Interactive
+`slabtop` consumes these observations and delegates the live screen to
+`Icod.DCurses`; monotonic refresh deadlines come from `Icod.Timing`.
 
 ## Batch 59 process-matching family
 

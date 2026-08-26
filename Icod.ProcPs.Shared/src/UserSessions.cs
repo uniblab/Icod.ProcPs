@@ -3,7 +3,6 @@ namespace Icod.ProcPs.Shared;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
-using Icod.CommandFramework.Host;
 
 /// <summary>Describes one logged-in interactive user session for ProcPs reporting.</summary>
 public sealed class ProcLoginSession {

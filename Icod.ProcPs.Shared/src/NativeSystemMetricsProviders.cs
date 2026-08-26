@@ -1,7 +1,6 @@
 namespace Icod.ProcPs.Shared;
 
 using System.Runtime.InteropServices;
-using Icod.CommandFramework.Host;
 
 /// <summary>Observes Windows system metrics through documented Win32 APIs.</summary>
 public sealed class WindowsProcSystemMetricsProvider : IProcSystemMetricsProvider {

@@ -60,6 +60,10 @@ public sealed class SystemProcPsAccountResolver : IProcPsAccountResolver {
 public static class Command {
 	private const int Success = 0; private const int Failure = 1; private const int Cancelled = 130; private const int DefaultWidth = 80;
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.Ps",
+		typeof( Command ).Assembly
+	);
 	private static readonly IReadOnlyDictionary<string, ProcReportFieldDefinition> FieldCatalog = ProcReportFieldCatalog.Aliases;
 	private static readonly string[] DefaultFields = [ "pid", "tty", "time", "comm" ];
 	private static readonly string[] BsdDefaultFields = [ "pid", "tty", "stat", "time", "command" ];
@@ -125,6 +129,8 @@ Output:
 	/// <summary>Runs <c>ps</c> asynchronously with injectable ProcPs providers.</summary>
 	public static async Task<int> RunAsync( string[] args, Stream? stdout = null, Stream? stderr = null, IProcProcessProvider? processProvider = null, IProcSystemMetricsProvider? metricsProvider = null, IProcMatchSupplementProvider? supplementProvider = null, IProcPsAccountResolver? accountResolver = null, Func<int>? currentProcessIdProvider = null, IReadOnlyDictionary<string, string?>? environment = null, Func<DateTimeOffset>? nowProvider = null, CancellationToken cancellationToken = default ) {
 		ArgumentNullException.ThrowIfNull( args );
+		stdout ??= Console.OpenStandardOutput();
+		stderr ??= Console.OpenStandardError();
 		var hostEnvironment = environment ?? ReadPersonalityEnvironment();
 		var parsed = ParseArguments( args, hostEnvironment, accountResolver ?? SystemProcPsAccountResolver.Instance );
 		if ( null != parsed.Error ) {
@@ -136,7 +142,7 @@ Output:
 			return Success;
 		}
 		if ( parsed.ShowVersion ) {
-			await WriteLineAsync( stdout, "ps from procps-ng 4.0.6", cancellationToken ).ConfigureAwait( false );
+			await WriteLineAsync( stdout, VersionText, cancellationToken ).ConfigureAwait( false );
 			return Success;
 		}
 		if ( parsed.ShowFieldList ) {

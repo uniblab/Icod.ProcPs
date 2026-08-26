@@ -1,8 +1,8 @@
 namespace Icod.ProcPs.Vmstat.Tests;
 
 using System.Text;
-using Icod.CommandFramework.Host;
 using Icod.ProcPs.Shared;
+using ObservationFidelity = Icod.ProcPs.Shared.ProcObservationFidelity;
 using Xunit;
 
 /// <summary>Contains tests for command.</summary>
@@ -253,7 +253,7 @@ public sealed class CommandTests {
 	public async Task VersionMatchesPinnedProcpsRelease() {
 		var result = await InvokeAsync( [ "--version" ], new FakeProvider( FullSnapshot() ) );
 		Assert.Equal( 0, result.Status );
-		Assert.Equal( string.Concat( "vmstat from procps-ng 4.0.6", Environment.NewLine ), result.Output );
+		Assert.Equal( string.Concat( "Icod.ProcPs.Vmstat (0.9.0-Alpha-6) inspired by procps-ng 4.0.6", Environment.NewLine ), result.Output );
 	}
 
 	/// <summary>Verifies that linux provider parses stat disk and partition fixtures.</summary>

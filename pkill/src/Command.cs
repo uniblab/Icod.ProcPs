@@ -8,6 +8,10 @@ using Icod.ProcPs.Shared;
 /// <summary>Implements procps-ng 4.0.6 <c>pkill</c> over the shared process-matching engine.</summary>
 public static class Command {
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.Pkill",
+		typeof( Command ).Assembly
+	);
 	/// <summary>Runs <c>pkill</c> synchronously.</summary>
 	public static int Run( string[] args, TextWriter? stdout = null, TextWriter? stderr = null ) {
 		ArgumentNullException.ThrowIfNull( args );
@@ -43,7 +47,8 @@ public static class Command {
 			supplements,
 			accountResolver,
 			currentProcessIdProvider,
-			cancellationToken
+			cancellationToken,
+			versionText: VersionText
 		);
 	}
 }

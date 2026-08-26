@@ -8,6 +8,10 @@ using Icod.ProcPs.Shared;
 /// <summary>Implements procps-ng 4.0.6 <c>pwdx</c> over the shared process-path provider.</summary>
 public static class Command {
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.Pwdx",
+		typeof( Command ).Assembly
+	);
 
 	/// <summary>Runs <c>pwdx</c> synchronously.</summary>
 	public static int Run( string[] args, TextWriter? stdout = null, TextWriter? stderr = null ) {
@@ -36,7 +40,8 @@ public static class Command {
 			stderr ?? Console.OpenStandardError(),
 			processProvider,
 			pathProvider,
-			cancellationToken
+			cancellationToken,
+			versionText: VersionText
 		);
 	}
 }

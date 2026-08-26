@@ -1,8 +1,8 @@
 namespace Icod.ProcPs.Uptime.Tests;
 
 using System.Text;
-using Icod.CommandFramework.Host;
 using Icod.ProcPs.Shared;
+using ObservationFidelity = Icod.ProcPs.Shared.ProcObservationFidelity;
 using Xunit;
 
 /// <summary>Contains tests for command.</summary>
@@ -77,7 +77,7 @@ public sealed class CommandTests {
 		using var error = new StringWriter();
 		var status = Command.Run( [ "--version" ], output, error );
 		Assert.Equal( 0, status );
-		Assert.Equal( $"uptime from procps-ng 4.0.6{Environment.NewLine}", output.ToString() );
+		Assert.Equal( $"Icod.ProcPs.Uptime (0.9.0-Alpha-6) inspired by procps-ng 4.0.6{Environment.NewLine}", output.ToString() );
 		Assert.Equal( string.Empty, error.ToString() );
 	}
 

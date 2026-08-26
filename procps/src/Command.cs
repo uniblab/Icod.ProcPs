@@ -9,10 +9,15 @@ using PkillCommand = Icod.ProcPs.Pkill.Command;
 using PmapCommand = Icod.ProcPs.Pmap.Command;
 using PsCommand = Icod.ProcPs.Ps.Command;
 using PwdxCommand = Icod.ProcPs.Pwdx.Command;
+using SlabTopCommand = Icod.ProcPs.SlabTop.Command;
+using HugeTopCommand = Icod.ProcPs.HugeTop.Command;
 using SysctlCommand = Icod.ProcPs.Sysctl.Command;
+using TloadCommand = Icod.ProcPs.Tload.Command;
+using TopCommand = Icod.ProcPs.Top.Command;
 using UptimeCommand = Icod.ProcPs.Uptime.Command;
 using VmstatCommand = Icod.ProcPs.Vmstat.Command;
 using WCommand = Icod.ProcPs.W.Command;
+using WatchCommand = Icod.ProcPs.Watch.Command;
 
 /// <summary>Routes <c>procps COMMAND [args...]</c> to the managed ProcPs commands.</summary>
 public static class Command {
@@ -31,10 +36,15 @@ Commands:
  pmap      report process memory maps
  ps        report a snapshot of current processes
  pwdx      report process working directories
+ slabtop   display Linux slab-cache information in real time
+ hugetop   display Linux huge-page pool and process usage in real time
  sysctl    read or write Linux runtime kernel parameters
+ tload     display a scrolling terminal graph of load averages
+ top       display dynamic process and system activity
  uptime    report system uptime, user count, and load averages
  vmstat    report virtual-memory and system activity
  w         show logged-in users and what they are doing
+ watch     execute a command periodically and display it fullscreen
 
 Router options:
  -h, --help       display this help and exit
@@ -84,10 +94,15 @@ Run 'procps COMMAND --help' for command-specific help.
 			"pmap" => await PmapCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"ps" => await PsCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"pwdx" => await PwdxCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
+			"slabtop" => await SlabTopCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
+			"hugetop" => await HugeTopCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"sysctl" => await SysctlCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
+			"tload" => await TloadCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
+			"top" => await TopCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"uptime" => await UptimeCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"vmstat" => await VmstatCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"w" => await WCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
+			"watch" => await WatchCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			_ => throw new InvalidOperationException( "Known command dispatch was incomplete." )
 		};
 	}
@@ -123,10 +138,15 @@ Run 'procps COMMAND --help' for command-specific help.
 			"pmap" or
 			"ps" or
 			"pwdx" or
+			"slabtop" or
+			"hugetop" or
 			"sysctl" or
+			"tload" or
+			"top" or
 			"uptime" or
 			"vmstat" or
-			"w";
+			"w" or
+			"watch";
 	}
 
 	private static string[] CopyCommandArguments( IReadOnlyList<string> arguments ) {

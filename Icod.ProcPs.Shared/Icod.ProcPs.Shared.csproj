@@ -10,14 +10,27 @@
 		<OutputPath>..\bin\$(Configuration)\</OutputPath>
 		<AssemblyName>Icod.ProcPs.Shared</AssemblyName>
 		<RootNamespace>Icod.ProcPs.Shared</RootNamespace>
+		<Version>1.0.0-Alpha-6</Version>
 	</PropertyGroup>
+	<PropertyGroup>
+		<PackageVersion>1.0.0-Alpha-6</PackageVersion>
+		<PackageReleaseNotes>Add exact Linux huge-page pool and process hugetlb observation contracts for hugetop.</PackageReleaseNotes>
+		<Authors>Timothy J. Bruce</Authors>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
+		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
+		<IncludeContentInPack>true</IncludeContentInPack>
+		<IncludeSymbols>True</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Icod.CommandFramework" Version="1.2.1" />
+		<PackageReference Include="Icod.Processes" Version="1.0.0" />
+		<PackageReference Include="Icod.Timing" Version="1.0.0" />
+	</ItemGroup>
 	<PropertyGroup Condition=" '$(PlatformTarget)' == '' ">
 		<PlatformTarget>AnyCPU</PlatformTarget>
 	</PropertyGroup>
-	<ItemGroup>
-		<PackageReference Include="Icod.CommandFramework" Version="1.1.0" />
-		<PackageReference Include="Icod.Timing" Version="1.0.0" />
-	</ItemGroup>
 	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
 		<ErrorReport>prompt</ErrorReport>
 		<WarningLevel>2</WarningLevel>
@@ -46,17 +59,6 @@
 		<SignAssembly>false</SignAssembly>
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 		<WarningsNotAsErrors>CS1591</WarningsNotAsErrors>
-	</PropertyGroup>
-	<PropertyGroup>
-		<PackageVersion>1.0.0-WIP1</PackageVersion>
-		<PackageReleaseNotes>Initial release of Icod.ProcPs.Shared</PackageReleaseNotes>
-		<Authors>Timothy J. Bruce</Authors>
-		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
-		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<IncludeContentInPack>true</IncludeContentInPack>
-		<IncludeSymbols>True</IncludeSymbols>
-		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 	</PropertyGroup>
 	<ItemGroup>
 		<Content Include="README.md">

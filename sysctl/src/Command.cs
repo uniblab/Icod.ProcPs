@@ -12,7 +12,10 @@ public static class Command {
 	private const int Cancelled = 130;
 	private const string DefaultPreload = "/etc/sysctl.conf";
 	private const string ProcDisplayRoot = "/proc/sys/";
-	private const string VersionText = "sysctl from procps-ng 4.0.6";
+	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
+		"Icod.ProcPs.Sysctl",
+		typeof( Command ).Assembly
+	);
 	private static readonly string[] SystemDirectories = [
 		"/etc/sysctl.d",
 		"/run/sysctl.d",

@@ -1,8 +1,8 @@
 namespace Icod.ProcPs.Pgrep.Tests;
 
-using Icod.CommandFramework.Host;
-using Icod.CommandFramework.Processes;
+using Icod.Processes;
 using Icod.ProcPs.Shared;
+using ObservationFidelity = Icod.ProcPs.Shared.ProcObservationFidelity;
 
 /// <summary>Provides reusable test fixtures and helpers.</summary>
 internal static class TestSupport {

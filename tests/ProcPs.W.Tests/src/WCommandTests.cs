@@ -1,9 +1,9 @@
 namespace Icod.ProcPs.W.Tests;
 
 using System.Text;
-using Icod.CommandFramework.Host;
-using Icod.CommandFramework.Processes;
+using Icod.Processes;
 using Icod.ProcPs.Shared;
+using ObservationFidelity = Icod.ProcPs.Shared.ProcObservationFidelity;
 using Xunit;
 using Tool = Icod.ProcPs.W.Command;
 
@@ -274,7 +274,7 @@ public sealed class WCommandTests {
 		using var version = new MemoryStream();
 		using var versionError = new MemoryStream();
 		Assert.Equal( 0, await Tool.RunAsync( [ "--version" ], stdout: version, stderr: versionError ) );
-		Assert.Equal( $"w from procps-ng 4.0.6{Environment.NewLine}", Text( version ) );
+		Assert.Equal( $"Icod.ProcPs.W (0.9.0-Alpha-6) inspired by procps-ng 4.0.6{Environment.NewLine}", Text( version ) );
 		Assert.Equal( string.Empty, Text( versionError ) );
 
 		using var invalid = new MemoryStream();

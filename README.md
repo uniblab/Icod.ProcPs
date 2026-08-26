@@ -4,8 +4,9 @@
 procps-ng 4.0.6.
 
 The repository provides familiar process- and system-observation commands such
-as `ps`, `pgrep`, `pkill`, `free`, `uptime`, `vmstat`, `w`, and `sysctl`, while
-factoring common ProcPs behavior into the reusable `Icod.ProcPs.Shared` library.
+as `ps`, `pgrep`, `pkill`, `free`, `uptime`, `vmstat`, `w`, `watch`, `slabtop`,
+`hugetop`, `tload`, `top`, and `sysctl`, while factoring common ProcPs behavior
+into the reusable `Icod.ProcPs.Shared` library.
 
 The implementation targets .NET 10 and C# 13 and is designed for Windows,
 Linux, and macOS. Linux `/proc` remains the authoritative source for Linux
@@ -25,9 +26,14 @@ reported as unavailable rather than synthesized from unrelated metrics.
 | [`pwdx`](pwdx/README.md) | Report the current working directory of one or more processes. |
 | [`pmap`](pmap/README.md) | Report process memory maps and Linux `smaps` detail. |
 | [`ps`](ps/README.md) | Report a snapshot of current processes, including ProcPs-style selection, formatting, sorting, personalities, and thread views. |
+| [`slabtop`](slabtop/README.md) | Display Linux slab-cache information in real time or as a one-shot report. |
+| [`hugetop`](hugetop/README.md) | Display Linux huge-page pools and per-process hugetlb usage in real time or as a one-shot report. |
+| [`tload`](tload/README.md) | Display a scrolling terminal graph of system load averages. |
+| [`top`](top/README.md) | Display dynamic process and system activity in batch or interactive mode. |
 | [`uptime`](uptime/README.md) | Report system uptime, user count, and load averages. |
 | [`vmstat`](vmstat/README.md) | Report virtual-memory, CPU, process, paging, disk, and system activity. |
 | [`w`](w/README.md) | Show logged-in users and what their sessions are doing. |
+| [`watch`](watch/README.md) | Execute a command periodically and display its output fullscreen. |
 | [`sysctl`](sysctl/README.md) | Read and write Linux runtime kernel parameters through `/proc/sys`. |
 
 Each executable directory contains its own man-page-style `README.md` describing
@@ -48,6 +54,7 @@ It provides the common ProcPs model and behavior for:
 - the shared `pgrep` / `pkill` / `pidwait` matching grammar;
 - executable, root, and current-working-directory observations;
 - process memory maps;
+- huge-page pool and per-process hugetlb observations;
 - CPU, memory, swap, load-average, uptime, and session observations;
 - `vmstat` counters and sampling calculations;
 - account, terminal, namespace, cgroup, container, and security observations
@@ -55,11 +62,19 @@ It provides the common ProcPs model and behavior for:
 - provenance and observation-fidelity metadata so callers can distinguish
   exact, equivalent, approximated, unavailable, and unsupported data.
 
-Cross-suite process-control and host abstractions are supplied by
-`Icod.CommandFramework`, while monotonic elapsed-time and periodic scheduling
-primitives are supplied by `Icod.Timing`. `Icod.ProcPs.Shared` consumes those
-neutral contracts rather than duplicating process launching, waiting, signal
-delivery, terminal primitives, clocks, or scheduling infrastructure.
+Cross-suite process-control abstractions are supplied by `Icod.Processes`,
+while monotonic elapsed-time and periodic scheduling primitives are supplied by
+`Icod.Timing`. `Icod.ProcPs.Shared` owns its observation-fidelity policy and
+consumes `Icod.CommandFramework.RegularExpressions` only for the managed
+GNU/POSIX regular-expression engine.
+
+Interactive full-screen commands use `Icod.DCurses` over `Icod.Terminal` and
+`Icod.TermInfo`; ProcPs command code owns application policy rather than native
+terminal modes, escape tables, or screen-refresh mechanics.
+
+`tload` is intentionally output-only. It uses `Icod.Terminal` and `Icod.TermInfo`
+directly for output-terminal geometry and cursor positioning without taking
+ownership of terminal input or a curses presentation.
 
 ## Platform model
 
@@ -72,7 +87,8 @@ Linux is the reference platform for procps-ng compatibility. The implementation
 uses procfs and related kernel interfaces for process detail, memory maps,
 memory and swap information, load averages, CPU activity, uptime, login
 sessions, namespaces, cgroups, signal state, disk statistics, paging counters,
-slab information, and other Linux-specific observations.
+slab information, huge-page pools, per-process hugetlb accounting, and other
+Linux-specific observations.
 
 ### Windows
 
@@ -106,9 +122,10 @@ The project therefore follows several rules:
 3. Preserve provenance and fidelity for observed values.
 4. Prefer an explicit unsupported/unavailable result to a plausible-looking but
    semantically incorrect value.
-5. Keep neutral process and host mechanics in `Icod.CommandFramework`,
-   neutral timing mechanics in `Icod.Timing`, and ProcPs-specific policy in
-   `Icod.ProcPs.Shared`.
+5. Keep neutral process-control mechanics in `Icod.Processes`, neutral timing
+   mechanics in `Icod.Timing`, managed GNU/POSIX regular expressions in
+   `Icod.CommandFramework.RegularExpressions`, and ProcPs-specific observation
+   policy in `Icod.ProcPs.Shared`.
 
 This means that some commands or modes are naturally more portable than others.
 For example, `ps`, `pgrep`, `pkill`, `free`, and uptime-related observations can
@@ -160,6 +177,7 @@ documentation warning `CS1591`.
 Icod.ProcPs/
 ├── Icod.ProcPs.Shared/    shared ProcPs library
 ├── free/
+├── hugetop/
 ├── pgrep/
 ├── pidof/
 ├── pidwait/
@@ -167,10 +185,14 @@ Icod.ProcPs/
 ├── pmap/
 ├── ps/
 ├── pwdx/
+├── slabtop/
 ├── sysctl/
+├── tload/
+├── top/
 ├── uptime/
 ├── vmstat/
 ├── w/
+├── watch/
 ├── tests/                 command and shared-library tests
 ├── Icod.ProcPs.sln
 ├── build.cmd

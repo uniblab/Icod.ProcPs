@@ -72,13 +72,22 @@ function Invoke-Tool {
 
         [string[]]$Arguments = @(),
 
-        [int]$ExpectedExitCode = 0
+        [int]$ExpectedExitCode = 0,
+
+        [string]$ExpectedOutput = ''
     )
 
     Write-Host "> $Path $($Arguments -join ' ')"
-    & $Path @Arguments
-    if ($ExpectedExitCode -ne $LASTEXITCODE) {
-        throw "Tool '$Path' exited with status $LASTEXITCODE; expected $ExpectedExitCode."
+    $output = @(& $Path @Arguments)
+    $exitCode = $LASTEXITCODE
+    foreach ($line in $output) {
+        Write-Host $line
+    }
+    if ($ExpectedExitCode -ne $exitCode) {
+        throw "Tool '$Path' exited with status $exitCode; expected $ExpectedExitCode."
+    }
+    if (0 -lt $ExpectedOutput.Length -and ($output -join "`n").Trim() -ne $ExpectedOutput) {
+        throw "Tool '$Path' reported '$($output -join ' ')'; expected '$ExpectedOutput'."
     }
 }
 
@@ -198,11 +207,36 @@ $commandNames = @(
     'pmap',
     'ps',
     'pwdx',
+    'slabtop',
+    'hugetop',
     'sysctl',
+    'tload',
+    'top',
     'uptime',
     'vmstat',
-    'w'
+    'w',
+    'watch'
 )
+
+$productNames = [ordered]@{
+    'free' = 'Icod.ProcPs.Free'
+    'pgrep' = 'Icod.ProcPs.Pgrep'
+    'pidof' = 'Icod.ProcPs.PidOf'
+    'pidwait' = 'Icod.ProcPs.PidWait'
+    'pkill' = 'Icod.ProcPs.Pkill'
+    'pmap' = 'Icod.ProcPs.Pmap'
+    'ps' = 'Icod.ProcPs.Ps'
+    'pwdx' = 'Icod.ProcPs.Pwdx'
+    'slabtop' = 'Icod.ProcPs.SlabTop'
+    'hugetop' = 'Icod.ProcPs.HugeTop'
+    'sysctl' = 'Icod.ProcPs.Sysctl'
+    'tload' = 'Icod.ProcPs.Tload'
+    'top' = 'Icod.ProcPs.Top'
+    'uptime' = 'Icod.ProcPs.Uptime'
+    'vmstat' = 'Icod.ProcPs.Vmstat'
+    'w' = 'Icod.ProcPs.W'
+    'watch' = 'Icod.ProcPs.Watch'
+}
 
 [xml]$routerProject = Get-Content -LiteralPath $routerProjectPath -Raw
 $targetFramework = Get-ProjectProperty -Project $routerProject -Name 'TargetFramework'
@@ -242,7 +276,11 @@ try {
         $standaloneExecutable = Get-ExecutablePath `
             -Directory $standaloneOutputPath `
             -CommandName $commandName
-        Invoke-Tool -Path $standaloneExecutable -Arguments @('--version')
+        $expectedVersion = "$($productNames[$commandName]) ($routerVersion) inspired by procps-ng 4.0.6"
+        Invoke-Tool `
+            -Path $standaloneExecutable `
+            -Arguments @('--version') `
+            -ExpectedOutput $expectedVersion
     }
 
     Invoke-DotNet -Arguments @(
@@ -278,9 +316,16 @@ try {
     )
 
     $routerShim = Get-ExecutablePath -Directory $routerToolPath -CommandName 'procps'
-    Invoke-Tool -Path $routerShim -Arguments @('--version')
+    Invoke-Tool `
+        -Path $routerShim `
+        -Arguments @('--version') `
+        -ExpectedOutput "procps (Icod.ProcPs) $routerVersion"
     foreach ($commandName in $commandNames) {
-        Invoke-Tool -Path $routerShim -Arguments @($commandName, '--version')
+        $expectedVersion = "$($productNames[$commandName]) ($routerVersion) inspired by procps-ng 4.0.6"
+        Invoke-Tool `
+            -Path $routerShim `
+            -Arguments @($commandName, '--version') `
+            -ExpectedOutput $expectedVersion
     }
 
     Write-Host ''

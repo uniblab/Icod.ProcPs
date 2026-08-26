@@ -2,7 +2,7 @@ namespace Icod.ProcPs.Shared.Tests;
 
 using Icod.ProcPs.Shared;
 using System.Globalization;
-using Icod.CommandFramework.Processes;
+using Icod.Processes;
 using Xunit;
 
 /// <summary>Contains tests for provider.</summary>
