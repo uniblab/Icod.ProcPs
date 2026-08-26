@@ -289,10 +289,10 @@ jobs:
 
           The installed command is `procps`; use `procps COMMAND [args...]` to
           route to `free`, `pgrep`, `pidof`, `pidwait`, `pkill`, `pmap`, `ps`,
-          `pwdx`, `sysctl`, `uptime`, `vmstat`, or `w`.
+          `pwdx`, `sysctl`, `uptime`, `vmstat`, `w`, or `watch`.
 
           Traditional executable ZIPs are attached for Windows, Linux, and macOS
-          on both x64 and ARM64. They contain all twelve historical commands plus
+          on both x64 and ARM64. They contain all thirteen historical commands plus
           `procps`, and require the .NET 10 runtime.
           '@ -f $version
 
