@@ -31,11 +31,11 @@
 		<OutputPath>..\bin\$(Configuration)\</OutputPath>
 		<AssemblyName>procps</AssemblyName>
 		<RootNamespace>Icod.ProcPs.Router</RootNamespace>
-		<Version>0.9.0-Alpha-7</Version>
+		<Version>1.0.0</Version>
 		<AssemblyVersion>0.9.0.0</AssemblyVersion>
 	</PropertyGroup>
 	<PropertyGroup>
-		<PackageVersion>0.9.0-Alpha-7</PackageVersion>
+		<PackageVersion>1.0.0</PackageVersion>
 		<PackAsTool>true</PackAsTool>
 		<ToolCommandName>procps</ToolCommandName>
 		<PackageId>Icod.ProcPs</PackageId>
