@@ -4,8 +4,8 @@
 procps-ng 4.0.6.
 
 The repository provides familiar process- and system-observation commands such
-as `ps`, `pgrep`, `pkill`, `free`, `uptime`, `vmstat`, `w`, and `sysctl`, while
-factoring common ProcPs behavior into the reusable `Icod.ProcPs.Shared` library.
+as `ps`, `pgrep`, `pkill`, `free`, `uptime`, `vmstat`, `w`, `watch`, and
+`sysctl`, while factoring common ProcPs behavior into the reusable `Icod.ProcPs.Shared` library.
 
 The implementation targets .NET 10 and C# 13 and is designed for Windows,
 Linux, and macOS. Linux `/proc` remains the authoritative source for Linux
@@ -28,6 +28,7 @@ reported as unavailable rather than synthesized from unrelated metrics.
 | [`uptime`](uptime/README.md) | Report system uptime, user count, and load averages. |
 | [`vmstat`](vmstat/README.md) | Report virtual-memory, CPU, process, paging, disk, and system activity. |
 | [`w`](w/README.md) | Show logged-in users and what their sessions are doing. |
+| [`watch`](watch/README.md) | Execute a command periodically and display its output fullscreen. |
 | [`sysctl`](sysctl/README.md) | Read and write Linux runtime kernel parameters through `/proc/sys`. |
 
 Each executable directory contains its own man-page-style `README.md` describing
@@ -60,6 +61,10 @@ while monotonic elapsed-time and periodic scheduling primitives are supplied by
 `Icod.Timing`. `Icod.ProcPs.Shared` owns its observation-fidelity policy and
 consumes `Icod.CommandFramework.RegularExpressions` only for the managed
 GNU/POSIX regular-expression engine.
+
+Interactive full-screen commands use `Icod.DCurses` over `Icod.Terminal` and
+`Icod.TermInfo`; ProcPs command code owns application policy rather than native
+terminal modes, escape tables, or screen-refresh mechanics.
 
 ## Platform model
 

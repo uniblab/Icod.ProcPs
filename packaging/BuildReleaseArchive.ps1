@@ -154,6 +154,7 @@ $projects = [ordered]@{
     'uptime' = 'uptime/Icod.ProcPs.Uptime.csproj'
     'vmstat' = 'vmstat/Icod.ProcPs.Vmstat.csproj'
     'w' = 'w/Icod.ProcPs.W.csproj'
+    'watch' = 'watch/Icod.ProcPs.Watch.csproj'
     'procps' = 'procps/Icod.ProcPs.Router.csproj'
 }
 

@@ -10,11 +10,11 @@
 		<OutputPath>..\bin\$(Configuration)\</OutputPath>
 		<AssemblyName>procps</AssemblyName>
 		<RootNamespace>Icod.ProcPs.Router</RootNamespace>
-		<Version>0.9.0-Alpha-2</Version>
+		<Version>0.9.0-Alpha-3</Version>
 		<AssemblyVersion>0.9.0.0</AssemblyVersion>
 	</PropertyGroup>
 	<PropertyGroup>
-		<PackageVersion>0.9.0-Alpha-2</PackageVersion>
+		<PackageVersion>0.9.0-Alpha-3</PackageVersion>
 		<PackAsTool>true</PackAsTool>
 		<ToolCommandName>procps</ToolCommandName>
 		<PackageId>Icod.ProcPs</PackageId>
@@ -27,8 +27,8 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>Initial Icod.ProcPs multi-command tool distribution.</PackageReleaseNotes>
-		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;sysctl;process;linux;cli;tool;icod;system-monitoring;dotnet</PackageTags>
+		<PackageReleaseNotes>Add the DCurses-backed watch command to the ProcPs distribution.</PackageReleaseNotes>
+		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;watch;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 	</PropertyGroup>
 	<PropertyGroup Condition=" '$(PlatformTarget)' == '' ">
 		<PlatformTarget>AnyCPU</PlatformTarget>
@@ -46,6 +46,7 @@
 		<ProjectReference Include="..\uptime\Icod.ProcPs.Uptime.csproj" />
 		<ProjectReference Include="..\vmstat\Icod.ProcPs.Vmstat.csproj" />
 		<ProjectReference Include="..\w\Icod.ProcPs.W.csproj" />
+		<ProjectReference Include="..\watch\Icod.ProcPs.Watch.csproj" />
 	</ItemGroup>
 	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
 		<ErrorReport>prompt</ErrorReport>

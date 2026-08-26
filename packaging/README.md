@@ -1,13 +1,13 @@
 # Icod.ProcPs distribution
 
 This directory contains distribution verification and release tooling for
-`Icod.ProcPs`. Command behavior remains in the twelve historical command
+`Icod.ProcPs`. Command behavior remains in the thirteen historical command
 projects and the `procps` router project.
 
 The supported distribution model has two forms:
 
 1. one installable .NET tool package exposing `procps`; and
-2. traditional ZIP archives containing all thirteen executable entry points for
+2. traditional ZIP archives containing all fourteen executable entry points for
    a specific runtime identifier.
 
 ## .NET tool package
@@ -34,9 +34,10 @@ procps sysctl [args...]
 procps uptime [args...]
 procps vmstat [args...]
 procps w [args...]
+procps watch [args...]
 ```
 
-The .NET tool package does not install separate shims for the twelve historical
+The .NET tool package does not install separate shims for the thirteen historical
 commands. Current `dotnet tool` packaging supports one command per package, so
 `procps` is the suite's single managed-tool entry point.
 
@@ -66,6 +67,7 @@ sysctl
 uptime
 vmstat
 w
+watch
 procps
 LICENSE
 README.md
@@ -93,7 +95,7 @@ pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier linux-x64 -Version 1.0
 pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier osx-x64 -Version 1.0.0
 ```
 
-The script smoke-tests all thirteen apphosts when the requested RID matches the
+The script smoke-tests all fourteen apphosts when the requested RID matches the
 current host. On Unix-like hosts it uses the system `zip` command so executable
 permissions are retained in the archive. A `-SelfContained` switch is available
 for local experimentation, but automated GitHub releases are intentionally
@@ -116,11 +118,11 @@ pwsh packaging/VerifyDistribution.ps1
 The verifier:
 
 - restores, builds, and tests the solution;
-- executes the twelve built standalone command apphosts through `--version`;
+- executes the thirteen built standalone command apphosts through `--version`;
 - packs `Icod.ProcPs` from the `procps` router project;
 - inspects the generated tool package and requires exactly one command named
   `procps`;
-- verifies that the router and twelve managed command assemblies are present in
+- verifies that the router and thirteen managed command assemblies are present in
   the package;
 - installs the package from an isolated local NuGet source; and
 - exercises `procps --version` and each routed command's `--version` path.

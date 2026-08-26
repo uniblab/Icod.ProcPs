@@ -201,7 +201,8 @@ $commandNames = @(
     'sysctl',
     'uptime',
     'vmstat',
-    'w'
+    'w',
+    'watch'
 )
 
 [xml]$routerProject = Get-Content -LiteralPath $routerProjectPath -Raw

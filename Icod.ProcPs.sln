@@ -30,6 +30,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Sysctl", "sysct
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Router", "procps\Icod.ProcPs.Router.csproj", "{AA7A35FE-111C-498E-8E87-7801E1AB09FD}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Watch", "watch\Icod.ProcPs.Watch.csproj", "{4A0F17EB-E6BE-487E-8D74-B140DE563BAF}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Shared.Tests", "tests\ProcPs.Shared.Tests\Icod.ProcPs.Shared.Tests.csproj", "{87390BF1-93C3-58EE-9128-D698E2273A14}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Pgrep.Tests", "tests\ProcPs.Pgrep.Tests\Icod.ProcPs.Pgrep.Tests.csproj", "{CC72FCAB-4FE5-569E-B0FA-3B2AD6843807}"
@@ -55,6 +57,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.W.Tests", "tests\ProcPs.W.Tests\Icod.ProcPs.W.Tests.csproj", "{D8FBC672-E10D-51BB-90BF-C027BFE5E57A}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Sysctl.Tests", "tests\ProcPs.Sysctl.Tests\Icod.ProcPs.Sysctl.Tests.csproj", "{D8F5A305-3745-59FA-A6C8-CF2A96051DBB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Icod.ProcPs.Watch.Tests", "tests\ProcPs.Watch.Tests\Icod.ProcPs.Watch.Tests.csproj", "{18884980-D17F-4801-9F4F-C9DA2FA297FF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{32F4BC07-0F19-5A57-A9B0-F3E72E27CB6C}"
 EndProject
@@ -227,6 +231,18 @@ Global
 		{D8F5A305-3745-59FA-A6C8-CF2A96051DBB}.Release|Any CPU.Build.0 = Release|Any CPU
 		{D8F5A305-3745-59FA-A6C8-CF2A96051DBB}.Staging|Any CPU.ActiveCfg = Staging|Any CPU
 		{D8F5A305-3745-59FA-A6C8-CF2A96051DBB}.Staging|Any CPU.Build.0 = Staging|Any CPU
+		{4A0F17EB-E6BE-487E-8D74-B140DE563BAF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4A0F17EB-E6BE-487E-8D74-B140DE563BAF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4A0F17EB-E6BE-487E-8D74-B140DE563BAF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4A0F17EB-E6BE-487E-8D74-B140DE563BAF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4A0F17EB-E6BE-487E-8D74-B140DE563BAF}.Staging|Any CPU.ActiveCfg = Staging|Any CPU
+		{4A0F17EB-E6BE-487E-8D74-B140DE563BAF}.Staging|Any CPU.Build.0 = Staging|Any CPU
+		{18884980-D17F-4801-9F4F-C9DA2FA297FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{18884980-D17F-4801-9F4F-C9DA2FA297FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{18884980-D17F-4801-9F4F-C9DA2FA297FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{18884980-D17F-4801-9F4F-C9DA2FA297FF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{18884980-D17F-4801-9F4F-C9DA2FA297FF}.Staging|Any CPU.ActiveCfg = Staging|Any CPU
+		{18884980-D17F-4801-9F4F-C9DA2FA297FF}.Staging|Any CPU.Build.0 = Staging|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -245,5 +261,6 @@ Global
 		{BF256EC8-5E67-52B4-9C1C-1D7014F51843} = {32F4BC07-0F19-5A57-A9B0-F3E72E27CB6C}
 		{D8FBC672-E10D-51BB-90BF-C027BFE5E57A} = {32F4BC07-0F19-5A57-A9B0-F3E72E27CB6C}
 		{D8F5A305-3745-59FA-A6C8-CF2A96051DBB} = {32F4BC07-0F19-5A57-A9B0-F3E72E27CB6C}
+		{18884980-D17F-4801-9F4F-C9DA2FA297FF} = {32F4BC07-0F19-5A57-A9B0-F3E72E27CB6C}
 	EndGlobalSection
 EndGlobal
