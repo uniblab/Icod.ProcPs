@@ -208,7 +208,7 @@ internal static class TopRenderer {
 		TopRuntimeState state
 	) {
 		string taskLabel = state.ShowThreads ? "Threads" : "Tasks";
-		IReadOnlyList<TopTaskRow> visible = ApplyFilters( sample.Tasks, state );
+		IReadOnlyList<TopTaskRow> visible = ApplyFilters( sample.Tasks, state ).ToList().AsReadOnly();
 		int running = visible.Count( row => IsState( row, ProcProcessState.Running ) );
 		int sleeping = visible.Count( row => IsState( row, ProcProcessState.Sleeping ) );
 		int stopped = visible.Count( row => IsState( row, ProcProcessState.Stopped ) || IsState( row, ProcProcessState.TracingStop ) );
