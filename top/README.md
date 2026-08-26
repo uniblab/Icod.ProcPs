@@ -187,6 +187,16 @@ tranches rather than represented incompletely:
 - fields whose source facts are not yet present in the neutral process model,
   including exact SHR accounting.
 
+## TESTING
+
+`tests/ProcPs.Top.Tests` exercises the terminal-independent sampler and renderer,
+batch scheduling, command-line validation and filtering, and the interactive
+DCurses seam with deterministic fake clocks, providers, terminal events, and
+process controls. The tests verify resize and repaint behavior without accidental
+resampling, fixed-rate refresh deadlines, secure-mode restrictions, reuse-aware
+process signalling, terminal disposal, and the pre-terminal help/version/field
+listing paths.
+
 ## EXIT STATUS
 
 `0`
