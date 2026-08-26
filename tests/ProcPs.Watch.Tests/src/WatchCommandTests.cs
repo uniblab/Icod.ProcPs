@@ -251,6 +251,37 @@ public sealed class WatchCommandTests {
 	}
 
 	[Fact]
+	public async Task ResizeDoesNotCountAsVisibleChange() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock, new WatchTerminalDimensions( 5, 3 ) );
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent(
+				WatchTerminalEventKind.Resize,
+				new WatchTerminalDimensions( 6, 3 )
+			)
+		);
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "abcdeX" ),
+			Execution.Success( "abcdeY" ),
+			Execution.Success( "abcdZZ" )
+		);
+
+		CommandResult result = await RunAsync(
+			[ "--exec", "--no-title", "--no-wrap", "--chgexit", "tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 3, executor.Options.Count );
+		Assert.Equal( 3, terminal.Frames.Count );
+		Assert.Equal( 5, terminal.Frames[ 0 ].Screen.Width );
+		Assert.Equal( 6, terminal.Frames[ 1 ].Screen.Width );
+	}
+
+	[Fact]
 	public async Task NoRerunRedrawsPreviousOutputAfterResize() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock, new WatchTerminalDimensions( 10, 4 ) );
@@ -315,6 +346,124 @@ public sealed class WatchCommandTests {
 		Assert.Equal( 2, screen.GetCell( 0, 1 ).DisplayWidth );
 		Assert.True( screen.GetCell( 0, 2 ).IsContinuation );
 		Assert.Equal( "B", screen.GetCell( 0, 3 ).Content );
+	}
+
+	[Fact]
+	public async Task HeaderCanBeSuppressed() {
+		FakeClock titledClock = new();
+		FakeTerminal titled = new(
+			titledClock,
+			new WatchTerminalDimensions( 50, 5 )
+		);
+		CommandResult titledResult = await RunAsync(
+			[ "--exec", "--equexit=1", "tool" ],
+			titled,
+			new FakeExecutor(
+				titledClock,
+				Execution.Success( "same" ),
+				Execution.Success( "same" )
+			),
+			titledClock
+		);
+
+		Assert.Equal( 0, titledResult.ExitCode );
+		Assert.Equal( 2, titled.Frames[ 0 ].HeaderLines.Count );
+		Assert.Contains(
+			"Every 2s: tool",
+			titled.Frames[ 0 ].HeaderLines[ 0 ],
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"test-host",
+			titled.Frames[ 0 ].HeaderLines[ 0 ],
+			StringComparison.Ordinal
+		);
+
+		FakeClock untitledClock = new();
+		FakeTerminal untitled = new(
+			untitledClock,
+			new WatchTerminalDimensions( 50, 5 )
+		);
+		CommandResult untitledResult = await RunAsync(
+			[ "--exec", "--no-title", "--equexit=1", "tool" ],
+			untitled,
+			new FakeExecutor(
+				untitledClock,
+				Execution.Success( "same" ),
+				Execution.Success( "same" )
+			),
+			untitledClock
+		);
+
+		Assert.Equal( 0, untitledResult.ExitCode );
+		Assert.Empty( untitled.Frames[ 0 ].HeaderLines );
+	}
+
+	[Fact]
+	public async Task ResumeRepaintAndInterruptReturnCanceledAndDisposeTerminal() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock, new WatchTerminalDimensions( 40, 5 ) );
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent( WatchTerminalEventKind.Repaint )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent( WatchTerminalEventKind.Interrupt )
+		);
+
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "first" )
+		);
+		CommandResult result = await RunAsync(
+			[ "--exec", "tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 130, result.ExitCode );
+		Assert.Single( executor.Options );
+		Assert.Single( terminal.Frames );
+		Assert.Equal( 1, terminal.RepaintCount );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task VersionDoesNotOpenInteractiveTerminal() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock, new WatchTerminalDimensions( 40, 5 ) );
+
+		CommandResult result = await RunAsync(
+			[ "--version" ],
+			terminal,
+			new FakeExecutor( clock ),
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Contains( "watch (Icod.ProcPs)", result.Stdout, StringComparison.Ordinal );
+		Assert.Equal( 0, terminal.OpenCount );
+		Assert.False( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task FollowConflictIsControlledWithoutOpeningTerminal() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock, new WatchTerminalDimensions( 40, 5 ) );
+		FakeExecutor executor = new( clock );
+
+		CommandResult result = await RunAsync(
+			[ "--follow", "--chgexit", "tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 1, result.ExitCode );
+		Assert.Contains( "conflicts", result.Stderr, StringComparison.Ordinal );
+		Assert.Empty( executor.Options );
+		Assert.Equal( 0, terminal.OpenCount );
+		Assert.False( terminal.Disposed );
 	}
 
 	[Fact]
@@ -579,6 +728,11 @@ public sealed class WatchCommandTests {
 			private set;
 		}
 
+		internal int RepaintCount {
+			get;
+			private set;
+		}
+
 		internal int OpenCount {
 			get;
 			set;
@@ -632,6 +786,7 @@ public sealed class WatchCommandTests {
 			CancellationToken cancellationToken = default
 		) {
 			cancellationToken.ThrowIfCancellationRequested();
+			this.RepaintCount++;
 			return ValueTask.CompletedTask;
 		}
 
