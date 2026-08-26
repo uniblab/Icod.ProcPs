@@ -52,6 +52,8 @@ Options:
 	/// <summary>Runs <c>pmap</c> asynchronously with injectable process and memory-map providers.</summary>
 	public static async Task<int> RunAsync( string[] args, Stream? stdout = null, Stream? stderr = null, IProcProcessProvider? processProvider = null, IProcMemoryMapProvider? memoryMapProvider = null, CancellationToken cancellationToken = default ) {
 		ArgumentNullException.ThrowIfNull( args );
+		stdout ??= Console.OpenStandardOutput();
+		stderr ??= Console.OpenStandardError();
 		if ( 0 == args.Length ) {
 			await WriteAsync( stderr, NormalizeLineEndings( Usage ), cancellationToken ).ConfigureAwait( false );
 			return Failure;

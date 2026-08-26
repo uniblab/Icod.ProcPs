@@ -129,6 +129,8 @@ Output:
 	/// <summary>Runs <c>ps</c> asynchronously with injectable ProcPs providers.</summary>
 	public static async Task<int> RunAsync( string[] args, Stream? stdout = null, Stream? stderr = null, IProcProcessProvider? processProvider = null, IProcSystemMetricsProvider? metricsProvider = null, IProcMatchSupplementProvider? supplementProvider = null, IProcPsAccountResolver? accountResolver = null, Func<int>? currentProcessIdProvider = null, IReadOnlyDictionary<string, string?>? environment = null, Func<DateTimeOffset>? nowProvider = null, CancellationToken cancellationToken = default ) {
 		ArgumentNullException.ThrowIfNull( args );
+		stdout ??= Console.OpenStandardOutput();
+		stderr ??= Console.OpenStandardError();
 		var hostEnvironment = environment ?? ReadPersonalityEnvironment();
 		var parsed = ParseArguments( args, hostEnvironment, accountResolver ?? SystemProcPsAccountResolver.Instance );
 		if ( null != parsed.Error ) {
