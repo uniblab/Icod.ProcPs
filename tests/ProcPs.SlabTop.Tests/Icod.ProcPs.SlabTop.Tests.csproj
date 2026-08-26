@@ -2,35 +2,31 @@
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<LangVersion>13.0</LangVersion>
-		<OutputType>Library</OutputType>
 		<TargetFramework>net10.0</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
+		<IsPackable>false</IsPackable>
+		<IsTestProject>true</IsTestProject>
 		<GenerateDocumentationFile>true</GenerateDocumentationFile>
-		<OutputPath>..\bin\$(Configuration)\</OutputPath>
-		<AssemblyName>Icod.ProcPs.Shared</AssemblyName>
-		<RootNamespace>Icod.ProcPs.Shared</RootNamespace>
-		<Version>1.0.0-Alpha-4</Version>
+		<AssemblyName>Icod.ProcPs.SlabTop.Tests</AssemblyName>
+		<RootNamespace>Icod.ProcPs.SlabTop.Tests</RootNamespace>
 	</PropertyGroup>
-	<PropertyGroup>
-		<PackageVersion>1.0.0-Alpha-4</PackageVersion>
-		<PackageReleaseNotes>Add exact Linux slab allocator observation contracts for slabtop.</PackageReleaseNotes>
-		<Authors>Timothy J. Bruce</Authors>
-		<PackageReadmeFile>README.md</PackageReadmeFile>
-		<PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
-		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<IncludeContentInPack>true</IncludeContentInPack>
-		<IncludeSymbols>True</IncludeSymbols>
-		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
-	</PropertyGroup>
-	<ItemGroup>
-		<PackageReference Include="Icod.CommandFramework" Version="1.2.1" />
-		<PackageReference Include="Icod.Processes" Version="1.0.0" />
-		<PackageReference Include="Icod.Timing" Version="1.0.0" />
-	</ItemGroup>
 	<PropertyGroup Condition=" '$(PlatformTarget)' == '' ">
 		<PlatformTarget>AnyCPU</PlatformTarget>
 	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Icod.Timing" Version="1.0.0" />
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
+		<PackageReference Include="xunit" Version="2.9.2" />
+		<PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+			<PrivateAssets>all</PrivateAssets>
+			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+		</PackageReference>
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\..\slabtop\Icod.ProcPs.SlabTop.csproj" />
+		<ProjectReference Include="..\..\Icod.ProcPs.Shared\Icod.ProcPs.Shared.csproj" />
+	</ItemGroup>
 	<PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
 		<ErrorReport>prompt</ErrorReport>
 		<WarningLevel>2</WarningLevel>
@@ -60,19 +56,4 @@
 		<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 		<WarningsNotAsErrors>CS1591</WarningsNotAsErrors>
 	</PropertyGroup>
-	<ItemGroup>
-		<Content Include="README.md">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<TargetPath>$(AssemblyName).README.md</TargetPath>
-			<Pack>true</Pack>
-			<PackagePath>\</PackagePath>
-		</Content>
-
-		<Content Include="LICENSE">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-			<TargetPath>$(AssemblyName).LICENSE.txt</TargetPath>
-			<Pack>true</Pack>
-			<PackagePath>\</PackagePath>
-		</Content>
-	</ItemGroup>
 </Project>

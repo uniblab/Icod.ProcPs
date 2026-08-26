@@ -4,7 +4,9 @@
 procps-ng 4.0.6 command set in this repository. It owns process enumeration,
 procps field semantics, Linux `/proc` parsing, native Windows and macOS
 observation providers, conservative fallback observations for other platforms,
-process selection, the shared pgrep/pkill/pidwait matching grammar, system metrics, vmstat-specific cumulative counters and disk observations, sampling calculations, personalities,
+process selection, the shared pgrep/pkill/pidwait matching grammar, system metrics,
+exact Linux slab-cache observation and `/proc/slabinfo` parsing, vmstat-specific
+cumulative counters and disk observations, sampling calculations, personalities,
 sorting, and reusable screen-state models.
 
 Cross-suite process-control mechanics are provided by the published

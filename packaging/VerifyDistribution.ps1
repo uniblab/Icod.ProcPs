@@ -198,6 +198,7 @@ $commandNames = @(
     'pmap',
     'ps',
     'pwdx',
+    'slabtop',
     'sysctl',
     'uptime',
     'vmstat',
