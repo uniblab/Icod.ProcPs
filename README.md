@@ -5,8 +5,8 @@ procps-ng 4.0.6.
 
 The repository provides familiar process- and system-observation commands such
 as `ps`, `pgrep`, `pkill`, `free`, `uptime`, `vmstat`, `w`, `watch`, `slabtop`,
-`hugetop`, `top`, and `sysctl`, while factoring common ProcPs behavior into the
-reusable `Icod.ProcPs.Shared` library.
+`hugetop`, `tload`, `top`, and `sysctl`, while factoring common ProcPs behavior
+into the reusable `Icod.ProcPs.Shared` library.
 
 The implementation targets .NET 10 and C# 13 and is designed for Windows,
 Linux, and macOS. Linux `/proc` remains the authoritative source for Linux
@@ -28,6 +28,7 @@ reported as unavailable rather than synthesized from unrelated metrics.
 | [`ps`](ps/README.md) | Report a snapshot of current processes, including ProcPs-style selection, formatting, sorting, personalities, and thread views. |
 | [`slabtop`](slabtop/README.md) | Display Linux slab-cache information in real time or as a one-shot report. |
 | [`hugetop`](hugetop/README.md) | Display Linux huge-page pools and per-process hugetlb usage in real time or as a one-shot report. |
+| [`tload`](tload/README.md) | Display a scrolling terminal graph of system load averages. |
 | [`top`](top/README.md) | Display dynamic process and system activity in batch or interactive mode. |
 | [`uptime`](uptime/README.md) | Report system uptime, user count, and load averages. |
 | [`vmstat`](vmstat/README.md) | Report virtual-memory, CPU, process, paging, disk, and system activity. |
@@ -70,6 +71,10 @@ GNU/POSIX regular-expression engine.
 Interactive full-screen commands use `Icod.DCurses` over `Icod.Terminal` and
 `Icod.TermInfo`; ProcPs command code owns application policy rather than native
 terminal modes, escape tables, or screen-refresh mechanics.
+
+`tload` is intentionally output-only. It uses `Icod.Terminal` and `Icod.TermInfo`
+directly for output-terminal geometry and cursor positioning without taking
+ownership of terminal input or a curses presentation.
 
 ## Platform model
 
@@ -172,6 +177,7 @@ documentation warning `CS1591`.
 Icod.ProcPs/
 ├── Icod.ProcPs.Shared/    shared ProcPs library
 ├── free/
+├── hugetop/
 ├── pgrep/
 ├── pidof/
 ├── pidwait/
@@ -179,10 +185,14 @@ Icod.ProcPs/
 ├── pmap/
 ├── ps/
 ├── pwdx/
+├── slabtop/
 ├── sysctl/
+├── tload/
+├── top/
 ├── uptime/
 ├── vmstat/
 ├── w/
+├── watch/
 ├── tests/                 command and shared-library tests
 ├── Icod.ProcPs.sln
 ├── build.cmd

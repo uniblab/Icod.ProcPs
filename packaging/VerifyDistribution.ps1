@@ -210,6 +210,7 @@ $commandNames = @(
     'slabtop',
     'hugetop',
     'sysctl',
+    'tload',
     'top',
     'uptime',
     'vmstat',
@@ -229,6 +230,7 @@ $productNames = [ordered]@{
     'slabtop' = 'Icod.ProcPs.SlabTop'
     'hugetop' = 'Icod.ProcPs.HugeTop'
     'sysctl' = 'Icod.ProcPs.Sysctl'
+    'tload' = 'Icod.ProcPs.Tload'
     'top' = 'Icod.ProcPs.Top'
     'uptime' = 'Icod.ProcPs.Uptime'
     'vmstat' = 'Icod.ProcPs.Vmstat'

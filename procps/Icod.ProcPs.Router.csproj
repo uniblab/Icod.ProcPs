@@ -27,8 +27,8 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>Add the DCurses-backed hugetop Linux huge-page monitor.</PackageReleaseNotes>
-		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;watch;slabtop;hugetop;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
+		<PackageReleaseNotes>Add tload and complete the seventeen-command ProcPs migration profile.</PackageReleaseNotes>
+		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<icon>icon.png</icon>
 	</PropertyGroup>
 	<PropertyGroup Condition=" '$(PlatformTarget)' == '' ">
@@ -46,6 +46,7 @@
 		<ProjectReference Include="..\slabtop\Icod.ProcPs.SlabTop.csproj" />
 		<ProjectReference Include="..\hugetop\Icod.ProcPs.HugeTop.csproj" />
 		<ProjectReference Include="..\sysctl\Icod.ProcPs.Sysctl.csproj" />
+		<ProjectReference Include="..\tload\Icod.ProcPs.Tload.csproj" />
 		<ProjectReference Include="..\top\Icod.ProcPs.Top.csproj" />
 		<ProjectReference Include="..\uptime\Icod.ProcPs.Uptime.csproj" />
 		<ProjectReference Include="..\vmstat\Icod.ProcPs.Vmstat.csproj" />

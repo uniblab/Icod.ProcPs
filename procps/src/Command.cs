@@ -12,6 +12,7 @@ using PwdxCommand = Icod.ProcPs.Pwdx.Command;
 using SlabTopCommand = Icod.ProcPs.SlabTop.Command;
 using HugeTopCommand = Icod.ProcPs.HugeTop.Command;
 using SysctlCommand = Icod.ProcPs.Sysctl.Command;
+using TloadCommand = Icod.ProcPs.Tload.Command;
 using TopCommand = Icod.ProcPs.Top.Command;
 using UptimeCommand = Icod.ProcPs.Uptime.Command;
 using VmstatCommand = Icod.ProcPs.Vmstat.Command;
@@ -38,6 +39,7 @@ Commands:
  slabtop   display Linux slab-cache information in real time
  hugetop   display Linux huge-page pool and process usage in real time
  sysctl    read or write Linux runtime kernel parameters
+ tload     display a scrolling terminal graph of load averages
  top       display dynamic process and system activity
  uptime    report system uptime, user count, and load averages
  vmstat    report virtual-memory and system activity
@@ -95,6 +97,7 @@ Run 'procps COMMAND --help' for command-specific help.
 			"slabtop" => await SlabTopCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"hugetop" => await HugeTopCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"sysctl" => await SysctlCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
+			"tload" => await TloadCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"top" => await TopCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"uptime" => await UptimeCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
 			"vmstat" => await VmstatCommand.RunAsync( commandArguments ).ConfigureAwait( false ),
@@ -138,6 +141,7 @@ Run 'procps COMMAND --help' for command-specific help.
 			"slabtop" or
 			"hugetop" or
 			"sysctl" or
+			"tload" or
 			"top" or
 			"uptime" or
 			"vmstat" or
