@@ -1,5 +1,3 @@
-// Ported to .NET by Timothy J. Bruce <uniblab@hotmail.com>
-
 namespace Icod.ProcPs.Watch;
 
 /// <summary>Provides the procps-ng compatible <c>watch [options] command</c> executable entry point.</summary>

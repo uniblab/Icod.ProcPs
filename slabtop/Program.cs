@@ -1,5 +1,3 @@
-// Ported to .NET by Timothy J. Bruce <uniblab@hotmail.com>
-
 namespace Icod.ProcPs.SlabTop;
 
 /// <summary>Provides the procps-ng compatible <c>slabtop [options]</c> entry point.</summary>

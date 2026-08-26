@@ -1,5 +1,3 @@
-// Ported to .NET by Timothy J. Bruce <uniblab@hotmail.com>
-
 namespace Icod.ProcPs.Pwdx;
 
 /// <summary>

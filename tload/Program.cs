@@ -1,5 +1,3 @@
-// Ported to .NET by Timothy J. Bruce <uniblab@hotmail.com>
-
 namespace Icod.ProcPs.Tload;
 
 /// <summary>Provides the procps-ng compatible <c>tload [options] [tty]</c> executable entry point.</summary>
