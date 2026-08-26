@@ -15,10 +15,12 @@ Cross-suite process-control mechanics are provided by the published
 process/process-group/session targets, launching, arbitrary waiting, signal
 delivery (including queued values), priority changes, and status translation.
 Monotonic elapsed-time and periodic scheduling primitives are provided by the
-standalone `Icod.Timing` package. GNU/POSIX regular-expression matching remains
-provided by `Icod.CommandFramework.RegularExpressions`; it is the only
-CommandFramework subsystem consumed by this library. ProcPs owns observation
-provenance and semantic-fidelity policy, including `ProcObservationFidelity`.
+standalone `Icod.Timing` package. `Icod.ProcPs.Shared` exposes the neutral
+`IProcMatchPatternCompiler` and `IProcMatchPattern` contracts used by the shared
+process-matching engine and has no `Icod.CommandFramework` dependency. The
+`pgrep`, `pkill`, and `pidwait` executables adapt the CommandFramework GNU ERE
+provider to those contracts. ProcPs owns observation provenance and
+semantic-fidelity policy, including `ProcObservationFidelity`.
 
 Linux `/proc` is the authoritative procps-ng data source. The neutral models do
 not require non-Linux systems to pretend that Linux-only counters exist:
@@ -101,14 +103,16 @@ Presentation and terminal lifecycle do not live in this library. Interactive
 ## Batch 59 process-matching family
 
 `ProcMatchCommand` is the single procps-ng 4.0.6 engine used by `pgrep`,
-`pkill`, and `pidwait`. The command profiles share GNU ERE matching through the
-cross-suite managed regular-expression provider, OR-within/AND-between selector
-semantics, PID/parent/group/session/user/terminal/state/cgroup/namespace/age/
-environment filtering, newest/oldest selection, pidfile policy, ancestor
-exclusion, and signal-handler selection. Linux lightweight-task enumeration and
-environment/namespace observations stay suite-specific here; actual signal
-delivery, queued values, reuse-aware waiting, and signal-disposition observation
-continue to use the cross-suite process-control contracts.
+`pkill`, and `pidwait`. The shared engine receives compiled patterns through the
+neutral `IProcMatchPatternCompiler` / `IProcMatchPattern` boundary; each command
+adapts the cross-suite managed GNU ERE provider at its executable boundary. The
+profiles retain OR-within/AND-between selector semantics, PID/parent/group/
+session/user/terminal/state/cgroup/namespace/age/environment filtering,
+newest/oldest selection, pidfile policy, ancestor exclusion, and signal-handler
+selection. Linux lightweight-task enumeration and environment/namespace
+observations stay suite-specific here; actual signal delivery, queued values,
+reuse-aware waiting, and signal-disposition observation continue to use the
+cross-suite process-control contracts.
 
 `pidwait` is the only installed waiting executable in the pinned procps-ng
 4.0.6 profile. No `pwait` launcher or project is created.

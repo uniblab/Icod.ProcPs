@@ -1,4 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+	Icod.ProcPs.Shared
+	Provides shared process and system observation infrastructure for Icod.ProcPs.
+	Copyright (C) 2026  Timothy J. Bruce <uniblab@hotmail.com>
+-->
+
+<!--
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU Lesser General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU Lesser General Public License for more details.
+
+	You should have received a copy of the GNU Lesser General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+-->
+
 <Project Sdk="Microsoft.NET.Sdk">
 	<PropertyGroup>
 		<LangVersion>13.0</LangVersion>
@@ -10,11 +31,11 @@
 		<OutputPath>..\bin\$(Configuration)\</OutputPath>
 		<AssemblyName>Icod.ProcPs.Shared</AssemblyName>
 		<RootNamespace>Icod.ProcPs.Shared</RootNamespace>
-		<Version>1.0.0-Alpha-6</Version>
+		<Version>1.0.0-Alpha-7</Version>
 	</PropertyGroup>
 	<PropertyGroup>
-		<PackageVersion>1.0.0-Alpha-6</PackageVersion>
-		<PackageReleaseNotes>Add exact Linux huge-page pool and process hugetlb observation contracts for hugetop.</PackageReleaseNotes>
+		<PackageVersion>1.0.0-Alpha-7</PackageVersion>
+		<PackageReleaseNotes>Decouple command-specific GNU regular-expression support from Icod.ProcPs.Shared.</PackageReleaseNotes>
 		<Authors>Timothy J. Bruce</Authors>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 		<PackageLicenseExpression>LGPL-3.0-or-later</PackageLicenseExpression>
@@ -24,7 +45,6 @@
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Icod.CommandFramework" Version="1.2.1" />
 		<PackageReference Include="Icod.Processes" Version="1.0.0" />
 		<PackageReference Include="Icod.Timing" Version="1.0.0" />
 	</ItemGroup>

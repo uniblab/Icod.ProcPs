@@ -1,3 +1,24 @@
+/*
+	Icod.ProcPs.Tload.Tests
+	Tests for the tload command implementation.
+	Copyright (C) 2026  Timothy J. Bruce <uniblab@hotmail.com>
+*/
+
+/*
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 namespace Icod.ProcPs.Tload.Tests;
 
 using System.Runtime.CompilerServices;
@@ -334,7 +355,7 @@ public sealed class TloadCommandTests {
 		);
 		Assert.Equal( 0, version.ExitCode );
 		Assert.Equal(
-			$"Icod.ProcPs.Tload (0.9.0-Alpha-6) inspired by procps-ng 4.0.6{Environment.NewLine}",
+			$"Icod.ProcPs.Tload (0.9.0-Alpha-7) inspired by procps-ng 4.0.6{Environment.NewLine}",
 			version.Stdout
 		);
 		Assert.Equal( string.Empty, version.Stderr );
@@ -354,7 +375,7 @@ public sealed class TloadCommandTests {
 
 		Assert.Equal( 0, status );
 		Assert.Equal(
-			$"Icod.ProcPs.Tload (0.9.0-Alpha-6) inspired by procps-ng 4.0.6{Environment.NewLine}",
+			$"Icod.ProcPs.Tload (0.9.0-Alpha-7) inspired by procps-ng 4.0.6{Environment.NewLine}",
 			Encoding.UTF8.GetString( output.ToArray() )
 		);
 		Assert.Equal( string.Empty, Encoding.UTF8.GetString( error.ToArray() ) );

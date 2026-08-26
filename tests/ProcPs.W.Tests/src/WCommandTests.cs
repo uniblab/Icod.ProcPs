@@ -1,3 +1,24 @@
+/*
+	Icod.ProcPs.W.Tests
+	Tests for the w command implementation.
+	Copyright (C) 2026  Timothy J. Bruce <uniblab@hotmail.com>
+*/
+
+/*
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 namespace Icod.ProcPs.W.Tests;
 
 using System.Text;
@@ -274,7 +295,7 @@ public sealed class WCommandTests {
 		using var version = new MemoryStream();
 		using var versionError = new MemoryStream();
 		Assert.Equal( 0, await Tool.RunAsync( [ "--version" ], stdout: version, stderr: versionError ) );
-		Assert.Equal( $"Icod.ProcPs.W (0.9.0-Alpha-6) inspired by procps-ng 4.0.6{Environment.NewLine}", Text( version ) );
+		Assert.Equal( $"Icod.ProcPs.W (0.9.0-Alpha-7) inspired by procps-ng 4.0.6{Environment.NewLine}", Text( version ) );
 		Assert.Equal( string.Empty, Text( versionError ) );
 
 		using var invalid = new MemoryStream();

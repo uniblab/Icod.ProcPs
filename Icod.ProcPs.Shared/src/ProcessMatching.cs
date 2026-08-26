@@ -1,10 +1,30 @@
+/*
+	Icod.ProcPs.Shared
+	Provides shared process and system observation infrastructure for Icod.ProcPs.
+	Copyright (C) 2026  Timothy J. Bruce <uniblab@hotmail.com>
+*/
+
+/*
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU Lesser General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU Lesser General Public License for more details.
+
+	You should have received a copy of the GNU Lesser General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 namespace Icod.ProcPs.Shared;
 
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
-using Icod.CommandFramework.RegularExpressions;
 using Icod.Processes;
 
 /// <summary>Identifies the pgrep, pkill, or pidwait command profile.</summary>
@@ -144,8 +164,30 @@ public static class ProcMatchCommand {
 	private static readonly string[] DefaultNamespaces = [ "ipc", "mnt", "net", "pid", "user", "uts" ];
 	private static readonly HashSet<string> SupportedNamespaces = new( DefaultNamespaces, StringComparer.Ordinal );
 	/// <summary>Runs the command asynchronously.</summary>
-	public static async Task<int> RunAsync( ProcMatchCommandMode mode, string[] args, Stream? stdin = null, Stream? stdout = null, Stream? stderr = null, IProcProcessProvider? processProvider = null, IProcMatchControl? control = null, IProcMatchSupplementProvider? supplements = null, IProcAccountResolver? accountResolver = null, Func<int>? currentProcessIdProvider = null, CancellationToken cancellationToken = default, string? versionText = null ) {
-		ArgumentNullException.ThrowIfNull( args ); var matchControl = control ?? SystemProcMatchControl.Instance; var parsed = Parse( mode, args, matchControl, accountResolver ?? SystemProcAccountResolver.Instance );
+	public static async Task<int> RunAsync(
+		ProcMatchCommandMode mode,
+		string[] args,
+		Stream? stdin = null,
+		Stream? stdout = null,
+		Stream? stderr = null,
+		IProcProcessProvider? processProvider = null,
+		IProcMatchControl? control = null,
+		IProcMatchSupplementProvider? supplements = null,
+		IProcAccountResolver? accountResolver = null,
+		Func<int>? currentProcessIdProvider = null,
+		CancellationToken cancellationToken = default,
+		string? versionText = null,
+		IProcMatchPatternCompiler? patternCompiler = null
+	) {
+		ArgumentNullException.ThrowIfNull( args );
+		var matchControl = control ?? SystemProcMatchControl.Instance;
+		var parsed = Parse(
+			mode,
+			args,
+			matchControl,
+			accountResolver ?? SystemProcAccountResolver.Instance,
+			patternCompiler
+		);
 		if ( null != parsed.Error ) { if ( 0 < parsed.Error.Length ) await WriteLineAsync( stderr, $"{ProgramName( mode )}: {parsed.Error}", cancellationToken ).ConfigureAwait( false ); if ( parsed.ShowUsageOnError ) await WriteAsync( stderr, NormalizeLineEndings( Usage( mode ) ), cancellationToken ).ConfigureAwait( false ); return parsed.ErrorStatus; }
 		if ( parsed.ShowHelp ) { await WriteAsync( stdout, NormalizeLineEndings( Usage( mode ) ), cancellationToken ).ConfigureAwait( false ); return Success; }
 		if ( parsed.ShowVersion ) { await WriteLineAsync( stdout, versionText ?? $"{ProgramName( mode )} from procps-ng 4.0.6", cancellationToken ).ConfigureAwait( false ); return Success; }
@@ -156,7 +198,7 @@ public static class ProcMatchCommand {
 	}
 	private static void ResolveSelfRelativeSelectors( ParsedArguments options, int currentPid, IReadOnlyList<ProcProcessSnapshot> processes ) { if ( !options.ProcessGroups.Contains( 0 ) && !options.Sessions.Contains( 0 ) ) return; var current = processes.FirstOrDefault( process => process.ProcessId == currentPid ); if ( options.ProcessGroups.Contains( 0 ) && null != current && current.ProcessGroupId.HasValue ) { options.ProcessGroups.Remove( 0 ); options.ProcessGroups.Add( current.ProcessGroupId.Value ); } if ( options.Sessions.Contains( 0 ) && null != current && current.SessionId.HasValue ) { options.Sessions.Remove( 0 ); options.Sessions.Add( current.SessionId.Value ); } }
 	private static bool Matches( ProcMatchCandidate candidate, ParsedArguments options, IReadOnlyDictionary<string,ulong?>? referenceNamespaces, IProcMatchControl control, CancellationToken cancellationToken ) {
-		var process = candidate.Process; var matched = true; matched &= 0 == options.ProcessIds.Count || options.ProcessIds.Contains( candidate.Supplement.ThreadGroupId ); matched &= 0 == options.ParentIds.Count || ( process.ParentProcessId.HasValue && options.ParentIds.Contains( process.ParentProcessId.Value ) ); matched &= 0 == options.ProcessGroups.Count || ( process.ProcessGroupId.HasValue && options.ProcessGroups.Contains( process.ProcessGroupId.Value ) ); matched &= 0 == options.Sessions.Count || ( process.SessionId.HasValue && options.Sessions.Contains( process.SessionId.Value ) ); matched &= 0 == options.RealUsers.Count || ( process.RealUserId.HasValue && options.RealUsers.Contains( process.RealUserId.Value ) ); matched &= 0 == options.EffectiveUsers.Count || ( process.EffectiveUserId.HasValue && options.EffectiveUsers.Contains( process.EffectiveUserId.Value ) ); matched &= 0 == options.RealGroups.Count || ( process.RealGroupId.HasValue && options.RealGroups.Contains( process.RealGroupId.Value ) ); matched &= 0 == options.States.Count || ( process.State.HasValue && options.States.Contains( process.State.Value ) ); matched &= 0 == options.Terminals.Count || MatchesTerminal( process.Terminal, options.Terminals ); matched &= null == options.OlderThan || ( candidate.Supplement.Elapsed.HasValue && candidate.Supplement.Elapsed.Value.TotalSeconds >= options.OlderThan.Value ); matched &= 0 == options.Cgroups.Count || ( process.Container.HasValue && options.Cgroups.Contains( process.Container.Value.CgroupPath ) ); matched &= 0 == options.Environment.Count || MatchesEnvironment( candidate.Supplement.Environment, options.Environment ); matched &= null == referenceNamespaces || MatchesNamespaces( process.Namespaces, referenceNamespaces ); if ( matched && options.RequireHandler ) { var disposition = control.ObserveDisposition( process, options.Signal! ); matched = disposition.Succeeded && ProcessSignalDisposition.Caught == disposition.Value; } if ( matched && null != options.PatternExpression ) { var input = options.MatchFull ? process.CommandLineArguments.HasValue ? string.Join( " ", process.CommandLineArguments.Value ) : string.Empty : process.CommandName.HasValue ? process.CommandName.Value : string.Empty; var result = options.PatternExpression.Match( input, cancellationToken: cancellationToken ); matched = result.IsSuccess && result.IsMatch; if ( matched && options.ExactPattern ) matched = 0 == result.Match!.Index && input.Length == result.Match.Length; } return options.Invert ? !matched : matched;
+		var process = candidate.Process; var matched = true; matched &= 0 == options.ProcessIds.Count || options.ProcessIds.Contains( candidate.Supplement.ThreadGroupId ); matched &= 0 == options.ParentIds.Count || ( process.ParentProcessId.HasValue && options.ParentIds.Contains( process.ParentProcessId.Value ) ); matched &= 0 == options.ProcessGroups.Count || ( process.ProcessGroupId.HasValue && options.ProcessGroups.Contains( process.ProcessGroupId.Value ) ); matched &= 0 == options.Sessions.Count || ( process.SessionId.HasValue && options.Sessions.Contains( process.SessionId.Value ) ); matched &= 0 == options.RealUsers.Count || ( process.RealUserId.HasValue && options.RealUsers.Contains( process.RealUserId.Value ) ); matched &= 0 == options.EffectiveUsers.Count || ( process.EffectiveUserId.HasValue && options.EffectiveUsers.Contains( process.EffectiveUserId.Value ) ); matched &= 0 == options.RealGroups.Count || ( process.RealGroupId.HasValue && options.RealGroups.Contains( process.RealGroupId.Value ) ); matched &= 0 == options.States.Count || ( process.State.HasValue && options.States.Contains( process.State.Value ) ); matched &= 0 == options.Terminals.Count || MatchesTerminal( process.Terminal, options.Terminals ); matched &= null == options.OlderThan || ( candidate.Supplement.Elapsed.HasValue && candidate.Supplement.Elapsed.Value.TotalSeconds >= options.OlderThan.Value ); matched &= 0 == options.Cgroups.Count || ( process.Container.HasValue && options.Cgroups.Contains( process.Container.Value.CgroupPath ) ); matched &= 0 == options.Environment.Count || MatchesEnvironment( candidate.Supplement.Environment, options.Environment ); matched &= null == referenceNamespaces || MatchesNamespaces( process.Namespaces, referenceNamespaces ); if ( matched && options.RequireHandler ) { var disposition = control.ObserveDisposition( process, options.Signal! ); matched = disposition.Succeeded && ProcessSignalDisposition.Caught == disposition.Value; } if ( matched && null != options.PatternExpression ) { var input = options.MatchFull ? process.CommandLineArguments.HasValue ? string.Join( " ", process.CommandLineArguments.Value ) : string.Empty : process.CommandName.HasValue ? process.CommandName.Value : string.Empty; var result = options.PatternExpression.Match( input, cancellationToken ); matched = result.HasValue; if ( result.HasValue && options.ExactPattern ) matched = 0 == result.Value.Index && input.Length == result.Value.Length; } return options.Invert ? !matched : matched;
 	}
 	private static bool MatchesTerminal( ProcObservedValue<ProcTerminalInfo> terminal, IReadOnlySet<string> selectors ) { if ( !terminal.HasValue ) return false; var name = terminal.Value.Name; if ( string.IsNullOrEmpty( name ) ) return selectors.Contains( "-" ) || selectors.Contains( "?" ); var normalized = name.StartsWith( "/dev/", StringComparison.Ordinal ) ? name[5..] : name; return selectors.Contains( normalized ) || selectors.Contains( name ); }
 	private static bool MatchesEnvironment( ProcObservedValue<IReadOnlyList<string>> environment, IReadOnlyList<string> selectors ) { if ( !environment.HasValue ) return false; foreach ( var selector in selectors ) { if ( 0 <= selector.IndexOf( '=' ) ) { if ( environment.Value.Any( entry => string.Equals( entry, selector, StringComparison.Ordinal ) ) ) return true; } else if ( environment.Value.Any( entry => entry.StartsWith( selector, StringComparison.Ordinal ) ) ) return true; } return false; }
@@ -170,7 +212,13 @@ public static class ProcMatchCommand {
 	private static async Task<int> ExecutePidWaitAsync( IReadOnlyList<ProcMatchCandidate> matches, ParsedArguments options, Stream? stdout, Stream? stderr, IProcMatchControl control, CancellationToken cancellationToken ) { if ( options.Count ) await WriteLineAsync( stdout, matches.Count.ToString( CultureInfo.InvariantCulture ), cancellationToken ).ConfigureAwait( false ); var pending = new List<(ProcMatchCandidate Match,Task<ProcessOperationResult<ProcessTermination>> Wait)>(); foreach ( var match in matches ) { if ( options.Echo ) await WriteLineAsync( stdout, $"waiting for {DisplayName( match.Process )} (pid {match.Process.ProcessId})", cancellationToken ).ConfigureAwait( false ); pending.Add( ( match, control.WaitAsync( match.Process, cancellationToken ) ) ); } var waited = 0; foreach ( var pendingWait in pending ) { var result = await pendingWait.Wait.ConfigureAwait( false ); if ( result.Succeeded ) waited++; else if ( ProcessOperationStatus.Canceled == result.Status ) return FatalError; else if ( ProcessOperationStatus.Vanished != result.Status ) await WriteLineAsync( stderr, $"pidwait: waiting for pid {pendingWait.Match.Process.ProcessId} failed: {result.Message ?? result.Status.ToString()}", cancellationToken ).ConfigureAwait( false ); } return 0 < waited ? Success : NoMatch; }
 	private static string DisplayName( ProcProcessSnapshot process ) => process.CommandName.HasValue ? process.CommandName.Value : process.ProcessId.ToString( CultureInfo.InvariantCulture );
 
-	private static ParsedArguments Parse( ProcMatchCommandMode mode, string[] args, IProcMatchControl control, IProcAccountResolver accounts ) {
+	private static ParsedArguments Parse(
+		ProcMatchCommandMode mode,
+		string[] args,
+		IProcMatchControl control,
+		IProcAccountResolver accounts,
+		IProcMatchPatternCompiler? patternCompiler
+	) {
 		var defaultSignal = control.ParseSignal( "TERM" ); if ( !defaultSignal.Succeeded ) return new ParsedArguments().Fail( defaultSignal.Message ?? "cannot resolve SIGTERM", FatalError, false ); var result = new ParsedArguments { Signal = defaultSignal.Value }; var operands = new List<string>();
 		for ( var index = 0; index < args.Length; index++ ) { var arg = args[index]; if ( "--" == arg ) { for ( index++; index < args.Length; index++ ) operands.Add( args[index] ); break; } if ( !arg.StartsWith( '-' ) || "-" == arg ) { operands.Add( arg ); continue; } if ( "--help" == arg || "-h" == arg ) { result.ShowHelp = true; continue; } if ( "--version" == arg || "-V" == arg ) { result.ShowVersion = true; continue; } if ( ProcMatchCommandMode.Pkill == mode && arg.Length > 1 && !arg.StartsWith( "--", StringComparison.Ordinal ) ) { var signal = control.ParseSignal( arg[1..] ); if ( signal.Succeeded ) { result.Signal = signal.Value!; continue; } }
 			if ( arg.StartsWith( "--", StringComparison.Ordinal ) ) { var split = arg[2..].Split( '=', 2 ); var name = split[0]; var inline = 2 == split.Length ? split[1] : null; string? Value() { if ( null != inline ) return inline; if ( index + 1 >= args.Length ) return null; return args[++index]; } switch ( name ) {
@@ -197,7 +245,23 @@ public static class ProcMatchCommand {
 		if ( result.ShowHelp || result.ShowVersion ) return result;
 		if ( result.Newest && result.Oldest || result.Invert && ( result.Newest || result.Oldest ) ) return result.Fail( "options --newest, --oldest and --inverse are mutually exclusive", SyntaxError ); if ( result.Quiet && ( result.ListName || result.ListFull ) ) return result.Fail( "--quiet may not be combined with --list-name or --list-full", SyntaxError ); if ( result.RequireLockedPidFile && string.IsNullOrEmpty( result.PidFile ) ) return result.Fail( "--logpidfile requires --pidfile", SyntaxError ); if ( 0 < result.NamespaceNames.Count && null == result.NamespaceProcessId ) return result.Fail( "--nslist requires --ns", SyntaxError ); if ( 1 < operands.Count ) return result.Fail( "only one pattern can be provided", SyntaxError ); if ( 1 == operands.Count ) result.Pattern = operands[0]; if ( !string.IsNullOrEmpty( result.PidFile ) && 0 < result.ProcessIds.Count ) return result.Fail( "--pidfile and --pid may not be combined", NoMatch, false );
 		var criterionCount = result.ProcessIds.Count + result.ParentIds.Count + result.ProcessGroups.Count + result.Sessions.Count + result.RealUsers.Count + result.EffectiveUsers.Count + result.RealGroups.Count + result.Terminals.Count + result.States.Count + result.Cgroups.Count + result.Environment.Count + ( null == result.NamespaceProcessId ? 0 : 1 ) + ( null == result.OlderThan ? 0 : 1 ) + ( result.RequireHandler ? 1 : 0 ) + ( result.Newest ? 1 : 0 ) + ( result.Oldest ? 1 : 0 ) + ( string.IsNullOrEmpty( result.PidFile ) ? 0 : 1 ); if ( null == result.Pattern && 0 == criterionCount ) return result.Fail( "no matching criteria specified", SyntaxError );
-		if ( null != result.Pattern ) { var compiled = GnuExtendedRegularExpressionProvider.Default.Compile( result.Pattern, RegularExpressionOptions.GnuExtendedCompatibility with { IgnoreCase = result.IgnoreCase } ); if ( !compiled.IsSuccess ) return result.Fail( compiled.Diagnostic?.Message ?? "invalid regular expression", SyntaxError, false ); result.PatternExpression = compiled.Expression; }
+		if ( null != result.Pattern ) {
+			if ( null == patternCompiler ) {
+				return result.Fail(
+					"regular expression support is unavailable",
+					FatalError,
+					false
+				);
+			}
+			try {
+				result.PatternExpression = patternCompiler.Compile(
+					result.Pattern,
+					result.IgnoreCase
+				);
+			} catch ( FormatException exception ) {
+				return result.Fail( exception.Message, SyntaxError, false );
+			}
+		}
 		return result;
 	}
 	private delegate bool NameResolver( string text, out uint id );
@@ -265,7 +329,7 @@ Options:
 	private static Task WriteLineAsync( Stream? stream, string text, CancellationToken cancellationToken ) => WriteAsync( stream, text + Environment.NewLine, cancellationToken );
 	private static string NormalizeLineEndings( string value ) { var normalized = value.Replace( "\r\n", "\n", StringComparison.Ordinal ).Replace( "\r", "\n", StringComparison.Ordinal ); return "\n" == Environment.NewLine ? normalized : normalized.Replace( "\n", Environment.NewLine, StringComparison.Ordinal ); }
 	private sealed class ParsedArguments {
-		public bool ShowHelp; public bool ShowVersion; public string? Error; public int ErrorStatus = SyntaxError; public bool ShowUsageOnError = true; public string? Pattern; public ICompiledRegularExpression? PatternExpression; public string Delimiter = System.Environment.NewLine; public bool ListName; public bool ListFull; public bool Quiet; public bool Invert; public bool Lightweight; public bool Count; public bool MatchFull; public bool IgnoreCase; public bool Newest; public bool Oldest; public double? OlderThan; public bool ExactPattern; public bool IgnoreAncestors; public bool ShellQuote; public bool RequireHandler; public int? QueueValue; public bool Echo; public bool MemoryRelease; public string? PidFile; public bool RequireLockedPidFile; public int? NamespaceProcessId; public ProcessSignal? Signal;
+		public bool ShowHelp; public bool ShowVersion; public string? Error; public int ErrorStatus = SyntaxError; public bool ShowUsageOnError = true; public string? Pattern; public IProcMatchPattern? PatternExpression; public string Delimiter = System.Environment.NewLine; public bool ListName; public bool ListFull; public bool Quiet; public bool Invert; public bool Lightweight; public bool Count; public bool MatchFull; public bool IgnoreCase; public bool Newest; public bool Oldest; public double? OlderThan; public bool ExactPattern; public bool IgnoreAncestors; public bool ShellQuote; public bool RequireHandler; public int? QueueValue; public bool Echo; public bool MemoryRelease; public string? PidFile; public bool RequireLockedPidFile; public int? NamespaceProcessId; public ProcessSignal? Signal;
 		public HashSet<int> ProcessIds { get; } = []; public HashSet<int> ParentIds { get; } = []; public HashSet<int> ProcessGroups { get; } = []; public HashSet<int> Sessions { get; } = []; public HashSet<uint> RealUsers { get; } = []; public HashSet<uint> EffectiveUsers { get; } = []; public HashSet<uint> RealGroups { get; } = []; public HashSet<string> Terminals { get; } = new( StringComparer.Ordinal ); public HashSet<ProcProcessState> States { get; } = []; public HashSet<string> Cgroups { get; } = new( StringComparer.Ordinal ); public List<string> Environment { get; } = []; public HashSet<string> NamespaceNames { get; } = new( StringComparer.Ordinal );
 		public ParsedArguments Fail( string error, int status, bool showUsage = true ) { this.Error = error; this.ErrorStatus = status; this.ShowUsageOnError = showUsage; return this; }
 	}

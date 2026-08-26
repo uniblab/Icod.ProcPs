@@ -64,9 +64,10 @@ It provides the common ProcPs model and behavior for:
 
 Cross-suite process-control abstractions are supplied by `Icod.Processes`,
 while monotonic elapsed-time and periodic scheduling primitives are supplied by
-`Icod.Timing`. `Icod.ProcPs.Shared` owns its observation-fidelity policy and
-consumes `Icod.CommandFramework.RegularExpressions` only for the managed
-GNU/POSIX regular-expression engine.
+`Icod.Timing`. `Icod.ProcPs.Shared` owns its observation-fidelity policy and a
+neutral process-pattern contract. The `pgrep`, `pkill`, and `pidwait` executables
+reference `Icod.CommandFramework.RegularExpressions` directly and adapt its
+managed GNU/POSIX ERE provider to that contract.
 
 Interactive full-screen commands use `Icod.DCurses` over `Icod.Terminal` and
 `Icod.TermInfo`; ProcPs command code owns application policy rather than native
@@ -123,9 +124,9 @@ The project therefore follows several rules:
 4. Prefer an explicit unsupported/unavailable result to a plausible-looking but
    semantically incorrect value.
 5. Keep neutral process-control mechanics in `Icod.Processes`, neutral timing
-   mechanics in `Icod.Timing`, managed GNU/POSIX regular expressions in
-   `Icod.CommandFramework.RegularExpressions`, and ProcPs-specific observation
-   policy in `Icod.ProcPs.Shared`.
+   mechanics in `Icod.Timing`, ProcPs-specific observation policy in
+   `Icod.ProcPs.Shared`, and GNU/POSIX regular-expression implementation
+   dependencies in the command projects that actually require them.
 
 This means that some commands or modes are naturally more portable than others.
 For example, `ps`, `pgrep`, `pkill`, `free`, and uptime-related observations can
