@@ -5,8 +5,8 @@ procps-ng 4.0.6.
 
 The repository provides familiar process- and system-observation commands such
 as `ps`, `pgrep`, `pkill`, `free`, `uptime`, `vmstat`, `w`, `watch`, `slabtop`,
-`top`, and `sysctl`, while factoring common ProcPs behavior into the reusable
-`Icod.ProcPs.Shared` library.
+`hugetop`, `top`, and `sysctl`, while factoring common ProcPs behavior into the
+reusable `Icod.ProcPs.Shared` library.
 
 The implementation targets .NET 10 and C# 13 and is designed for Windows,
 Linux, and macOS. Linux `/proc` remains the authoritative source for Linux
@@ -27,6 +27,7 @@ reported as unavailable rather than synthesized from unrelated metrics.
 | [`pmap`](pmap/README.md) | Report process memory maps and Linux `smaps` detail. |
 | [`ps`](ps/README.md) | Report a snapshot of current processes, including ProcPs-style selection, formatting, sorting, personalities, and thread views. |
 | [`slabtop`](slabtop/README.md) | Display Linux slab-cache information in real time or as a one-shot report. |
+| [`hugetop`](hugetop/README.md) | Display Linux huge-page pools and per-process hugetlb usage in real time or as a one-shot report. |
 | [`top`](top/README.md) | Display dynamic process and system activity in batch or interactive mode. |
 | [`uptime`](uptime/README.md) | Report system uptime, user count, and load averages. |
 | [`vmstat`](vmstat/README.md) | Report virtual-memory, CPU, process, paging, disk, and system activity. |
@@ -52,6 +53,7 @@ It provides the common ProcPs model and behavior for:
 - the shared `pgrep` / `pkill` / `pidwait` matching grammar;
 - executable, root, and current-working-directory observations;
 - process memory maps;
+- huge-page pool and per-process hugetlb observations;
 - CPU, memory, swap, load-average, uptime, and session observations;
 - `vmstat` counters and sampling calculations;
 - account, terminal, namespace, cgroup, container, and security observations
@@ -80,7 +82,8 @@ Linux is the reference platform for procps-ng compatibility. The implementation
 uses procfs and related kernel interfaces for process detail, memory maps,
 memory and swap information, load averages, CPU activity, uptime, login
 sessions, namespaces, cgroups, signal state, disk statistics, paging counters,
-slab information, and other Linux-specific observations.
+slab information, huge-page pools, per-process hugetlb accounting, and other
+Linux-specific observations.
 
 ### Windows
 
