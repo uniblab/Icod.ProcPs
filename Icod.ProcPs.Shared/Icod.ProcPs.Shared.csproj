@@ -24,7 +24,7 @@
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Icod.CommandFramework" Version="1.2.0" />
+		<PackageReference Include="Icod.CommandFramework" Version="1.2.1" />
 		<PackageReference Include="Icod.Processes" Version="1.0.0" />
 		<PackageReference Include="Icod.Timing" Version="1.0.0" />
 	</ItemGroup>
