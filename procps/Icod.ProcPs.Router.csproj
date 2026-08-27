@@ -50,7 +50,7 @@
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
 		<PackageReleaseNotes>Move GNU regular-expression dependencies from Icod.ProcPs.Shared to pgrep, pkill, and pidwait.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
-		<icon>icon.png</icon>
+		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>
 	<PropertyGroup Condition=" '$(PlatformTarget)' == '' ">
 		<PlatformTarget>AnyCPU</PlatformTarget>
