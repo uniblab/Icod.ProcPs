@@ -357,7 +357,7 @@ public sealed class HugeTopCommandTests {
 		Assert.Equal( 0, help.ExitCode );
 		Assert.Contains( "Usage:", help.Stdout, StringComparison.Ordinal );
 		Assert.Equal( 0, version.ExitCode );
-		Assert.Contains( "Icod.ProcPs.HugeTop (0.9.0-Alpha-7) inspired by procps-ng 4.0.6", version.Stdout, StringComparison.Ordinal );
+		Assert.Contains( "Icod.ProcPs.HugeTop (1.0.0) inspired by procps-ng 4.0.6", version.Stdout, StringComparison.Ordinal );
 		Assert.Equal( 1, delay.ExitCode );
 		Assert.Contains( "delay must be positive", delay.Stderr, StringComparison.Ordinal );
 		Assert.Equal( 1, operand.ExitCode );
