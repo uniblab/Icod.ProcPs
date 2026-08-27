@@ -274,7 +274,7 @@ public sealed class CommandTests {
 	public async Task VersionMatchesPinnedProcpsRelease() {
 		var result = await InvokeAsync( [ "--version" ], new FakeProvider( FullSnapshot() ) );
 		Assert.Equal( 0, result.Status );
-		Assert.Equal( string.Concat( "Icod.ProcPs.Vmstat (1.0.1) inspired by procps-ng 4.0.6", Environment.NewLine ), result.Output );
+		Assert.Equal( string.Concat( global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.Vmstat" ), Environment.NewLine ), result.Output );
 	}
 
 	/// <summary>Verifies that linux provider parses stat disk and partition fixtures.</summary>

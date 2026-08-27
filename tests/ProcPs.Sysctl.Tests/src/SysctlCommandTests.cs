@@ -260,12 +260,15 @@ public sealed class SysctlCommandTests {
 	public async Task HelpAndVersionRemainPortable() {
 		var backend = CreateBackend( supported: false );
 		var help = await RunAsync( [ "--help" ], backend );
-		var version = await RunAsync( [ "--version" ], backend );
+		var version = await RunAsync( [ "-V" ], backend );
 
 		Assert.Equal( 0, help.Status );
 		Assert.Contains( "Usage:", help.Output );
 		Assert.Equal( 0, version.Status );
-		Assert.Contains( "procps-ng 4.0.6", version.Output );
+		Assert.Equal(
+			string.Concat( global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.Sysctl" ), Environment.NewLine ),
+			version.Output
+		);
 	}
 
 	/// <summary>Operational requests fail explicitly when Linux /proc/sys capability is unavailable.</summary>

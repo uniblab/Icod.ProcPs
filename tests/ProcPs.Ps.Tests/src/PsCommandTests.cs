@@ -239,8 +239,11 @@ public sealed class PsCommandTests {
 		Assert.Equal( 0, await RunAsync( [ "--help" ], help ) );
 		Assert.Contains( "Usage:", Text( help ), StringComparison.Ordinal );
 		using var version = new MemoryStream();
-		Assert.Equal( 0, await RunAsync( [ "--version" ], version ) );
-		Assert.Contains( "procps-ng 4.0.6", Text( version ), StringComparison.Ordinal );
+		Assert.Equal( 0, await RunAsync( [ "-V" ], version ) );
+		Assert.Equal(
+			string.Concat( global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.Ps" ), Environment.NewLine ),
+			Text( version )
+		);
 		using var fields = new MemoryStream();
 		Assert.Equal( 0, await RunAsync( [ "L" ], fields ) );
 		Assert.Contains( "pid", Text( fields ), StringComparison.Ordinal );

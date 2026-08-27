@@ -196,6 +196,7 @@ function Write-LocalNuGetConfig {
 }
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$suitePropertiesPath = Join-Path $repositoryRoot 'Directory.Build.props'
 $routerProjectPath = Join-Path $repositoryRoot 'procps/Icod.ProcPs.Router.csproj'
 $solutionPath = Join-Path $repositoryRoot 'Icod.ProcPs.sln'
 $commandNames = @(
@@ -238,10 +239,11 @@ $productNames = [ordered]@{
     'watch' = 'Icod.ProcPs.Watch'
 }
 
+[xml]$suiteProperties = Get-Content -LiteralPath $suitePropertiesPath -Raw
 [xml]$routerProject = Get-Content -LiteralPath $routerProjectPath -Raw
 $targetFramework = Get-ProjectProperty -Project $routerProject -Name 'TargetFramework'
 $routerPackageId = Get-ProjectProperty -Project $routerProject -Name 'PackageId'
-$routerVersion = Get-ProjectProperty -Project $routerProject -Name 'PackageVersion'
+$routerVersion = Get-ProjectProperty -Project $suiteProperties -Name 'IcodProcPsSuiteVersion'
 
 $validationRoot = Join-Path $repositoryRoot 'artifacts/distribution-validation'
 $packageDirectory = Join-Path $validationRoot 'packages'

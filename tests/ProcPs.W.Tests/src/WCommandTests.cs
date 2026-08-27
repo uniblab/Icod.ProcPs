@@ -295,7 +295,7 @@ public sealed class WCommandTests {
 		using var version = new MemoryStream();
 		using var versionError = new MemoryStream();
 		Assert.Equal( 0, await Tool.RunAsync( [ "--version" ], stdout: version, stderr: versionError ) );
-		Assert.Equal( $"Icod.ProcPs.W (1.0.1) inspired by procps-ng 4.0.6{Environment.NewLine}", Text( version ) );
+		Assert.Equal( string.Concat( global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.W" ), Environment.NewLine ), Text( version ) );
 		Assert.Equal( string.Empty, Text( versionError ) );
 
 		using var invalid = new MemoryStream();

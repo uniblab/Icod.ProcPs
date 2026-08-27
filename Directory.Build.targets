@@ -1,12 +1,16 @@
 <Project>
-  <PropertyGroup>
-    <IcodProcPsSuiteVersion>1.0.1</IcodProcPsSuiteVersion>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(OutputType)' == 'Exe' and '$(PackAsTool)' != 'true'">
     <Version>$(IcodProcPsSuiteVersion)</Version>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup Condition="'$(OutputType)' == 'Exe' and '$(PackAsTool)' != 'true'">
     <Compile Include="$(MSBuildThisFileDirectory)build/ProcCommandVersion.cs" Link="ProcCommandVersion.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)build/ProcPsTestVersion.cs" Link="ProcPsTestVersion.cs" />
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>IcodProcPsSuiteVersion</_Parameter1>
+      <_Parameter2>$(IcodProcPsSuiteVersion)</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 </Project>
