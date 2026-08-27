@@ -103,7 +103,7 @@ public sealed class CommandTests {
 		using var error = new StringWriter();
 		var status = Command.Run( [ "--version" ], output, error );
 		Assert.Equal( 0, status );
-		Assert.Equal( $"{global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.Free" )}{Environment.NewLine}", output.ToString() );
+		Assert.Equal( string.Concat( global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.Free" ), Environment.NewLine ), output.ToString() );
 		Assert.Equal( string.Empty, error.ToString() );
 	}
 	/// <summary>Verifies that invalid mem available falls back to mem free.</summary>

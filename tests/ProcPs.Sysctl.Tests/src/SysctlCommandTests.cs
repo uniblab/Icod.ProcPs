@@ -266,7 +266,7 @@ public sealed class SysctlCommandTests {
 		Assert.Contains( "Usage:", help.Output );
 		Assert.Equal( 0, version.Status );
 		Assert.Equal(
-			$"{global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.Sysctl" )}{Environment.NewLine}",
+			string.Concat( global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.Sysctl" ), Environment.NewLine ),
 			version.Output
 		);
 	}

@@ -241,7 +241,7 @@ public sealed class PsCommandTests {
 		using var version = new MemoryStream();
 		Assert.Equal( 0, await RunAsync( [ "-V" ], version ) );
 		Assert.Equal(
-			$"{global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.Ps" )}{Environment.NewLine}",
+			string.Concat( global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.Ps" ), Environment.NewLine ),
 			Text( version )
 		);
 		using var fields = new MemoryStream();
