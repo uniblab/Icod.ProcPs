@@ -197,8 +197,8 @@ workflow grants `packages: write` only to the GitHub Packages publication job an
 
 ### Publishing a version
 
-First update `IcodProcPsSuiteVersion` in `Directory.Build.targets` together with
-`Version` and `PackageVersion` in the `procps` router project, merge that change
+First update `IcodProcPsSuiteVersion` in `Directory.Build.props`; the router and
+standalone commands consume that shared value. Merge that change
 to `main`, and ensure normal CI is green. Then tag that exact commit and push the
 tag:
 
@@ -218,11 +218,10 @@ recovering a partially completed release.
 
 ## Versioning
 
-The suite release version is recorded in two places:
+The suite release version is recorded in one place:
 
 ```text
-Directory.Build.targets                         IcodProcPsSuiteVersion
-procps/Icod.ProcPs.Router.csproj                Version / PackageVersion
+Directory.Build.props                           IcodProcPsSuiteVersion
 ```
 
 `IcodProcPsSuiteVersion` supplies assembly version metadata to every standalone

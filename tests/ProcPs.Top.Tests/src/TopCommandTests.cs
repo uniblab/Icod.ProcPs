@@ -72,7 +72,7 @@ public sealed class TopCommandTests {
 		Assert.Equal( 0, help.ExitCode );
 		Assert.Contains( "top [options]", help.Stdout, StringComparison.Ordinal );
 		Assert.Equal( 0, version.ExitCode );
-		Assert.Contains( "Icod.ProcPs.Top (1.0.1) inspired by procps-ng 4.0.6", version.Stdout, StringComparison.Ordinal );
+		Assert.Contains( global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.Top" ), version.Stdout, StringComparison.Ordinal );
 		Assert.Equal( 0, fields.ExitCode );
 		Assert.Contains( "PID", fields.Stdout, StringComparison.Ordinal );
 		Assert.Contains( "SHR", fields.Stdout, StringComparison.Ordinal );

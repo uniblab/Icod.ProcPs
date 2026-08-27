@@ -1,12 +1,13 @@
 <Project>
-  <PropertyGroup>
-    <IcodProcPsSuiteVersion>1.0.1</IcodProcPsSuiteVersion>
-  </PropertyGroup>
   <PropertyGroup Condition="'$(OutputType)' == 'Exe' and '$(PackAsTool)' != 'true'">
     <Version>$(IcodProcPsSuiteVersion)</Version>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup Condition="'$(OutputType)' == 'Exe' and '$(PackAsTool)' != 'true'">
     <Compile Include="$(MSBuildThisFileDirectory)build/ProcCommandVersion.cs" Link="ProcCommandVersion.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(IsTestProject)' == 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)build/ProcPsTestVersion.cs" Link="ProcPsTestVersion.cs" />
+    <ProjectReference Include="$(MSBuildThisFileDirectory)procps/Icod.ProcPs.Router.csproj" />
   </ItemGroup>
 </Project>
