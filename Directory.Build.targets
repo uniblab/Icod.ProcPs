@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <IcodProcPsSuiteVersion>1.0.0</IcodProcPsSuiteVersion>
+    <IcodProcPsSuiteVersion>1.0.1</IcodProcPsSuiteVersion>
   </PropertyGroup>
   <PropertyGroup Condition="'$(OutputType)' == 'Exe' and '$(PackAsTool)' != 'true'">
     <Version>$(IcodProcPsSuiteVersion)</Version>

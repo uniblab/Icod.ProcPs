@@ -98,9 +98,9 @@ osx-arm64
 To build an archive locally with PowerShell 7:
 
 ```text
-pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier win-x64 -Version 1.0.0
-pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier linux-x64 -Version 1.0.0
-pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier osx-x64 -Version 1.0.0
+pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier win-x64 -Version 1.0.1
+pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier linux-x64 -Version 1.0.1
+pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier osx-x64 -Version 1.0.1
 ```
 
 The script smoke-tests all eighteen apphosts when the requested RID matches the
@@ -205,8 +205,8 @@ tag:
 ```text
 git switch main
 git pull
-git tag -a v1.0.0 -m "Icod.ProcPs 1.0.0"
-git push origin v1.0.0
+git tag -a v1.0.1 -m "Icod.ProcPs 1.0.1"
+git push origin v1.0.1
 ```
 
 The tag is the release trigger and the immutable source identity for every

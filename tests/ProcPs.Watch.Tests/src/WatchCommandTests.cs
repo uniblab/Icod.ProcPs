@@ -462,7 +462,7 @@ public sealed class WatchCommandTests {
 		);
 
 		Assert.Equal( 0, result.ExitCode );
-		Assert.Contains( "Icod.ProcPs.Watch (1.0.0) inspired by procps-ng 4.0.6", result.Stdout, StringComparison.Ordinal );
+		Assert.Contains( "Icod.ProcPs.Watch (1.0.1) inspired by procps-ng 4.0.6", result.Stdout, StringComparison.Ordinal );
 		Assert.Equal( 0, terminal.OpenCount );
 		Assert.False( terminal.Disposed );
 	}

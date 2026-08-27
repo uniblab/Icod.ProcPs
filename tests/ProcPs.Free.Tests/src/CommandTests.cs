@@ -103,7 +103,7 @@ public sealed class CommandTests {
 		using var error = new StringWriter();
 		var status = Command.Run( [ "--version" ], output, error );
 		Assert.Equal( 0, status );
-		Assert.Equal( $"Icod.ProcPs.Free (1.0.0) inspired by procps-ng 4.0.6{Environment.NewLine}", output.ToString() );
+		Assert.Equal( $"Icod.ProcPs.Free (1.0.1) inspired by procps-ng 4.0.6{Environment.NewLine}", output.ToString() );
 		Assert.Equal( string.Empty, error.ToString() );
 	}
 	/// <summary>Verifies that invalid mem available falls back to mem free.</summary>
