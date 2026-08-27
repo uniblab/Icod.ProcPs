@@ -23,13 +23,14 @@ namespace Icod.ProcPs.Tests;
 
 using System.Reflection;
 
-/// <summary>Provides version expectations pinned to the built ProcPs router.</summary>
+/// <summary>Provides version expectations pinned to the version consumed by the ProcPs router.</summary>
 internal static class ProcPsTestVersion {
 	private const string ProcpsNgCompatibilityVersion = "4.0.6";
+	private const string SuiteVersionMetadataKey = "IcodProcPsSuiteVersion";
 
-	/// <summary>Gets the version reported by the built ProcPs router assembly.</summary>
-	internal static string RouterVersion { get; } = GetVersionText(
-		typeof( global::Icod.ProcPs.Router.Command ).Assembly
+	/// <summary>Gets the suite version consumed by the ProcPs router.</summary>
+	internal static string RouterVersion { get; } = GetRouterVersion(
+		typeof( ProcPsTestVersion ).Assembly
 	);
 
 	/// <summary>Formats the expected standalone-command version text using the router version.</summary>
@@ -42,25 +43,18 @@ internal static class ProcPsTestVersion {
 		return $"{productName} ({RouterVersion}) inspired by procps-ng {ProcpsNgCompatibilityVersion}";
 	}
 
-	private static string GetVersionText(
+	private static string GetRouterVersion(
 		Assembly assembly
 	) {
 		ArgumentNullException.ThrowIfNull( assembly );
-		string? informationalVersion = assembly
-			.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-			?.InformationalVersion;
-		if ( !string.IsNullOrWhiteSpace( informationalVersion ) ) {
-			int metadataSeparator = informationalVersion.IndexOf( '+' );
-			if ( 0 <= metadataSeparator ) {
-				return informationalVersion[ ..metadataSeparator ];
+		foreach ( AssemblyMetadataAttribute attribute in assembly.GetCustomAttributes<AssemblyMetadataAttribute>() ) {
+			if (
+				SuiteVersionMetadataKey == attribute.Key
+				&& !string.IsNullOrWhiteSpace( attribute.Value )
+			) {
+				return attribute.Value;
 			}
-			return informationalVersion;
 		}
-
-		Version? assemblyVersion = assembly.GetName().Version;
-		if ( assemblyVersion is null ) {
-			return "unknown";
-		}
-		return assemblyVersion.ToString( 3 );
+		return "unknown";
 	}
 }

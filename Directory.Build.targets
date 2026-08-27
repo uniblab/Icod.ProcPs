@@ -8,6 +8,9 @@
   </ItemGroup>
   <ItemGroup Condition="'$(IsTestProject)' == 'true'">
     <Compile Include="$(MSBuildThisFileDirectory)build/ProcPsTestVersion.cs" Link="ProcPsTestVersion.cs" />
-    <ProjectReference Include="$(MSBuildThisFileDirectory)procps/Icod.ProcPs.Router.csproj" />
+    <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+      <_Parameter1>IcodProcPsSuiteVersion</_Parameter1>
+      <_Parameter2>$(IcodProcPsSuiteVersion)</_Parameter2>
+    </AssemblyAttribute>
   </ItemGroup>
 </Project>
