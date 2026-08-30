@@ -312,10 +312,12 @@ public sealed class TopCommandTests {
 		Assert.Equal( 1, processes.CaptureCount );
 		Assert.DoesNotContain(
 			terminal.Frames[ 2 ].Lines,
-			line => line.Text.Contains(
-				"1:Def",
-				StringComparison.Ordinal
-			)
+			line =>
+				TopLineStyle.Header == line.Style
+				&& line.Text.Contains(
+					"1:Def",
+					StringComparison.Ordinal
+				)
 		);
 		Assert.Contains(
 			terminal.Frames[ 3 ].Lines,
@@ -831,7 +833,7 @@ public sealed class TopCommandTests {
 			StringComparison.Ordinal
 		);
 		Assert.Contains(
-			"display limits, filters, and scrolling reset",
+			"display limits reset for 1:Def",
 			reset.Lines[ ^1 ].Text,
 			StringComparison.Ordinal
 		);
