@@ -138,14 +138,14 @@ profile:
 - `j` toggles character columns between left justification (the default) and
   right justification. The trailing COMMAND value remains unpadded in the
   default mode and gains only the minimum header width when right-justified.
-- `f` opens the single-window Fields Management screen. `*` marks displayed
+- `f` opens Fields Management for the current window. `*` marks displayed
   fields, `S` marks the active sort field, and `>` marks the current selection.
   Arrow keys, Page Up, Page Down, Home, and End navigate. `d` or Space toggles
   field visibility, `s` designates the sort field, Right begins repositioning,
-  and Left or Enter commits the new position. `q` or Escape returns to the
+  and Left or Enter commits the new position. `a` and `w` cycle the targeted
+  field group while the manager remains open. `q` or Escape returns to the
   process display. Visibility and order changes reset horizontal scrolling but
-  preserve the task display's vertical position. Alternate-window `a`/`w`
-  field-group cycling remains deferred with alternate-display mode.
+  preserve the task display's vertical position.
 - `x` toggles highlighting of the active sort field. The highlight is clipped
   to the visible portion of that field when the task display is horizontally
   scrolled. A hidden sort field has no task-column highlight.
@@ -153,11 +153,20 @@ profile:
   built-in monochrome profile starts with running-row highlighting enabled and
   uses bold emphasis until `b` changes it.
 - `A` toggles between full-screen mode and a four-window alternate display.
-  The first alternate display shows all four field groups: `1:Def`, `2:Job`,
-  `3:Mem`, and `4:Usr`.
+  The initial task displays are `1:Def`, `2:Job`, `3:Mem`, and `4:Usr`; later
+  mode switches preserve the visibility choices made with `-` and `_`.
 - `a` and `w` make the next or previous window current in circular order.
   `g` prompts for an exact window number from 1 through 4. Commands and Fields
   Management operate on the current window.
+- `G` renames the current field group. Names occupy one through three UTF-8
+  bytes, matching the native procps window-name storage contract.
+- `-` toggles the current task display in alternate-display mode. `_` inverts
+  the visibility of all four task displays. `=` forces the current task
+  display visible while clearing its display limits, and `+` clears those
+  limits for every window and makes all four task displays visible.
+- In alternate-display mode, an explicit `n` maximum controls each non-final
+  visible task window. Windows without a maximum share the remaining rows,
+  while the final visible window consumes the rows left after earlier panes.
 - `c` toggles short command names and observed command lines for the current
   window.
 - `H` toggles process/thread presentation globally and resamples immediately.
@@ -193,7 +202,9 @@ profile:
   personal Icod top configuration file without resampling processes.
 - Arrow keys, Page Up, Page Down, Home, and End scroll the task display; Left and
   Right scroll horizontally.
-- `=` clears idle/max-task display limits, PID/user/Other Filter restrictions, locate state, and scrolling.
+- `=` clears current-window idle/max-task limits, PID/user/Other Filter
+  restrictions, locate state, and scrolling while forcing that task display
+  visible. `+` applies the window-local reset to all four field groups.
 - `h` or `?` displays a compact help screen.
 
 In secure mode the `d`/`s`, `k`, and `r` commands are disabled.
@@ -221,11 +232,14 @@ compatibility. `W` always writes the preferred Icod JSON path.
 
 Persisted state includes delay, alternate-display/current-window selection,
 global bold enable, memory scales, thread/Irix/zero-suppression state, and each
-window's sort field/direction, emphasis and justification toggles, maximum tasks,
-command/idle/forest/CPU-summary state, field order/visibility, and active Other Filters.
-The alpha.13/14 single-window JSON remains readable and initializes `1:Def` when
-no window array is present. PID monitoring, user filtering, locate text,
-scrolling, prompts, field-manager cursor state, and secure mode remain transient.
+window's name, task-display visibility, sort field/direction, emphasis and
+justification toggles, maximum tasks, command/idle/forest/CPU-summary state,
+field order/visibility, and active Other Filters. The alpha.13/14 single-window
+JSON remains readable and initializes `1:Def` when no window array is present;
+the first alpha.15 four-window JSON remains readable because omitted names and
+visibility values retain the canonical names and visible defaults. PID
+monitoring, user filtering, locate text, scrolling, prompts, field-manager
+cursor state, and secure mode remain transient.
 
 ## CPU ACCOUNTING
 
@@ -273,8 +287,6 @@ tranches rather than represented incompletely:
 
 - native procps personal `toprc` wire-format interoperability plus system-wide
   `topdefaultrc` defaults;
-- advanced window visibility/naming controls beyond the four-window alternate
-  display foundation;
 - configurable color schemes and color-management screens;
 - per-logical-CPU activity rows until the Shared metrics contract exposes them;
 - cumulative dead-child CPU time (`-S`); and
