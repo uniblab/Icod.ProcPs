@@ -118,6 +118,12 @@ profile:
 - `q` quits; Enter or Space requests an immediate refresh.
 - `P`, `M`, `N`, and `T` sort by CPU, memory, PID, and cumulative CPU time.
 - `R` toggles the active sort direction between high-to-low and low-to-high.
+- `B` globally enables or disables use of bold rendition in the summary and
+  task areas.
+- `b` selects bold versus reverse-video emphasis for highlighted task rows.
+- `y` toggles highlighting of tasks whose observed state is running. The
+  built-in monochrome profile starts with running-row highlighting enabled and
+  uses bold emphasis until `b` changes it.
 - `c` toggles short command names and observed command lines.
 - `H` toggles process/thread presentation and resamples immediately.
 - `i` toggles idle-task suppression and `V` toggles forest ordering.

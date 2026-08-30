@@ -135,10 +135,10 @@ Options:
  -h, --help                    display this help and exit
 
 Interactive keys:
- q quit; P/M/N/T sort; R reverse/normal sort; c command line; H threads;
- i idle tasks; V forest; I CPU normalization; E/e memory scale; d/s delay;
- u/U user filter; k signal; r renice; arrows/PgUp/PgDn/Home/End scroll;
- h/? help.
+ q quit; P/M/N/T sort; R reverse/normal sort; B bold enable; b emphasis mode;
+ y running rows; c command line; H threads; i idle tasks; V forest;
+ I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
+ k signal; r renice; arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
 
 	/// <summary>Runs <c>top</c> synchronously.</summary>
@@ -496,7 +496,8 @@ Interactive keys:
 				new TopRenderFrame(
 					lines,
 					Math.Max( 1, dimensions.Columns ),
-					Math.Max( 1, dimensions.Rows )
+					Math.Max( 1, dimensions.Rows ),
+					state.BoldEnabled
 				),
 				cancellationToken
 			).ConfigureAwait( false );
@@ -612,6 +613,15 @@ Interactive keys:
 				state.Message = state.SortHighToLow
 					? "sort direction: high to low"
 					: "sort direction: low to high";
+				return TopCommandAction.Rerender;
+			case 'B':
+				state.BoldEnabled = !state.BoldEnabled;
+				return TopCommandAction.Rerender;
+			case 'b':
+				state.HighlightBold = !state.HighlightBold;
+				return TopCommandAction.Rerender;
+			case 'y':
+				state.HighlightRunning = !state.HighlightRunning;
 				return TopCommandAction.Rerender;
 			case 'c':
 				state.ShowCommandLine = !state.ShowCommandLine;

@@ -34,6 +34,8 @@ internal static class TopRenderer {
 		" q              quit",
 		" Enter/Space    refresh now",
 		" P/M/N/T        sort by CPU, memory, PID, or time",
+		" R              reverse/normal sort direction",
+		" B / b / y      bold, emphasis mode, running rows",
 		" c              toggle command name / command line",
 		" H              toggle thread display",
 		" i              toggle idle-task suppression",
@@ -90,9 +92,14 @@ internal static class TopRenderer {
 		for ( int index = state.VerticalOffset;
 			index < tasks.Count && lines.Count < dimensions.Rows - footerRows;
 			index++ ) {
-			string line = FormatTaskLine( tasks[ index ], state, sample.ProcessorCount );
+			TopTaskRow task = tasks[ index ];
+			string line = FormatTaskLine( task, state, sample.ProcessorCount );
 			lines.Add( new TopRenderLine(
-				SliceForDisplay( line, state.HorizontalOffset, dimensions.Columns )
+				SliceForDisplay( line, state.HorizontalOffset, dimensions.Columns ),
+				TaskLineStyle(
+					task,
+					state
+				)
 			) );
 		}
 
@@ -115,7 +122,12 @@ internal static class TopRenderer {
 				) );
 			}
 		}
-		return new TopRenderFrame( lines, dimensions.Columns, dimensions.Rows );
+		return new TopRenderFrame(
+			lines,
+			dimensions.Columns,
+			dimensions.Rows,
+			state.BoldEnabled
+		);
 	}
 
 	internal static IReadOnlyList<string> RenderBatch(
@@ -247,7 +259,12 @@ internal static class TopRenderer {
 		}
 		state.VerticalOffset = 0;
 		state.HorizontalOffset = 0;
-		return new TopRenderFrame( lines, dimensions.Columns, dimensions.Rows );
+		return new TopRenderFrame(
+			lines,
+			dimensions.Columns,
+			dimensions.Rows,
+			state.BoldEnabled
+		);
 	}
 
 	private static IReadOnlyList<string> BuildSummaryLines(
@@ -554,6 +571,25 @@ internal static class TopRenderer {
 
 	private static bool IsState( TopTaskRow row, ProcProcessState state ) =>
 		row.Process.State.HasValue && row.Process.State.Value == state;
+
+	private static TopLineStyle TaskLineStyle(
+		TopTaskRow row,
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( row );
+		ArgumentNullException.ThrowIfNull( state );
+
+		if (
+			!state.HighlightRunning
+			|| !IsState( row, ProcProcessState.Running )
+		) {
+			return TopLineStyle.Default;
+		}
+		if ( state.HighlightBold ) {
+			return TopLineStyle.HighlightBold;
+		}
+		return TopLineStyle.HighlightReverse;
+	}
 
 	private static string StateCode( ProcProcessSnapshot process ) {
 		if ( !process.State.HasValue ) {

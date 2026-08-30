@@ -80,7 +80,9 @@ internal enum TopLineStyle {
 	Header,
 	Prompt,
 	Message,
-	Dim
+	Dim,
+	HighlightBold,
+	HighlightReverse
 }
 
 /// <summary>Represents one rendered top line.</summary>
@@ -94,7 +96,8 @@ internal sealed class TopRenderFrame {
 	internal TopRenderFrame(
 		IReadOnlyList<TopRenderLine> lines,
 		int columns,
-		int rows
+		int rows,
+		bool boldEnabled
 	) {
 		ArgumentNullException.ThrowIfNull( lines );
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( columns );
@@ -102,11 +105,13 @@ internal sealed class TopRenderFrame {
 		this.Lines = lines;
 		this.Columns = columns;
 		this.Rows = rows;
+		this.BoldEnabled = boldEnabled;
 	}
 
 	internal IReadOnlyList<TopRenderLine> Lines { get; }
 	internal int Columns { get; }
 	internal int Rows { get; }
+	internal bool BoldEnabled { get; }
 }
 
 /// <summary>Creates the terminal presentation session used by top.</summary>
@@ -182,6 +187,16 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 		CursesColor.Default,
 		CursesColor.Default,
 		CursesTextAttributes.Dim
+	);
+	private static readonly CursesStyle HighlightBoldStyle = new(
+		CursesColor.Default,
+		CursesColor.Default,
+		CursesTextAttributes.Bold
+	);
+	private static readonly CursesStyle HighlightReverseStyle = new(
+		CursesColor.Default,
+		CursesColor.Default,
+		CursesTextAttributes.Reverse
 	);
 
 	internal DCursesTopTerminalSession( CursesSession session ) {
@@ -269,7 +284,7 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 				continue;
 			}
 			window.Move( row, 0 );
-			window.Write( line.Text, StyleFor( line.Style ) );
+			window.Write( line.Text, StyleFor( line.Style, frame.BoldEnabled ) );
 		}
 		window.Move( 0, 0 );
 		await this.session.RefreshAsync( cancellationToken ).ConfigureAwait( false );
@@ -326,12 +341,25 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 		};
 	}
 
-	private static CursesStyle StyleFor( TopLineStyle style ) => style switch {
-		TopLineStyle.Summary => SummaryStyle,
-		TopLineStyle.Header => HeaderStyle,
-		TopLineStyle.Prompt => PromptStyle,
-		TopLineStyle.Message => MessageStyle,
-		TopLineStyle.Dim => DimStyle,
-		_ => CursesStyle.Default
-	};
+	private static CursesStyle StyleFor(
+		TopLineStyle style,
+		bool boldEnabled
+	) {
+		CursesStyle result = style switch {
+			TopLineStyle.Summary => SummaryStyle,
+			TopLineStyle.Header => HeaderStyle,
+			TopLineStyle.Prompt => PromptStyle,
+			TopLineStyle.Message => MessageStyle,
+			TopLineStyle.Dim => DimStyle,
+			TopLineStyle.HighlightBold => HighlightBoldStyle,
+			TopLineStyle.HighlightReverse => HighlightReverseStyle,
+			_ => CursesStyle.Default
+		};
+		if ( boldEnabled ) {
+			return result;
+		}
+		return result.WithAttributes(
+			result.Attributes & ~CursesTextAttributes.Bold
+		);
+	}
 }

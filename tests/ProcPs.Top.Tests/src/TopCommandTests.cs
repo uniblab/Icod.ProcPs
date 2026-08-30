@@ -380,6 +380,69 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task AppearanceCommandsRerenderWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'b' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'B' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'y' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new(
+			new ProcProcessCollection(
+				[
+					CreateProcess(
+						101,
+						"alpha",
+						1000,
+						10,
+						10,
+						64UL * 1024 * 1024,
+						ProcProcessState.Running
+					),
+					CreateProcess(
+						202,
+						"beta",
+						1001,
+						20,
+						10,
+						256UL * 1024 * 1024
+					)
+				]
+			)
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 4, terminal.Frames.Count );
+		Assert.True( terminal.Frames[ 0 ].BoldEnabled );
+		Assert.Equal(
+			TopLineStyle.HighlightBold,
+			terminal.Frames[ 0 ].Lines[ 6 ].Style
+		);
+		Assert.Equal(
+			TopLineStyle.HighlightReverse,
+			terminal.Frames[ 1 ].Lines[ 6 ].Style
+		);
+		Assert.False( terminal.Frames[ 2 ].BoldEnabled );
+		Assert.Equal(
+			TopLineStyle.HighlightReverse,
+			terminal.Frames[ 2 ].Lines[ 6 ].Style
+		);
+		Assert.Equal(
+			TopLineStyle.Default,
+			terminal.Frames[ 3 ].Lines[ 6 ].Style
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task ImmediateRefreshInputResamplesWithoutWaitingForTimeout() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock );
@@ -581,7 +644,8 @@ public sealed class TopCommandTests {
 		uint userId,
 		ulong userCpu,
 		ulong systemCpu,
-		ulong residentBytes
+		ulong residentBytes,
+		ProcProcessState state = ProcProcessState.Sleeping
 	) {
 		ProcessIdentity identity = new(
 			processId,
@@ -592,7 +656,7 @@ public sealed class TopCommandTests {
 			CommandLineArguments = Exact<IReadOnlyList<string>>(
 				[ command, "--worker", processId.ToString( System.Globalization.CultureInfo.InvariantCulture ) ]
 			),
-			State = Exact( ProcProcessState.Sleeping ),
+			State = Exact( state ),
 			ParentProcessId = Exact( 1 ),
 			RealUserId = Exact( userId ),
 			EffectiveUserId = Exact( userId ),
