@@ -791,17 +791,15 @@ public sealed class TopCommandTests {
 		Assert.Equal( 1, processes.CaptureCount );
 		Assert.Equal( 12, terminal.Frames.Count );
 
-		Assert.True(
-			terminal.Frames[ 1 ].Lines.Any(
-				line => line.Text.StartsWith( ">*S", StringComparison.Ordinal )
-					&& line.Text.Contains( "%CPU", StringComparison.Ordinal )
-			)
+		Assert.Contains(
+			terminal.Frames[ 1 ].Lines,
+			line => line.Text.StartsWith( ">*S", StringComparison.Ordinal )
+				&& line.Text.Contains( "%CPU", StringComparison.Ordinal )
 		);
-		Assert.True(
-			terminal.Frames[ 2 ].Lines.Any(
-				line => line.Text.StartsWith( "> S", StringComparison.Ordinal )
-					&& line.Text.Contains( "%CPU", StringComparison.Ordinal )
-			)
+		Assert.Contains(
+			terminal.Frames[ 2 ].Lines,
+			line => line.Text.StartsWith( "> S", StringComparison.Ordinal )
+				&& line.Text.Contains( "%CPU", StringComparison.Ordinal )
 		);
 
 		Assert.Null(
@@ -810,11 +808,11 @@ public sealed class TopCommandTests {
 
 		TopRenderFrame reordered = terminal.Frames[ 11 ];
 		string header = reordered.Lines[ 5 ].Text;
-		Assert.True(
-			header.StartsWith( "USER", StringComparison.Ordinal )
+		Assert.StartsWith(
+			"USER", header, StringComparison.Ordinal )
 		);
 		Assert.False(
-			header.Contains( "%CPU", StringComparison.Ordinal )
+			header.Contains( "%CPU", header, StringComparison.Ordinal )
 		);
 		Assert.True(
 			header.IndexOf( "PID", StringComparison.Ordinal )
@@ -1342,8 +1340,12 @@ public sealed class TopCommandTests {
 			| ProcProcessCapabilities.Memory
 			| ProcProcessCapabilities.Priority
 			| ProcProcessCapabilities.Threads;
-		internal int CaptureCount { get; private set; }
-		internal Action? CaptureAction { get; init; }
+		internal int CaptureCount {
+			get; private set;
+		}
+		internal Action? CaptureAction {
+			get; init;
+		}
 
 		public Task<ProcProcessCollection> GetProcessesAsync( CancellationToken cancellationToken = default ) {
 			cancellationToken.ThrowIfCancellationRequested();
@@ -1403,7 +1405,9 @@ public sealed class TopCommandTests {
 			| ProcSystemCapabilities.LoadAverage
 			| ProcSystemCapabilities.Uptime
 			| ProcSystemCapabilities.UserSessions;
-		internal int CaptureCount { get; private set; }
+		internal int CaptureCount {
+			get; private set;
+		}
 
 		public Task<ProcSystemSnapshot> GetSnapshotAsync( CancellationToken cancellationToken = default ) {
 			cancellationToken.ThrowIfCancellationRequested();
@@ -1477,7 +1481,9 @@ public sealed class TopCommandTests {
 			this.ProcessorCount = processorCount;
 		}
 
-		internal int ProcessorCount { get; }
+		internal int ProcessorCount {
+			get;
+		}
 
 		public ValueTask<ProcessorResourceSnapshot> GetProcessorResourcesAsync(
 			CancellationToken cancellationToken = default
@@ -1535,7 +1541,7 @@ public sealed class TopCommandTests {
 			if ( TimeSpan.Zero > duration ) {
 				throw new ArgumentOutOfRangeException( nameof( duration ) );
 			}
-			this.timestamp = checked( this.timestamp + duration.Ticks );
+			this.timestamp = checked(this.timestamp + duration.Ticks);
 		}
 	}
 
@@ -1560,15 +1566,25 @@ public sealed class TopCommandTests {
 			this.IsInteractive = isInteractive;
 		}
 
-		public bool IsInteractive { get; }
+		public bool IsInteractive {
+			get;
+		}
 		public CancellationToken TerminationToken => CancellationToken.None;
 		internal Queue<ScheduledTerminalEvent> Events { get; } = new();
 		internal List<TimeSpan> Waits { get; } = [];
 		internal List<TopRenderFrame> Frames { get; } = [];
-		internal int OpenCount { get; private set; }
-		internal int RepaintCount { get; private set; }
-		internal int AlertCount { get; private set; }
-		internal bool Disposed { get; private set; }
+		internal int OpenCount {
+			get; private set;
+		}
+		internal int RepaintCount {
+			get; private set;
+		}
+		internal int AlertCount {
+			get; private set;
+		}
+		internal bool Disposed {
+			get; private set;
+		}
 
 		public ValueTask<ITopTerminalSession> OpenAsync(
 			CancellationToken cancellationToken = default
@@ -1632,14 +1648,30 @@ public sealed class TopCommandTests {
 	}
 
 	private sealed class FakeProcessControl : ITopProcessControl {
-		internal int ParseSignalCount { get; private set; }
-		internal int SignalCount { get; private set; }
-		internal int PriorityCount { get; private set; }
-		internal int? LastSignaledProcessId { get; private set; }
-		internal ProcessIdentity? LastSignaledIdentity { get; private set; }
-		internal int? LastPriorityProcessId { get; private set; }
-		internal ProcessIdentity? LastPriorityIdentity { get; private set; }
-		internal int? LastNiceValue { get; private set; }
+		internal int ParseSignalCount {
+			get; private set;
+		}
+		internal int SignalCount {
+			get; private set;
+		}
+		internal int PriorityCount {
+			get; private set;
+		}
+		internal int? LastSignaledProcessId {
+			get; private set;
+		}
+		internal ProcessIdentity? LastSignaledIdentity {
+			get; private set;
+		}
+		internal int? LastPriorityProcessId {
+			get; private set;
+		}
+		internal ProcessIdentity? LastPriorityIdentity {
+			get; private set;
+		}
+		internal int? LastNiceValue {
+			get; private set;
+		}
 
 		public ProcessOperationResult<ProcessSignal> ParseSignal( string text ) {
 			ArgumentNullException.ThrowIfNull( text );
