@@ -575,7 +575,7 @@ internal static class TopRenderer {
 				state.NumericLeftJustified
 			),
 			AlignField(
-				FormatCpuTime( row.CpuSeconds ),
+				cpuTime,
 				9,
 				state.NumericLeftJustified
 			),
