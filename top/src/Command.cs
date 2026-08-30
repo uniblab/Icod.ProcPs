@@ -139,8 +139,8 @@ Interactive keys:
  B bold enable; b emphasis mode; J numeric justify; j character justify;
  x sort column; y running rows; c command line; H threads; i idle tasks;
  V forest; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
- k signal; r renice; = reset limits; arrows/PgUp/PgDn/Home/End scroll;
- h/? help.
+ L locate; & locate next; k signal; r renice; = reset limits;
+ arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
 
 	/// <summary>Runs <c>top</c> synchronously.</summary>
@@ -532,6 +532,7 @@ Interactive keys:
 				input,
 				sample,
 				state,
+				dimensions,
 				processProvider,
 				accountResolver,
 				processControl,
@@ -577,7 +578,11 @@ Interactive keys:
 			return TopCommandAction.Rerender;
 		}
 		if ( TopInputKey.End == input.Key ) {
-			state.VerticalOffset = int.MaxValue;
+			state.VerticalOffset = TopRenderer.GetEndOffset(
+				sample,
+				state,
+				dimensions
+			);
 			return TopCommandAction.Rerender;
 		}
 		if ( TopInputKey.Left == input.Key ) {
@@ -686,6 +691,32 @@ Interactive keys:
 					"Maximum tasks (0 for unlimited): "
 				);
 				return TopCommandAction.Rerender;
+			case 'L':
+				state.Message = null;
+				state.Prompt = new TopPromptState(
+					TopPromptKind.Locate,
+					"Locate string: "
+				);
+				return TopCommandAction.Rerender;
+			case '&':
+				if ( string.IsNullOrEmpty( state.SearchText ) ) {
+					state.Message = "no locate string is active";
+					return TopCommandAction.Rerender;
+				}
+				int nextLocate = TopRenderer.FindTaskOffset(
+					sample,
+					state,
+					state.SearchText,
+					state.VerticalOffset + 1,
+					dimensions
+				);
+				if ( 0 <= nextLocate ) {
+					state.VerticalOffset = nextLocate;
+					state.Message = null;
+				} else {
+					state.Message = $"no further match for: {state.SearchText}";
+				}
+				return TopCommandAction.Rerender;
 			case 'd':
 			case 's':
 				if ( state.SecureMode ) {
@@ -728,6 +759,7 @@ Interactive keys:
 				state.UserFilter = null;
 				state.HideIdle = false;
 				state.MaximumTasks = 0;
+				state.SearchText = null;
 				state.VerticalOffset = 0;
 				state.HorizontalOffset = 0;
 				state.Message = "display limits, filters, and scrolling reset";
@@ -745,6 +777,7 @@ Interactive keys:
 		TopInputEvent input,
 		TopSample sample,
 		TopRuntimeState state,
+		TopTerminalDimensions dimensions,
 		IProcProcessProvider processProvider,
 		IProcAccountDisplayResolver accountResolver,
 		ITopProcessControl processControl,
@@ -802,6 +835,30 @@ Interactive keys:
 				state.Message = 0 == maximumTasks
 					? "maximum tasks: unlimited"
 					: $"maximum tasks set to {maximumTasks}";
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.Locate:
+				state.Prompt = null;
+				string locateText = prompt.Buffer;
+				if ( 0 == locateText.Length ) {
+					state.SearchText = null;
+					state.Message = "locate disabled";
+					return TopCommandAction.Rerender;
+				}
+				state.SearchText = locateText;
+				int locateOffset = TopRenderer.FindTaskOffset(
+					sample,
+					state,
+					locateText,
+					state.VerticalOffset,
+					dimensions
+				);
+				if ( 0 <= locateOffset ) {
+					state.VerticalOffset = locateOffset;
+					state.Message = null;
+				} else {
+					state.Message = $"locate string not found: {locateText}";
+				}
 				return TopCommandAction.Rerender;
 
 			case TopPromptKind.KillProcessId:

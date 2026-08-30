@@ -763,6 +763,195 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task LocateAndLocateNextRepositionWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'L' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'b' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'e' ) );
+		terminal.Events.Enqueue( CharacterEvent( 't' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'a' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( '&' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new(
+			new ProcProcessCollection(
+				[
+					CreateProcess(
+						101,
+						"alpha",
+						1000,
+						0,
+						0,
+						64UL * 1024 * 1024
+					),
+					CreateProcess(
+						202,
+						"beta-one",
+						1000,
+						0,
+						0,
+						128UL * 1024 * 1024
+					),
+					CreateProcess(
+						303,
+						"beta-two",
+						1000,
+						0,
+						0,
+						256UL * 1024 * 1024
+					)
+				]
+			)
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 8, terminal.Frames.Count );
+		Assert.Contains(
+			"beta-one",
+			terminal.Frames[ 6 ].Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"beta-two",
+			terminal.Frames[ 7 ].Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True(
+			string.IsNullOrEmpty( terminal.Frames[ 7 ].Lines[ 7 ].Text )
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task LocateIsCaseSensitiveAndEmptyInputDisablesLocateNext() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'L' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'B' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'e' ) );
+		terminal.Events.Enqueue( CharacterEvent( 't' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'a' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( 'L' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( '&' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new(
+			new ProcProcessCollection(
+				[
+					CreateProcess(
+						101,
+						"beta",
+						1000,
+						0,
+						0,
+						64UL * 1024 * 1024
+					)
+				]
+			)
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 10, terminal.Frames.Count );
+		Assert.Contains(
+			"locate string not found: Beta",
+			terminal.Frames[ 6 ].Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"locate disabled",
+			terminal.Frames[ 8 ].Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"no locate string is active",
+			terminal.Frames[ 9 ].Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task EndKeepsLastPageBottomAlignedAfterScrollNormalization() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new TopTerminalDimensions( 100, 8 )
+		);
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.End ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new(
+			new ProcProcessCollection(
+				[
+					CreateProcess(
+						101,
+						"alpha",
+						1000,
+						0,
+						0,
+						64UL * 1024 * 1024
+					),
+					CreateProcess(
+						202,
+						"beta",
+						1000,
+						0,
+						0,
+						128UL * 1024 * 1024
+					),
+					CreateProcess(
+						303,
+						"gamma",
+						1000,
+						0,
+						0,
+						256UL * 1024 * 1024
+					)
+				]
+			)
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 2, terminal.Frames.Count );
+		Assert.Contains(
+			"202",
+			terminal.Frames[ 1 ].Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"303",
+			terminal.Frames[ 1 ].Lines[ 7 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task ImmediateRefreshInputResamplesWithoutWaitingForTimeout() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock );

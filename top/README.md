@@ -150,13 +150,20 @@ profile:
 - `d` or `s` opens an in-screen line editor for the refresh delay.
 - `u` and `U` open an in-screen user-filter editor; an empty value clears the
   filter and an initial `!` inverts it.
+- `L` prompts for a case-sensitive string and moves the matching task row to
+  the top of the task area. Searching considers the horizontally visible
+  portion of each fully formatted task row, so command mode, forest layout,
+  justification, zero suppression, filters, and horizontal scrolling all
+  influence matches. An empty search disables locate-next.
+- `&` repeats the active locate operation starting after the current top task;
+  searches do not wrap and horizontal scrolling is never changed.
 - `k` prompts for PID and signal and performs reuse-protected delivery through
   `Icod.Processes`.
 - `r` prompts for PID and nice value and performs reuse-protected priority
   changes through `Icod.Processes`.
 - Arrow keys, Page Up, Page Down, Home, and End scroll the task display; Left and
   Right scroll horizontally.
-- `=` clears idle/max-task display limits, PID/user restrictions, and scrolling.
+- `=` clears idle/max-task display limits, PID/user restrictions, locate state, and scrolling.
 - `h` or `?` displays a compact help screen.
 
 In secure mode the `d`/`s`, `k`, and `r` commands are disabled.

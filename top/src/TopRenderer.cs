@@ -54,6 +54,7 @@ internal static class TopRenderer {
 		" E / e          cycle summary / task memory scale",
 		" d or s         change refresh delay",
 		" u / U          filter by effective / any observed user",
+		" L / &          locate string / locate next",
 		" k              signal a process",
 		" r              change a process nice value",
 		" arrows/PgUp    scroll task display",
@@ -78,18 +79,13 @@ internal static class TopRenderer {
 		}
 
 		List<TopTaskRow> tasks = SelectAndOrderTasks( sample, state );
-		int footerRows = state.Prompt is null && string.IsNullOrEmpty( state.Message ) ? 0 : 1;
-		int availableTaskRows = Math.Max(
-			0,
-			dimensions.Rows - SummaryRows - TableHeaderRows - footerRows
+		int availableTaskRows = AvailableTaskRows(
+			state,
+			dimensions
 		);
-		if ( 0 < state.MaximumTasks ) {
-			availableTaskRows = Math.Min(
-				availableTaskRows,
-				state.MaximumTasks
-			);
-		}
-		int maxOffset = Math.Max( 0, tasks.Count - availableTaskRows );
+		int maxOffset = 0 < tasks.Count
+			? tasks.Count - 1
+			: 0;
 		state.VerticalOffset = Math.Clamp( state.VerticalOffset, 0, maxOffset );
 		state.HorizontalOffset = Math.Max( 0, state.HorizontalOffset );
 
@@ -188,6 +184,95 @@ internal static class TopRenderer {
 			) );
 		}
 		return lines;
+	}
+
+	internal static int GetEndOffset(
+		TopSample sample,
+		TopRuntimeState state,
+		TopTerminalDimensions dimensions
+	) {
+		ArgumentNullException.ThrowIfNull( sample );
+		ArgumentNullException.ThrowIfNull( state );
+		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
+
+		List<TopTaskRow> tasks = SelectAndOrderTasks(
+			sample,
+			state
+		);
+		int availableTaskRows = AvailableTaskRows(
+			state,
+			dimensions
+		);
+		if ( 0 == tasks.Count || 0 == availableTaskRows ) {
+			return 0;
+		}
+		return Math.Max(
+			0,
+			tasks.Count - availableTaskRows
+		);
+	}
+
+	internal static int FindTaskOffset(
+		TopSample sample,
+		TopRuntimeState state,
+		string searchText,
+		int startIndex,
+		TopTerminalDimensions dimensions
+	) {
+		ArgumentNullException.ThrowIfNull( sample );
+		ArgumentNullException.ThrowIfNull( state );
+		ArgumentException.ThrowIfNullOrEmpty( searchText );
+		ArgumentOutOfRangeException.ThrowIfNegative( startIndex );
+		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
+
+		List<TopTaskRow> tasks = SelectAndOrderTasks(
+			sample,
+			state
+		);
+		for ( int index = startIndex; index < tasks.Count; index++ ) {
+			string visibleLine = SliceForDisplay(
+				FormatTaskLine(
+					tasks[ index ],
+					state,
+					sample.ProcessorCount
+				).Text,
+				state.HorizontalOffset,
+				dimensions.Columns
+			);
+			if ( visibleLine.Contains( searchText, StringComparison.Ordinal ) ) {
+				return index;
+			}
+		}
+		return -1;
+	}
+
+	private static int AvailableTaskRows(
+		TopRuntimeState state,
+		TopTerminalDimensions dimensions
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
+
+		int footerRows = state.Prompt is null && string.IsNullOrEmpty( state.Message )
+			? 0
+			: 1;
+		int result = Math.Max(
+			0,
+			dimensions.Rows - SummaryRows - TableHeaderRows - footerRows
+		);
+		if ( 0 < state.MaximumTasks ) {
+			result = Math.Min(
+				result,
+				state.MaximumTasks
+			);
+		}
+		return result;
 	}
 
 	internal static IReadOnlyList<string> ListFields() => [

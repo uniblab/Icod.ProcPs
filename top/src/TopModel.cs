@@ -77,6 +77,7 @@ internal sealed class TopRuntimeState {
 	internal bool CharacterRightJustified { get; set; }
 	internal bool SuppressZeros { get; set; }
 	internal int MaximumTasks { get; set; }
+	internal string? SearchText { get; set; }
 	internal TopMemoryScale SummaryScale { get; set; } = TopMemoryScale.Mebibytes;
 	internal TopMemoryScale TaskScale { get; set; } = TopMemoryScale.Kibibytes;
 	internal bool ShowCommandLine { get; set; }
@@ -99,6 +100,7 @@ internal sealed class TopRuntimeState {
 internal enum TopPromptKind {
 	Delay,
 	MaximumTasks,
+	Locate,
 	KillProcessId,
 	KillSignal,
 	ReniceProcessId,
