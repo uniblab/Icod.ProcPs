@@ -79,11 +79,10 @@ public sealed class TopProcpsConfigurationWriteTests {
 		string serialized = TopProcpsConfigurationCodec.Serialize(
 			source
 		);
-		Assert.True(
-			serialized.StartsWith(
-				TopProcpsConfigurationCodec.IcodOwnershipHeader + "\n",
-				StringComparison.Ordinal
-			)
+		Assert.StartsWith(
+			TopProcpsConfigurationCodec.IcodOwnershipHeader + "\n",
+			serialized,
+			StringComparison.Ordinal
 		);
 
 		string[] lines = serialized.Split(

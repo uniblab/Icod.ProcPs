@@ -1225,30 +1225,36 @@ internal static partial class TopProcpsConfigurationCodec {
 			wholeText,
 			"Delay_time"
 		);
-		int fractional = ParseInteger(
-			fractionalText,
-			"Delay_time fraction"
-		);
-		if (
-			0 > whole
-			|| 0 > fractional
-		) {
+		if ( 0 > whole ) {
 			throw new FormatException(
 				"the procps delay must be nonnegative"
 			);
 		}
 
-		double seconds = whole + fractional / 1000.0;
-		try {
-			return TimeSpan.FromSeconds(
-				seconds
-			);
-		} catch ( OverflowException exception ) {
+		if (
+			!decimal.TryParse(
+				$"0.{fractionalText}",
+				NumberStyles.AllowDecimalPoint,
+				CultureInfo.InvariantCulture,
+				out decimal fractional
+			)
+		) {
 			throw new FormatException(
-				"the procps delay is too large",
-				exception
+				"the procps delay fraction is invalid"
 			);
 		}
+
+		long fractionalTicks = decimal.ToInt64(
+			decimal.Round(
+				fractional * TimeSpan.TicksPerSecond,
+				0,
+				MidpointRounding.AwayFromZero
+			)
+		);
+		return TimeSpan.FromTicks(
+			( (long)whole * TimeSpan.TicksPerSecond )
+			+ fractionalTicks
+		);
 	}
 
 	private static TopMemoryScale ParseMemoryScale(
