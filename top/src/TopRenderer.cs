@@ -514,7 +514,7 @@ internal static class TopRenderer {
 			memoryPercent = string.Empty;
 		}
 
-		string cpuTime = cpuTime;
+		string cpuTime = FormatCpuTime( row.CpuSeconds );
 		if (
 			state.SuppressZeros
 			&& row.CpuSeconds.HasValue
