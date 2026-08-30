@@ -79,9 +79,13 @@ internal static class TopRenderer {
 		}
 
 		List<TopTaskRow> tasks = SelectAndOrderTasks( sample, state );
+		int footerRows = state.Prompt is null && string.IsNullOrEmpty( state.Message )
+			? 0
+			: 1;
 		int availableTaskRows = AvailableTaskRows(
 			state,
-			dimensions
+			dimensions,
+			footerRows
 		);
 		int maxOffset = 0 < tasks.Count
 			? tasks.Count - 1
@@ -201,9 +205,13 @@ internal static class TopRenderer {
 			sample,
 			state
 		);
+		int footerRows = state.Prompt is null && string.IsNullOrEmpty( state.Message )
+			? 0
+			: 1;
 		int availableTaskRows = AvailableTaskRows(
 			state,
-			dimensions
+			dimensions,
+			footerRows
 		);
 		if ( 0 == tasks.Count || 0 == availableTaskRows ) {
 			return 0;
@@ -252,16 +260,17 @@ internal static class TopRenderer {
 
 	private static int AvailableTaskRows(
 		TopRuntimeState state,
-		TopTerminalDimensions dimensions
+		TopTerminalDimensions dimensions,
+		int footerRows
 	) {
 		ArgumentNullException.ThrowIfNull( state );
 		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
 			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
 		}
+		if ( 0 > footerRows || 1 < footerRows ) {
+			throw new ArgumentOutOfRangeException( nameof( footerRows ) );
+		}
 
-		int footerRows = state.Prompt is null && string.IsNullOrEmpty( state.Message )
-			? 0
-			: 1;
 		int result = Math.Max(
 			0,
 			dimensions.Rows - SummaryRows - TableHeaderRows - footerRows
