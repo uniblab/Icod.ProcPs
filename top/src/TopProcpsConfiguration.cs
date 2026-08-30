@@ -413,7 +413,11 @@ internal static partial class TopProcpsConfigurationCodec {
 			),
 			Forest = 0 != (
 				winFlags
-				& 0x000002
+				& ShowForestFlag
+			),
+			SingleCpuSummary = 0 != (
+				winFlags
+				& ViewCpuSummary
 			)
 		};
 

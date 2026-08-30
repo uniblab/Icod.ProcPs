@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.17 extends native top rcfile reading through procps 3.2.8 and procps-ng 3.3.17, including character-field visibility decoding, legacy flag/sort remapping, historical field-table expansion, and Latin-1 native-file reads; Icod JSON remains the only write format.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.18 adds guarded native procps top rcfile writing: W keeps the lossless Icod JSON authoritative while creating or refreshing only Icod-owned current-format native mirrors, never overwriting foreign legacy or XDG configuration; current native files are decoded as UTF-8 while legacy character formats retain Latin-1 byte semantics.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

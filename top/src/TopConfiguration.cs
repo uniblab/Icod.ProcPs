@@ -145,11 +145,10 @@ internal static class TopSystemIdentity {
 }
 
 /// <summary>Uses the process environment and filesystem for top configuration.</summary>
-internal sealed class SystemTopConfigurationStore {
+internal sealed partial class SystemTopConfigurationStore {
 	private const string LinuxSystemRestrictionsPath = "/etc/toprc";
 	private const string LinuxSystemDefaultsPath = "/etc/topdefaultrc";
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
-	private static readonly Encoding NativeConfigurationEncoding = Encoding.Latin1;
 	private readonly TopConfigurationPaths paths;
 	private readonly string? systemRestrictionsPath;
 	private readonly Func<bool> privilegedUserProvider;
@@ -298,6 +297,10 @@ internal sealed class SystemTopConfigurationStore {
 		} finally {
 			TryDeleteTemporaryFile( temporaryPath );
 		}
+		await this.SaveNativeMirrorAsync(
+			state,
+			cancellationToken
+		).ConfigureAwait( false );
 		return path;
 	}
 
@@ -368,11 +371,13 @@ internal sealed class SystemTopConfigurationStore {
 			return false;
 		}
 
-		string text = await File.ReadAllTextAsync(
+		byte[] bytes = await File.ReadAllBytesAsync(
 			path,
-			NativeConfigurationEncoding,
 			cancellationToken
 		).ConfigureAwait( false );
+		string text = TopProcpsConfigurationCodec.Decode(
+			bytes
+		);
 		try {
 			TopProcpsConfigurationCodec.Apply(
 				text,

@@ -242,10 +242,21 @@ field-table expansions. Supported window names, field order/visibility, sort
 state, task limits, presentation flags, memory scales, alternate/Irix modes,
 delay, and Other Filters are translated into the Icod four-window model.
 
-`W` continues to write only `icod-toprc.json`. This is intentional: native
-procps files can contain fields, color state, graph state, and Inspection
-entries that Icod does not yet model losslessly, so overwriting a native `toprc`
-would risk destroying configuration owned by procps.
+`W` always writes the lossless `icod-toprc.json`. On Linux it also maintains a
+current-format procps `toprc` mirror when doing so is ownership-safe. If a
+legacy `$HOME/.toprc` exists, Icod updates it only when its first line carries
+the Icod ownership marker; a foreign legacy file is preserved and no XDG file
+is created to shadow it. Otherwise the XDG/HOME `.config` `procps/toprc` is
+created when absent or refreshed only when it is Icod-owned. Native procps
+ignores the first eyecatcher line, so it can consume an Icod mirror directly.
+If procps later rewrites that mirror, the Icod marker disappears and subsequent
+`W` commands leave the native file alone.
+
+The native mirror contains the state shared by both implementations. Procps
+features not yet represented by Icod, including colors, graph modes, and
+Inspection entries, receive neutral/default values only in an Icod-owned file.
+The native task-memory scale has no EiB encoding, so an Icod EiB task scale is
+mirrored as PiB. The JSON file remains authoritative and lossless.
 
 The Icod JSON persists delay, alternate-display/current-window selection,
 global bold enable, memory scales, thread/Irix/zero-suppression state, and each
@@ -302,7 +313,6 @@ This tranche establishes the production monitor engine and terminal lifecycle.
 The following large procps `top` subsystems are intentionally left for later
 tranches rather than represented incompletely:
 
-- native procps rcfile writing;
 - configurable color schemes and color-management screens;
 - per-logical-CPU activity rows until the Shared metrics contract exposes them;
 - cumulative dead-child CPU time (`-S`); and
