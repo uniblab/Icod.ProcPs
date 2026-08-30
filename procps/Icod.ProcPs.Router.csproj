@@ -32,7 +32,6 @@
 		<AssemblyName>procps</AssemblyName>
 		<RootNamespace>Icod.ProcPs.Router</RootNamespace>
 		<Version>$(IcodProcPsSuiteVersion)</Version>
-		<AssemblyVersion>$(IcodProcPsSuiteVersion).0</AssemblyVersion>
 	</PropertyGroup>
 	<PropertyGroup>
 		<PackageVersion>$(IcodProcPsSuiteVersion)</PackageVersion>
@@ -48,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>Move GNU regular-expression dependencies from Icod.ProcPs.Shared to pgrep, pkill, and pidwait.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.12 adds procps-compatible top O/o Other Filtering with include/exclude criteria, substring equality, relational string comparisons, multiple active filters, and reset integration.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

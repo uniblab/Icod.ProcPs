@@ -29,11 +29,24 @@ using Icod.ProcPs.Shared;
 internal static class TopRenderer {
 	private const int SummaryRows = 5;
 	private const int TableHeaderRows = 1;
+
+	private readonly record struct TopFormattedTaskLine(
+		string Text,
+		int SortFieldStart,
+		int SortFieldLength
+	);
+
 	private static readonly string[] HelpLines = [
 		"top help -- core interactive commands",
 		" q              quit",
 		" Enter/Space    refresh now",
+		" 0              toggle zero suppression",
+		" n or #         set maximum displayed tasks",
 		" P/M/N/T        sort by CPU, memory, PID, or time",
+		" R              reverse/normal sort direction",
+		" B/b/x/y        emphasis and highlighting",
+		" J / j          justify numeric / character columns",
+		" f              manage task fields",
 		" c              toggle command name / command line",
 		" H              toggle thread display",
 		" i              toggle idle-task suppression",
@@ -42,11 +55,13 @@ internal static class TopRenderer {
 		" E / e          cycle summary / task memory scale",
 		" d or s         change refresh delay",
 		" u / U          filter by effective / any observed user",
+		" O / o          add case-sensitive / insensitive Other Filter",
+		" L / &          locate string / locate next",
 		" k              signal a process",
 		" r              change a process nice value",
 		" arrows/PgUp    scroll task display",
 		" Home/End       jump to first/last task",
-		" =              clear PID/user filters and scrolling",
+		" =              clear display limits, filters, scrolling",
 		" h or ?         close this help"
 	];
 
@@ -61,17 +76,28 @@ internal static class TopRenderer {
 			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
 		}
 
+		if ( state.ShowFieldManager ) {
+			return RenderFieldManager(
+				state,
+				dimensions
+			);
+		}
 		if ( state.ShowHelp ) {
 			return RenderHelp( state, dimensions );
 		}
 
 		List<TopTaskRow> tasks = SelectAndOrderTasks( sample, state );
-		int footerRows = state.Prompt is null && string.IsNullOrEmpty( state.Message ) ? 0 : 1;
-		int availableTaskRows = Math.Max(
-			0,
-			dimensions.Rows - SummaryRows - TableHeaderRows - footerRows
+		int footerRows = state.Prompt is null && string.IsNullOrEmpty( state.Message )
+			? 0
+			: 1;
+		int availableTaskRows = AvailableTaskRows(
+			state,
+			dimensions,
+			footerRows
 		);
-		int maxOffset = Math.Max( 0, tasks.Count - availableTaskRows );
+		int maxOffset = 0 < tasks.Count
+			? tasks.Count - 1
+			: 0;
 		state.VerticalOffset = Math.Clamp( state.VerticalOffset, 0, maxOffset );
 		state.HorizontalOffset = Math.Max( 0, state.HorizontalOffset );
 
@@ -83,16 +109,41 @@ internal static class TopRenderer {
 			) );
 		}
 		lines.Add( new TopRenderLine(
-			SliceForDisplay( BuildHeader(), state.HorizontalOffset, dimensions.Columns ),
+			SliceForDisplay( BuildHeader( state ), state.HorizontalOffset, dimensions.Columns ),
 			TopLineStyle.Header
 		) );
 
+		int taskEndIndex = Math.Min(
+			tasks.Count,
+			state.VerticalOffset + availableTaskRows
+		);
 		for ( int index = state.VerticalOffset;
-			index < tasks.Count && lines.Count < dimensions.Rows - footerRows;
+			index < taskEndIndex;
 			index++ ) {
-			string line = FormatTaskLine( tasks[ index ], state, sample.ProcessorCount );
+			TopTaskRow task = tasks[ index ];
+			TopFormattedTaskLine formatted = FormatTaskLine(
+				task,
+				state,
+				sample.ProcessorCount
+			);
+			string visibleLine = SliceForDisplay(
+				formatted.Text,
+				state.HorizontalOffset,
+				dimensions.Columns
+			);
+			TopLineStyle lineStyle = TaskLineStyle(
+				task,
+				state
+			);
 			lines.Add( new TopRenderLine(
-				SliceForDisplay( line, state.HorizontalOffset, dimensions.Columns )
+				visibleLine,
+				lineStyle,
+				SortColumnSpans(
+					visibleLine,
+					formatted,
+					state,
+					lineStyle
+				)
 			) );
 		}
 
@@ -115,7 +166,12 @@ internal static class TopRenderer {
 				) );
 			}
 		}
-		return new TopRenderFrame( lines, dimensions.Columns, dimensions.Rows );
+		return new TopRenderFrame(
+			lines,
+			dimensions.Columns,
+			dimensions.Rows,
+			state.BoldEnabled
+		);
 	}
 
 	internal static IReadOnlyList<string> RenderBatch(
@@ -128,54 +184,159 @@ internal static class TopRenderer {
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
 		var lines = new List<string>();
 		lines.AddRange( BuildSummaryLines( sample, state ).Select( line => LimitRunes( line, width ) ) );
-		lines.Add( LimitRunes( BuildHeader(), width ) );
+		lines.Add( LimitRunes( BuildHeader( state ), width ) );
 		foreach ( TopTaskRow task in SelectAndOrderTasks( sample, state ) ) {
 			lines.Add( LimitRunes(
-				FormatTaskLine( task, state, sample.ProcessorCount ),
+				FormatTaskLine(
+					task,
+					state,
+					sample.ProcessorCount
+				).Text,
 				width
 			) );
 		}
 		return lines;
 	}
 
-	internal static IReadOnlyList<string> ListFields() => [
-		"PID      process or task identifier",
-		"USER     effective user name or numeric identifier",
-		"PR       portable priority derived from the observed nice value",
-		"NI       observed nice value",
-		"VIRT     virtual memory size",
-		"RES      resident memory size",
-		"SHR      shared resident memory (shown as unavailable until observed)",
-		"S        task state",
-		"%CPU     interval CPU utilization",
-		"%MEM     resident memory percentage",
-		"TIME+    cumulative observed CPU time",
-		"COMMAND  command name or command line"
-	];
+	internal static int GetEndOffset(
+		TopSample sample,
+		TopRuntimeState state,
+		TopTerminalDimensions dimensions
+	) {
+		ArgumentNullException.ThrowIfNull( sample );
+		ArgumentNullException.ThrowIfNull( state );
+		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
 
-	internal static bool TryParseSortField( string text, out TopSortField field ) {
+		List<TopTaskRow> tasks = SelectAndOrderTasks(
+			sample,
+			state
+		);
+		int footerRows = state.Prompt is null && string.IsNullOrEmpty( state.Message )
+			? 0
+			: 1;
+		int availableTaskRows = AvailableTaskRows(
+			state,
+			dimensions,
+			footerRows
+		);
+		if ( 0 == tasks.Count || 0 == availableTaskRows ) {
+			return 0;
+		}
+		return Math.Max(
+			0,
+			tasks.Count - availableTaskRows
+		);
+	}
+
+	internal static int FindTaskOffset(
+		TopSample sample,
+		TopRuntimeState state,
+		string searchText,
+		int startIndex,
+		TopTerminalDimensions dimensions
+	) {
+		ArgumentNullException.ThrowIfNull( sample );
+		ArgumentNullException.ThrowIfNull( state );
+		ArgumentException.ThrowIfNullOrEmpty( searchText );
+		ArgumentOutOfRangeException.ThrowIfNegative( startIndex );
+		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
+
+		List<TopTaskRow> tasks = SelectAndOrderTasks(
+			sample,
+			state
+		);
+		for ( int index = startIndex; index < tasks.Count; index++ ) {
+			string visibleLine = SliceForDisplay(
+				FormatTaskLine(
+					tasks[ index ],
+					state,
+					sample.ProcessorCount
+				).Text,
+				state.HorizontalOffset,
+				dimensions.Columns
+			);
+			if ( visibleLine.Contains( searchText, StringComparison.Ordinal ) ) {
+				return index;
+			}
+		}
+		return -1;
+	}
+
+	private static int AvailableTaskRows(
+		TopRuntimeState state,
+		TopTerminalDimensions dimensions,
+		int footerRows
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
+		if ( 0 > footerRows || 1 < footerRows ) {
+			throw new ArgumentOutOfRangeException( nameof( footerRows ) );
+		}
+
+		int result = Math.Max(
+			0,
+			dimensions.Rows - SummaryRows - TableHeaderRows - footerRows
+		);
+		if ( 0 < state.MaximumTasks ) {
+			result = Math.Min(
+				result,
+				state.MaximumTasks
+			);
+		}
+		return result;
+	}
+
+	internal static IReadOnlyList<string> ListFields() {
+		var result = new List<string>( TopFieldCatalog.Definitions.Count );
+		foreach ( TopFieldDefinition definition in TopFieldCatalog.Definitions ) {
+			result.Add(
+				$"{definition.Name,-9}{definition.Description}"
+			);
+		}
+		return result;
+	}
+
+	internal static bool TryParseSortField(
+		string text,
+		out TopFieldId field
+	) {
 		ArgumentNullException.ThrowIfNull( text );
-		string normalized = text.Trim().TrimStart( '+', '-' ).ToUpperInvariant();
-		field = normalized switch {
-			"%CPU" or "CPU" or "P" => TopSortField.Cpu,
-			"%MEM" or "MEM" or "M" => TopSortField.Memory,
-			"PID" or "N" => TopSortField.Pid,
-			"TIME" or "TIME+" or "T" => TopSortField.Time,
-			"VIRT" => TopSortField.VirtualMemory,
-			"RES" => TopSortField.ResidentMemory,
-			"USER" => TopSortField.User,
-			"COMMAND" or "CMD" => TopSortField.Command,
-			"NI" or "NICE" => TopSortField.Nice,
-			"S" or "STATE" => TopSortField.State,
-			_ => default
-		};
-		return normalized is "%CPU" or "CPU" or "P"
-			or "%MEM" or "MEM" or "M"
-			or "PID" or "N"
-			or "TIME" or "TIME+" or "T"
-			or "VIRT" or "RES" or "USER"
-			or "COMMAND" or "CMD" or "NI" or "NICE"
-			or "S" or "STATE";
+		return TopFieldCatalog.TryParse(
+			text,
+			out field
+		);
+	}
+
+	internal static bool TryParseSortOverride(
+		string text,
+		out TopFieldId field,
+		out bool? highToLow
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+
+		string normalized = text.Trim();
+		highToLow = null;
+		if ( 0 < normalized.Length ) {
+			if ( '+' == normalized[ 0 ] ) {
+				highToLow = true;
+				normalized = normalized[ 1.. ];
+			} else if ( '-' == normalized[ 0 ] ) {
+				highToLow = false;
+				normalized = normalized[ 1.. ];
+			}
+		}
+		if ( TryParseSortField( normalized, out field ) ) {
+			return true;
+		}
+
+		highToLow = null;
+		return false;
 	}
 
 	internal static TopMemoryScale NextScale( TopMemoryScale scale ) => scale switch {
@@ -221,7 +382,134 @@ internal static class TopRenderer {
 		}
 		state.VerticalOffset = 0;
 		state.HorizontalOffset = 0;
-		return new TopRenderFrame( lines, dimensions.Columns, dimensions.Rows );
+		return new TopRenderFrame(
+			lines,
+			dimensions.Columns,
+			dimensions.Rows,
+			state.BoldEnabled
+		);
+	}
+
+	private static TopRenderFrame RenderFieldManager(
+		TopRuntimeState state,
+		TopTerminalDimensions dimensions
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
+		if ( 0 == state.FieldOrder.Count ) {
+			throw new InvalidOperationException(
+				"The top field order cannot be empty."
+			);
+		}
+
+		state.FieldCursor = Math.Clamp(
+			state.FieldCursor,
+			0,
+			state.FieldOrder.Count - 1
+		);
+		TopFieldDefinition sortDefinition = TopFieldCatalog.Get(
+			state.SortField
+		);
+		var lines = new List<TopRenderLine>( dimensions.Rows ) {
+			new(
+				LimitRunes(
+					$"Fields Management for 1:Def - sort field: {sortDefinition.Name}",
+					dimensions.Columns
+				),
+				TopLineStyle.Header
+			),
+			new(
+				LimitRunes(
+					"Markers: > selected, * displayed, S sort, M moving",
+					dimensions.Columns
+				),
+				TopLineStyle.Dim
+			),
+			new(
+				LimitRunes(
+					"Up/Down/Pg/Home/End move; d/Space display; s sort; Right move; Left/Enter place; q/Esc return",
+					dimensions.Columns
+				),
+				TopLineStyle.Dim
+			)
+		};
+
+		int listRows = Math.Max(
+			1,
+			dimensions.Rows - 3
+		);
+		int maxOffset = Math.Max(
+			0,
+			state.FieldOrder.Count - listRows
+		);
+		int offset = Math.Clamp(
+			state.FieldCursor - listRows + 1,
+			0,
+			maxOffset
+		);
+		int end = Math.Min(
+			state.FieldOrder.Count,
+			offset + listRows
+		);
+		for ( int index = offset; index < end; index++ ) {
+			TopFieldId field = state.FieldOrder[ index ];
+			TopFieldDefinition definition = TopFieldCatalog.Get(
+				field
+			);
+
+			string selectedMarker = " ";
+			if ( index == state.FieldCursor ) {
+				selectedMarker = ">";
+			}
+			string visibleMarker = " ";
+			if ( state.VisibleFields.Contains( field ) ) {
+				visibleMarker = "*";
+			}
+			string sortMarker = " ";
+			if ( field == state.SortField ) {
+				sortMarker = "S";
+			}
+			string moveMarker = " ";
+			if (
+				state.FieldMoveActive
+				&& index == state.FieldCursor
+			) {
+				moveMarker = "M";
+			}
+			string markers = string.Concat(
+				selectedMarker,
+				visibleMarker,
+				sortMarker,
+				moveMarker
+			);
+			string lineText = $"{markers} {definition.Name,-8} {definition.Description}";
+			TopLineStyle lineStyle = TopLineStyle.Default;
+			if ( index == state.FieldCursor ) {
+				lineStyle = TopLineStyle.HighlightReverse;
+			}
+			lines.Add(
+				new TopRenderLine(
+					LimitRunes(
+						lineText,
+						dimensions.Columns
+					),
+					lineStyle
+				)
+			);
+		}
+		while ( lines.Count < dimensions.Rows ) {
+			lines.Add(
+				new TopRenderLine( string.Empty )
+			);
+		}
+		return new TopRenderFrame(
+			lines,
+			dimensions.Columns,
+			dimensions.Rows,
+			state.BoldEnabled
+		);
 	}
 
 	private static IReadOnlyList<string> BuildSummaryLines(
@@ -229,7 +517,11 @@ internal static class TopRenderer {
 		TopRuntimeState state
 	) {
 		string taskLabel = state.ShowThreads ? "Threads" : "Tasks";
-		IReadOnlyList<TopTaskRow> visible = ApplyFilters( sample.Tasks, state ).ToList().AsReadOnly();
+		IReadOnlyList<TopTaskRow> visible = ApplyFilters(
+			sample.Tasks,
+			state,
+			sample.ProcessorCount
+		).ToList().AsReadOnly();
 		int running = visible.Count( row => IsState( row, ProcProcessState.Running ) );
 		int sleeping = visible.Count( row => IsState( row, ProcProcessState.Sleeping ) );
 		int stopped = visible.Count( row => IsState( row, ProcProcessState.Stopped ) || IsState( row, ProcProcessState.TracingStop ) );
@@ -355,43 +647,175 @@ internal static class TopRenderer {
 		);
 	}
 
-	private static string BuildHeader() =>
-		"    PID USER       PR  NI     VIRT      RES      SHR S  %CPU %MEM     TIME+ COMMAND";
+	private static string BuildHeader(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
 
-	private static string FormatTaskLine(
+		var fields = new List<string>();
+		foreach ( TopFieldId field in state.FieldOrder ) {
+			if ( !state.VisibleFields.Contains( field ) ) {
+				continue;
+			}
+			TopFieldDefinition definition = TopFieldCatalog.Get(
+				field
+			);
+			bool leftJustified;
+			if ( definition.Numeric ) {
+				leftJustified = state.NumericLeftJustified;
+			} else {
+				leftJustified = !state.CharacterRightJustified;
+			}
+			fields.Add(
+				AlignField(
+					definition.Name,
+					definition.Width,
+					leftJustified
+				)
+			);
+		}
+		return string.Join(
+			" ",
+			fields
+		);
+	}
+
+	private static TopFormattedTaskLine FormatTaskLine(
 		TopTaskRow row,
 		TopRuntimeState state,
 		int processorCount
 	) {
-		ProcProcessSnapshot process = row.Process;
-		double cpu = state.IrixMode
-			? row.CpuPercentIrix
-			: row.CpuPercentIrix / Math.Max( 1, processorCount );
-		string command = FormatCommand( process, state.ShowCommandLine );
-		if ( state.Forest && 0 < row.ForestDepth ) {
-			command = new string( ' ', row.ForestDepth * 2 ) + "\\_ " + command;
+		ArgumentNullException.ThrowIfNull( row );
+		ArgumentNullException.ThrowIfNull( state );
+
+		var builder = new StringBuilder();
+		int runePosition = 0;
+		int sortFieldStart = -1;
+		int sortFieldLength = 0;
+		bool first = true;
+		foreach ( TopFieldId field in state.FieldOrder ) {
+			if ( !state.VisibleFields.Contains( field ) ) {
+				continue;
+			}
+
+			string fieldText = FieldDisplayValue(
+				row,
+				state,
+				processorCount,
+				field
+			);
+
+			if ( !first ) {
+				builder.Append( ' ' );
+				runePosition++;
+			}
+			first = false;
+
+			int fieldLength = CountRunes( fieldText );
+			if ( field == state.SortField ) {
+				sortFieldStart = runePosition;
+				sortFieldLength = fieldLength;
+			}
+			builder.Append( fieldText );
+			runePosition += fieldLength;
 		}
-		string priority = process.NiceValue.HasValue
-			? ( 20 + process.NiceValue.Value ).ToString( CultureInfo.InvariantCulture )
-			: "?";
-		string nice = process.NiceValue.HasValue
-			? process.NiceValue.Value.ToString( CultureInfo.InvariantCulture )
-			: "?";
-		return string.Format(
-			CultureInfo.InvariantCulture,
-			"{0,7} {1,-8} {2,3} {3,3} {4,8} {5,8} {6,8} {7,1} {8,5:0.0} {9,4:0.0} {10,9} {11}",
-			process.ProcessId,
-			TruncateUser( row.User ),
-			priority,
-			nice,
-			FormatTaskMemory( process.VirtualMemoryBytes, state.TaskScale ),
-			FormatTaskMemory( process.ResidentMemoryBytes, state.TaskScale ),
-			"-",
-			StateCode( process ),
-			cpu,
-			row.MemoryPercent,
-			FormatCpuTime( row.CpuSeconds ),
-			command
+
+		return new TopFormattedTaskLine(
+			builder.ToString(),
+			sortFieldStart,
+			sortFieldLength
+		);
+	}
+
+	internal static string FieldDisplayValue(
+		TopTaskRow row,
+		TopRuntimeState state,
+		int processorCount,
+		TopFieldId field
+	) {
+		ArgumentNullException.ThrowIfNull( row );
+		ArgumentNullException.ThrowIfNull( state );
+
+		TopFieldDefinition definition = TopFieldCatalog.Get(
+			field
+		);
+		string fieldText = definition.Formatter(
+			row,
+			state,
+			processorCount
+		);
+		if ( TopFieldId.Command == field ) {
+			return FormatCommandField(
+				fieldText,
+				state.CharacterRightJustified
+			);
+		}
+
+		bool leftJustified;
+		if ( definition.Numeric ) {
+			leftJustified = state.NumericLeftJustified;
+		} else {
+			leftJustified = !state.CharacterRightJustified;
+		}
+		return AlignField(
+			fieldText,
+			definition.Width,
+			leftJustified
+		);
+	}
+
+	internal static string FieldAlign(
+		string text,
+		int width,
+		bool leftJustified
+	) => AlignField(
+		text,
+		width,
+		leftJustified
+	);
+
+	private static string AlignField(
+		string text,
+		int width,
+		bool leftJustified
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
+
+		int length = CountRunes( text );
+		if ( width <= length ) {
+			return text;
+		}
+
+		string padding = new(
+			' ',
+			width - length
+		);
+		if ( leftJustified ) {
+			return string.Concat(
+				text,
+				padding
+			);
+		}
+		return string.Concat(
+			padding,
+			text
+		);
+	}
+
+	private static string FormatCommandField(
+		string command,
+		bool rightJustified
+	) {
+		ArgumentNullException.ThrowIfNull( command );
+
+		if ( !rightJustified ) {
+			return command;
+		}
+		return AlignField(
+			command,
+			7,
+			leftJustified: false
 		);
 	}
 
@@ -399,11 +823,18 @@ internal static class TopRenderer {
 		TopSample sample,
 		TopRuntimeState state
 	) {
-		List<TopTaskRow> tasks = ApplyFilters( sample.Tasks, state ).ToList();
+		List<TopTaskRow> tasks = ApplyFilters(
+			sample.Tasks,
+			state,
+			sample.ProcessorCount
+		).ToList();
 		if ( state.HideIdle ) {
 			tasks = tasks.Where( row => 0.0001 < row.CpuPercentIrix || IsState( row, ProcProcessState.Running ) ).ToList();
 		}
-		Comparison<TopTaskRow> comparison = SortComparison( state.SortField );
+		Comparison<TopTaskRow> comparison = SortComparison(
+			state.SortField,
+			state.SortHighToLow
+		);
 		if ( state.Forest ) {
 			return OrderForest( tasks, comparison );
 		}
@@ -416,7 +847,8 @@ internal static class TopRenderer {
 
 	private static IEnumerable<TopTaskRow> ApplyFilters(
 		IReadOnlyList<TopTaskRow> tasks,
-		TopRuntimeState state
+		TopRuntimeState state,
+		int processorCount
 	) {
 		IEnumerable<TopTaskRow> filtered = tasks;
 		if ( 0 < state.ProcessIds.Count ) {
@@ -435,7 +867,72 @@ internal static class TopRenderer {
 				return filter.Negate ? !matches : matches;
 			} );
 		}
+		if ( 0 < state.OtherFilters.Count ) {
+			filtered = filtered.Where(
+				row => MatchesOtherFilters(
+					row,
+					state,
+					processorCount
+				)
+			);
+		}
 		return filtered;
+	}
+
+	private static bool MatchesOtherFilters(
+		TopTaskRow row,
+		TopRuntimeState state,
+		int processorCount
+	) {
+		ArgumentNullException.ThrowIfNull( row );
+		ArgumentNullException.ThrowIfNull( state );
+
+		foreach ( TopOtherFilter filter in state.OtherFilters ) {
+			if ( !state.VisibleFields.Contains( filter.Field ) ) {
+				continue;
+			}
+
+			string fieldText = FieldDisplayValue(
+				row,
+				state,
+				processorCount,
+				filter.Field
+			);
+			StringComparison comparison = filter.CaseSensitive
+				? StringComparison.Ordinal
+				: StringComparison.OrdinalIgnoreCase;
+			bool matches;
+			switch ( filter.Operator ) {
+				case TopOtherFilterOperator.Equality:
+					matches = fieldText.Contains(
+						filter.SelectionValue,
+						comparison
+					);
+					break;
+				case TopOtherFilterOperator.LessThan:
+					matches = 0 > string.Compare(
+						fieldText,
+						filter.SelectionValue,
+						comparison
+					);
+					break;
+				case TopOtherFilterOperator.GreaterThan:
+					matches = 0 < string.Compare(
+						fieldText,
+						filter.SelectionValue,
+						comparison
+					);
+					break;
+				default:
+					throw new InvalidOperationException(
+						"The Other Filter operator was not recognized."
+					);
+			}
+			if ( filter.Include != matches ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private static bool MatchesObservedUser( ProcProcessSnapshot process, uint userId ) =>
@@ -490,24 +987,99 @@ internal static class TopRenderer {
 		return result;
 	}
 
-	private static Comparison<TopTaskRow> SortComparison( TopSortField field ) => field switch {
-		TopSortField.Memory => ( left, right ) => Descending( left.MemoryPercent, right.MemoryPercent, left, right ),
-		TopSortField.Pid => ( left, right ) => left.Process.ProcessId.CompareTo( right.Process.ProcessId ),
-		TopSortField.Time => ( left, right ) => Descending( left.CpuSeconds ?? 0.0, right.CpuSeconds ?? 0.0, left, right ),
-		TopSortField.VirtualMemory => ( left, right ) => Descending( ObservedOrZero( left.Process.VirtualMemoryBytes ), ObservedOrZero( right.Process.VirtualMemoryBytes ), left, right ),
-		TopSortField.ResidentMemory => ( left, right ) => Descending( ObservedOrZero( left.Process.ResidentMemoryBytes ), ObservedOrZero( right.Process.ResidentMemoryBytes ), left, right ),
-		TopSortField.User => ( left, right ) => TieBreak( string.Compare( left.User, right.User, StringComparison.Ordinal ), left, right ),
-		TopSortField.Command => ( left, right ) => TieBreak( string.Compare( FormatCommand( left.Process, false ), FormatCommand( right.Process, false ), StringComparison.Ordinal ), left, right ),
-		TopSortField.Nice => ( left, right ) => TieBreak( ObservedNice( left.Process ).CompareTo( ObservedNice( right.Process ) ), left, right ),
-		TopSortField.State => ( left, right ) => TieBreak( string.Compare( StateCode( left.Process ), StateCode( right.Process ), StringComparison.Ordinal ), left, right ),
-		_ => ( left, right ) => Descending( left.CpuPercentIrix, right.CpuPercentIrix, left, right )
-	};
+	private static Comparison<TopTaskRow> SortComparison(
+		TopFieldId field,
+		bool highToLow
+	) {
+		Comparison<TopTaskRow> comparison = TopFieldCatalog.Get(
+			field
+		).HighToLowComparison;
+		return ( highToLow )
+			? comparison
+			: ( left, right ) => comparison( right, left )
+		;
+	}
 
 	private static int Descending<T>( T left, T right, TopTaskRow leftRow, TopTaskRow rightRow )
 		where T : IComparable<T> {
 		int result = right.CompareTo( left );
 		return TieBreak( result, leftRow, rightRow );
 	}
+
+	internal static int CompareFieldDescending<T>(
+		T left,
+		T right,
+		TopTaskRow leftRow,
+		TopTaskRow rightRow
+	)
+		where T : IComparable<T> {
+		ArgumentNullException.ThrowIfNull( leftRow );
+		ArgumentNullException.ThrowIfNull( rightRow );
+		return Descending(
+			left,
+			right,
+			leftRow,
+			rightRow
+		);
+	}
+
+	internal static ulong FieldObservedOrZero(
+		ProcObservedValue<ulong> value
+	) => ObservedOrZero( value );
+
+	internal static int FieldObservedPriority(
+		ProcProcessSnapshot process
+	) {
+		ArgumentNullException.ThrowIfNull( process );
+		if ( !process.NiceValue.HasValue ) {
+			return int.MaxValue;
+		}
+		return 20 + process.NiceValue.Value;
+	}
+
+	internal static int FieldObservedNice(
+		ProcProcessSnapshot process
+	) {
+		ArgumentNullException.ThrowIfNull( process );
+		return ObservedNice( process );
+	}
+
+	internal static string FieldStateCode(
+		ProcProcessSnapshot process
+	) {
+		ArgumentNullException.ThrowIfNull( process );
+		return StateCode( process );
+	}
+
+	internal static string FieldCommand(
+		ProcProcessSnapshot process,
+		bool commandLine
+	) {
+		ArgumentNullException.ThrowIfNull( process );
+		return FormatCommand(
+			process,
+			commandLine
+		);
+	}
+
+	internal static string FieldTruncateUser(
+		string user
+	) {
+		ArgumentNullException.ThrowIfNull( user );
+		return TruncateUser( user );
+	}
+
+	internal static string FieldCpuTime(
+		double? seconds
+	) => FormatCpuTime( seconds );
+
+	internal static string FieldTaskMemory(
+		ProcObservedValue<ulong> bytes,
+		TopMemoryScale scale
+	) => FormatTaskMemory(
+		bytes,
+		scale
+	);
 
 	private static int TieBreak( int comparison, TopTaskRow left, TopTaskRow right ) =>
 		0 != comparison ? comparison : left.Process.ProcessId.CompareTo( right.Process.ProcessId );
@@ -517,6 +1089,139 @@ internal static class TopRenderer {
 
 	private static bool IsState( TopTaskRow row, ProcProcessState state ) =>
 		row.Process.State.HasValue && row.Process.State.Value == state;
+
+	private static TopLineStyle TaskLineStyle(
+		TopTaskRow row,
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( row );
+		ArgumentNullException.ThrowIfNull( state );
+
+		if (
+			!state.HighlightRunning
+			|| !IsState( row, ProcProcessState.Running )
+		) {
+			return TopLineStyle.Default;
+		}
+		if ( state.HighlightBold ) {
+			return TopLineStyle.HighlightBold;
+		}
+		return TopLineStyle.HighlightReverse;
+	}
+
+	private static IReadOnlyList<TopRenderSpan>? SortColumnSpans(
+		string visibleLine,
+		TopFormattedTaskLine formatted,
+		TopRuntimeState state,
+		TopLineStyle lineStyle
+	) {
+		ArgumentNullException.ThrowIfNull( visibleLine );
+		ArgumentNullException.ThrowIfNull( state );
+
+		if ( !state.HighlightSortColumn ) {
+			return null;
+		}
+		if (
+			0 > formatted.SortFieldStart
+			|| 0 >= formatted.SortFieldLength
+		) {
+			return null;
+		}
+
+		int visibleLength = CountRunes( visibleLine );
+		int visibleStart = state.HorizontalOffset;
+		int fieldStart = formatted.SortFieldStart;
+		int fieldEnd = fieldStart + formatted.SortFieldLength;
+		int visibleEnd = visibleStart + visibleLength;
+		if (
+			fieldEnd <= visibleStart
+			|| visibleEnd <= fieldStart
+		) {
+			return null;
+		}
+
+		int relativeStart = Math.Max(
+			0,
+			fieldStart - visibleStart
+		);
+		int relativeEnd = Math.Min(
+			visibleLength,
+			fieldEnd - visibleStart
+		);
+		int start = StringIndexAtRuneOffset(
+			visibleLine,
+			relativeStart
+		);
+		int end = StringIndexAtRuneOffset(
+			visibleLine,
+			relativeEnd
+		);
+		if ( end <= start ) {
+			return null;
+		}
+
+		return [
+			new TopRenderSpan(
+				start,
+				end - start,
+				SortColumnStyle(
+					state,
+					lineStyle
+				)
+			)
+		];
+	}
+
+	private static TopLineStyle SortColumnStyle(
+		TopRuntimeState state,
+		TopLineStyle lineStyle
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		TopLineStyle preferred = ( state.HighlightBold )
+			? TopLineStyle.HighlightBold
+			: TopLineStyle.HighlightReverse
+		;
+		if ( lineStyle != preferred ) {
+			return preferred;
+		}
+		return ( state.HighlightBold )
+			? TopLineStyle.HighlightReverse
+			: TopLineStyle.HighlightBold
+		;
+	}
+
+	private static int CountRunes(
+		string text
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+
+		int result = 0;
+		foreach ( Rune rune in text.EnumerateRunes() ) {
+			_ = rune;
+			result++;
+		}
+		return result;
+	}
+
+	private static int StringIndexAtRuneOffset(
+		string text,
+		int runeOffset
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+		ArgumentOutOfRangeException.ThrowIfNegative( runeOffset );
+
+		int stringIndex = 0;
+		int runeIndex = 0;
+		foreach ( Rune rune in text.EnumerateRunes() ) {
+			if ( runeOffset <= runeIndex ) {
+				break;
+			}
+			stringIndex += rune.Utf16SequenceLength;
+			runeIndex++;
+		}
+		return stringIndex;
+	}
 
 	private static string StateCode( ProcProcessSnapshot process ) {
 		if ( !process.State.HasValue ) {

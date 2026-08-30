@@ -123,7 +123,7 @@ Options:
  -i, --idle-toggle             suppress tasks idle during the most recent interval
  -n, --iterations NUMBER       exit after NUMBER refreshes
  -O, --list-fields             list fields implemented by this top and exit
- -o, --sort-override FIELD     sort by CPU, MEM, PID, TIME+, VIRT, RES, USER, COMMAND, NI, or S
+ -o, --sort-override FIELD     sort by PID, USER, PR, NI, VIRT, RES, SHR, S, %CPU, %MEM, TIME+, or COMMAND
  -p, --pid PIDLIST             monitor only the selected process IDs (maximum 20)
  -s, --secure-mode             disable interactive delay, signal, and renice commands
  -S, --accum-time-toggle       not available: child CPU counters are not yet observed
@@ -135,9 +135,13 @@ Options:
  -h, --help                    display this help and exit
 
 Interactive keys:
- q quit; P/M/N/T sort; c command line; H threads; i idle tasks; V forest;
- I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
- k signal; r renice; arrows/PgUp/PgDn/Home/End scroll; h/? help.
+ q quit; 0 zero suppress; n/# max tasks; P/M/N/T sort; R reverse/normal sort;
+ B bold enable; b emphasis mode; J numeric justify; j character justify;
+ f manage fields; x sort column; y running rows; c command line; H threads;
+ i idle tasks;
+ V forest; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
+ O/o other filter; L locate; & locate next; k signal; r renice; = reset limits;
+ arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
 
 	/// <summary>Runs <c>top</c> synchronously.</summary>
@@ -495,7 +499,8 @@ Interactive keys:
 				new TopRenderFrame(
 					lines,
 					Math.Max( 1, dimensions.Columns ),
-					Math.Max( 1, dimensions.Rows )
+					Math.Max( 1, dimensions.Rows ),
+					state.BoldEnabled
 				),
 				cancellationToken
 			).ConfigureAwait( false );
@@ -523,11 +528,19 @@ Interactive keys:
 		ArgumentNullException.ThrowIfNull( accountResolver );
 		ArgumentNullException.ThrowIfNull( processControl );
 
+		if ( state.ShowFieldManager ) {
+			return HandleFieldManagerInput(
+				input,
+				state,
+				dimensions
+			);
+		}
 		if ( state.Prompt is not null ) {
 			return await HandlePromptInputAsync(
 				input,
 				sample,
 				state,
+				dimensions,
 				processProvider,
 				accountResolver,
 				processControl,
@@ -541,6 +554,17 @@ Interactive keys:
 		if ( TopInputKey.EndOfInput == input.Key ) {
 			return TopCommandAction.Exit;
 		}
+		int pageSize = Math.Max(
+			1,
+			dimensions.Rows - 7
+		);
+		if ( 0 < state.MaximumTasks ) {
+			pageSize = Math.Min(
+				pageSize,
+				state.MaximumTasks
+			);
+		}
+
 		if ( TopInputKey.Up == input.Key ) {
 			state.VerticalOffset = Math.Max( 0, state.VerticalOffset - 1 );
 			return TopCommandAction.Rerender;
@@ -550,11 +574,11 @@ Interactive keys:
 			return TopCommandAction.Rerender;
 		}
 		if ( TopInputKey.PageUp == input.Key ) {
-			state.VerticalOffset = Math.Max( 0, state.VerticalOffset - Math.Max( 1, dimensions.Rows - 7 ) );
+			state.VerticalOffset = Math.Max( 0, state.VerticalOffset - pageSize );
 			return TopCommandAction.Rerender;
 		}
 		if ( TopInputKey.PageDown == input.Key ) {
-			state.VerticalOffset += Math.Max( 1, dimensions.Rows - 7 );
+			state.VerticalOffset += pageSize;
 			return TopCommandAction.Rerender;
 		}
 		if ( TopInputKey.Home == input.Key ) {
@@ -562,7 +586,11 @@ Interactive keys:
 			return TopCommandAction.Rerender;
 		}
 		if ( TopInputKey.End == input.Key ) {
-			state.VerticalOffset = int.MaxValue;
+			state.VerticalOffset = TopRenderer.GetEndOffset(
+				sample,
+				state,
+				dimensions
+			);
 			return TopCommandAction.Rerender;
 		}
 		if ( TopInputKey.Left == input.Key ) {
@@ -590,20 +618,62 @@ Interactive keys:
 			case 'Q':
 				return TopCommandAction.Exit;
 			case 'P':
-				state.SortField = TopSortField.Cpu;
+				state.SortField = TopFieldId.Cpu;
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
 			case 'M':
-				state.SortField = TopSortField.Memory;
+				state.SortField = TopFieldId.Memory;
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
 			case 'N':
-				state.SortField = TopSortField.Pid;
+				state.SortField = TopFieldId.Pid;
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
 			case 'T':
-				state.SortField = TopSortField.Time;
+				state.SortField = TopFieldId.Time;
 				state.VerticalOffset = 0;
+				return TopCommandAction.Rerender;
+			case '0':
+				state.SuppressZeros = !state.SuppressZeros;
+				return TopCommandAction.Rerender;
+			case 'R':
+				state.SortHighToLow = !state.SortHighToLow;
+				state.VerticalOffset = 0;
+				state.Message = state.SortHighToLow
+					? "sort direction: high to low"
+					: "sort direction: low to high";
+				return TopCommandAction.Rerender;
+			case 'B':
+				state.BoldEnabled = !state.BoldEnabled;
+				return TopCommandAction.Rerender;
+			case 'b':
+				state.HighlightBold = !state.HighlightBold;
+				return TopCommandAction.Rerender;
+			case 'J':
+				state.NumericLeftJustified = !state.NumericLeftJustified;
+				return TopCommandAction.Rerender;
+			case 'j':
+				state.CharacterRightJustified = !state.CharacterRightJustified;
+				return TopCommandAction.Rerender;
+			case 'f': {
+				state.ShowFieldManager = true;
+				state.FieldMoveActive = false;
+				state.Message = null;
+				int sortFieldIndex = state.FieldOrder.IndexOf(
+					state.SortField
+				);
+				if ( 0 <= sortFieldIndex ) {
+					state.FieldCursor = sortFieldIndex;
+				} else {
+					state.FieldCursor = 0;
+				}
+				return TopCommandAction.Rerender;
+			}
+			case 'x':
+				state.HighlightSortColumn = !state.HighlightSortColumn;
+				return TopCommandAction.Rerender;
+			case 'y':
+				state.HighlightRunning = !state.HighlightRunning;
 				return TopCommandAction.Rerender;
 			case 'c':
 				state.ShowCommandLine = !state.ShowCommandLine;
@@ -635,6 +705,53 @@ Interactive keys:
 			case '1':
 				state.SingleCpuSummary = !state.SingleCpuSummary;
 				state.Message = "Per-CPU activity rows are not yet exposed by the shared metrics contract; aggregate CPU remains shown.";
+				return TopCommandAction.Rerender;
+			case 'n':
+			case '#':
+				state.Prompt = new TopPromptState(
+					TopPromptKind.MaximumTasks,
+					"Maximum tasks (0 for unlimited): "
+				);
+				return TopCommandAction.Rerender;
+			case 'O':
+				state.Message = null;
+				state.Prompt = new TopPromptState(
+					TopPromptKind.OtherFilterCaseSensitive,
+					"Other filter (case sensitive): "
+				);
+				return TopCommandAction.Rerender;
+			case 'o':
+				state.Message = null;
+				state.Prompt = new TopPromptState(
+					TopPromptKind.OtherFilterIgnoreCase,
+					"Other filter (ignore case): "
+				);
+				return TopCommandAction.Rerender;
+			case 'L':
+				state.Message = null;
+				state.Prompt = new TopPromptState(
+					TopPromptKind.Locate,
+					"Locate string: "
+				);
+				return TopCommandAction.Rerender;
+			case '&':
+				if ( string.IsNullOrEmpty( state.SearchText ) ) {
+					state.Message = "no locate string is active";
+					return TopCommandAction.Rerender;
+				}
+				int nextLocate = TopRenderer.FindTaskOffset(
+					sample,
+					state,
+					state.SearchText,
+					state.VerticalOffset + 1,
+					dimensions
+				);
+				if ( 0 <= nextLocate ) {
+					state.VerticalOffset = nextLocate;
+					state.Message = null;
+				} else {
+					state.Message = $"no further match for: {state.SearchText}";
+				}
 				return TopCommandAction.Rerender;
 			case 'd':
 			case 's':
@@ -676,9 +793,13 @@ Interactive keys:
 			case '=':
 				state.ProcessIds.Clear();
 				state.UserFilter = null;
+				state.OtherFilters.Clear();
+				state.HideIdle = false;
+				state.MaximumTasks = 0;
+				state.SearchText = null;
 				state.VerticalOffset = 0;
 				state.HorizontalOffset = 0;
-				state.Message = "filters and scrolling reset";
+				state.Message = "display limits, filters, and scrolling reset";
 				return TopCommandAction.Rerender;
 			case 'h':
 			case '?':
@@ -689,10 +810,173 @@ Interactive keys:
 		}
 	}
 
+	private static TopCommandAction HandleFieldManagerInput(
+		TopInputEvent input,
+		TopRuntimeState state,
+		TopTerminalDimensions dimensions
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
+		if ( 0 == state.FieldOrder.Count ) {
+			throw new InvalidOperationException(
+				"The top field order cannot be empty."
+			);
+		}
+
+		if ( TopInputKey.EndOfInput == input.Key ) {
+			return TopCommandAction.Exit;
+		}
+		if ( TopInputKey.Escape == input.Key ) {
+			state.ShowFieldManager = false;
+			state.FieldMoveActive = false;
+			return TopCommandAction.Rerender;
+		}
+
+		int pageSize = Math.Max(
+			1,
+			dimensions.Rows - 3
+		);
+		if ( TopInputKey.Up == input.Key ) {
+			MoveFieldCursor(
+				state,
+				state.FieldCursor - 1
+			);
+			return TopCommandAction.Rerender;
+		}
+		if ( TopInputKey.Down == input.Key ) {
+			MoveFieldCursor(
+				state,
+				state.FieldCursor + 1
+			);
+			return TopCommandAction.Rerender;
+		}
+		if ( TopInputKey.PageUp == input.Key ) {
+			MoveFieldCursor(
+				state,
+				state.FieldCursor - pageSize
+			);
+			return TopCommandAction.Rerender;
+		}
+		if ( TopInputKey.PageDown == input.Key ) {
+			MoveFieldCursor(
+				state,
+				state.FieldCursor + pageSize
+			);
+			return TopCommandAction.Rerender;
+		}
+		if ( TopInputKey.Home == input.Key ) {
+			MoveFieldCursor(
+				state,
+				0
+			);
+			return TopCommandAction.Rerender;
+		}
+		if ( TopInputKey.End == input.Key ) {
+			MoveFieldCursor(
+				state,
+				state.FieldOrder.Count - 1
+			);
+			return TopCommandAction.Rerender;
+		}
+		if ( TopInputKey.Right == input.Key ) {
+			state.FieldMoveActive = true;
+			return TopCommandAction.Rerender;
+		}
+		if (
+			TopInputKey.Left == input.Key
+			|| TopInputKey.Enter == input.Key
+		) {
+			state.FieldMoveActive = false;
+			return TopCommandAction.Rerender;
+		}
+		if (
+			TopInputKey.Character != input.Key
+			|| !input.Character.HasValue
+		) {
+			return TopCommandAction.None;
+		}
+
+		int value = input.Character.Value.Value;
+		char key = '\0';
+		if ( 0x7f >= value ) {
+			key = (char)value;
+		}
+		switch ( key ) {
+			case 'q':
+			case 'Q':
+				state.ShowFieldManager = false;
+				state.FieldMoveActive = false;
+				return TopCommandAction.Rerender;
+			case 'd':
+			case ' ': {
+				TopFieldId selected = state.FieldOrder[
+					state.FieldCursor
+				];
+				if ( !state.VisibleFields.Remove( selected ) ) {
+					state.VisibleFields.Add( selected );
+				}
+				state.HorizontalOffset = 0;
+				return TopCommandAction.Rerender;
+			}
+			case 's':
+				state.SortField = state.FieldOrder[
+					state.FieldCursor
+				];
+				state.VerticalOffset = 0;
+				state.Message = null;
+				return TopCommandAction.Rerender;
+			default:
+				return TopCommandAction.None;
+		}
+	}
+
+	private static void MoveFieldCursor(
+		TopRuntimeState state,
+		int targetIndex
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		if ( 0 == state.FieldOrder.Count ) {
+			throw new InvalidOperationException(
+				"The top field order cannot be empty."
+			);
+		}
+
+		int currentIndex = Math.Clamp(
+			state.FieldCursor,
+			0,
+			state.FieldOrder.Count - 1
+		);
+		int destination = Math.Clamp(
+			targetIndex,
+			0,
+			state.FieldOrder.Count - 1
+		);
+		if (
+			state.FieldMoveActive
+			&& currentIndex != destination
+		) {
+			TopFieldId field = state.FieldOrder[
+				currentIndex
+			];
+			state.FieldOrder.RemoveAt(
+				currentIndex
+			);
+			state.FieldOrder.Insert(
+				destination,
+				field
+			);
+			state.HorizontalOffset = 0;
+		}
+		state.FieldCursor = destination;
+	}
+
 	private static async Task<TopCommandAction> HandlePromptInputAsync(
 		TopInputEvent input,
 		TopSample sample,
 		TopRuntimeState state,
+		TopTerminalDimensions dimensions,
 		IProcProcessProvider processProvider,
 		IProcAccountDisplayResolver accountResolver,
 		ITopProcessControl processControl,
@@ -731,6 +1015,74 @@ Interactive keys:
 				state.Prompt = null;
 				state.Message = $"delay set to {delay.TotalSeconds:0.###} seconds";
 				return TopCommandAction.Resample;
+
+			case TopPromptKind.MaximumTasks:
+				state.Prompt = null;
+				if (
+					!int.TryParse(
+						text,
+						NumberStyles.None,
+						CultureInfo.InvariantCulture,
+						out int maximumTasks
+					)
+				) {
+					state.Message = "maximum tasks must be zero or a positive integer";
+					return TopCommandAction.Rerender;
+				}
+				state.MaximumTasks = maximumTasks;
+				state.VerticalOffset = 0;
+				state.Message = 0 == maximumTasks
+					? "maximum tasks: unlimited"
+					: $"maximum tasks set to {maximumTasks}";
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.Locate:
+				state.Prompt = null;
+				string locateText = prompt.Buffer;
+				if ( 0 == locateText.Length ) {
+					state.SearchText = null;
+					state.Message = "locate disabled";
+					return TopCommandAction.Rerender;
+				}
+				state.SearchText = locateText;
+				int locateOffset = TopRenderer.FindTaskOffset(
+					sample,
+					state,
+					locateText,
+					state.VerticalOffset,
+					dimensions
+				);
+				if ( 0 <= locateOffset ) {
+					state.VerticalOffset = locateOffset;
+					state.Message = null;
+				} else {
+					state.Message = $"locate string not found: {locateText}";
+				}
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.OtherFilterCaseSensitive:
+			case TopPromptKind.OtherFilterIgnoreCase:
+				state.Prompt = null;
+				bool caseSensitive = TopPromptKind.OtherFilterCaseSensitive == prompt.Kind;
+				if (
+					!TopOtherFilterParser.TryParse(
+						prompt.Buffer,
+						caseSensitive,
+						state,
+						out TopOtherFilter? otherFilter,
+						out string? filterError
+					)
+				) {
+					state.Message = filterError ?? "invalid other filter";
+					return TopCommandAction.Rerender;
+				}
+				state.OtherFilters.Insert(
+					0,
+					otherFilter!
+				);
+				state.VerticalOffset = 0;
+				state.Message = $"filter added: {otherFilter!.RawText}";
+				return TopCommandAction.Rerender;
 
 			case TopPromptKind.KillProcessId:
 				if ( !TryParsePositiveProcessId( text, out int killPid ) ) {
@@ -973,10 +1325,19 @@ Interactive keys:
 				continue;
 			}
 			if ( TryOptionValue( args, ref index, argument, "-o", "--sort-override", out string? sortText ) ) {
-				if ( !TopRenderer.TryParseSortField( sortText!, out TopSortField sortField ) ) {
+				if (
+					!TopRenderer.TryParseSortOverride(
+						sortText!,
+						out TopFieldId sortField,
+						out bool? sortHighToLow
+					)
+				) {
 					result.Fail( $"unknown sort field '{sortText}'" );
 				} else {
 					result.State.SortField = sortField;
+					if ( sortHighToLow.HasValue ) {
+						result.State.SortHighToLow = sortHighToLow.Value;
+					}
 				}
 				continue;
 			}

@@ -79,9 +79,9 @@ pathological values.
 
 ## INTERACTIVE TERMINAL MODEL
 
-Interactive mode requires a terminal of at least 40 columns by 9 rows. It uses
-a DCurses alternate-screen session in cbreak mode with echo disabled, keypad
-processing enabled, and the cursor hidden. DCurses and `Icod.Terminal` own the
+Interactive mode requires a terminal of at least 40 columns by 9 rows. The
+stable `Icod.DCurses 0.1.0` defaults provide the alternate-screen, cbreak,
+no-echo, keypad, and hidden-cursor profile. DCurses and `Icod.Terminal` own the
 terminal lifecycle and restore the live terminal when the session ends.
 
 The refresh deadline is monotonic and starts when a sampling cycle begins. Time
@@ -89,15 +89,23 @@ spent reading `/proc/slabinfo` and rendering therefore counts against the
 configured delay; if a cycle consumes the full interval, the next sample begins
 immediately rather than adding another full delay.
 
-Resize events redraw the current slab snapshot immediately without forcing an
-extra `/proc/slabinfo` read. Resume events synchronize dimensions and invalidate
-the physical screen before repainting. An interrupt or termination event returns
-status 130.
+DCurses applies resize/resume geometry and physical-screen invalidation before
+delivering those lifecycle events. `slabtop` redraws the current slab snapshot
+without forcing an extra `/proc/slabinfo` read. An interrupt or termination
+event returns status 130.
 
-Interactive key bindings are not implemented in this tranche. Ordinary input
-events are ignored and do not force a resample or change the selected sort key;
-use the command-line `--sort` option and a terminal interrupt such as `Ctrl+C`
-to terminate the interactive display.
+Interactive commands follow the procps-ng `slabtop` profile:
+
+- `a`, `b`, `c`, `l`, `v`, `n`, `o`, `p`, `s`, and `u` change the active sort
+  criterion; uppercase and lowercase letters are accepted.
+- Space requests an immediate fresh sample and redraw.
+- `q` or `Q` exits successfully.
+
+A sort-key command also requests an immediate fresh sample so the newly selected
+order is applied to current data. Unsupported input is ignored without changing
+the refresh deadline. Terminal end-of-input exits successfully. `Ctrl+C` and
+terminal interrupt/termination lifecycle events remain cancellation and return
+status 130.
 
 ## DATA SOURCE AND AVAILABILITY
 

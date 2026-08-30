@@ -119,6 +119,32 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task SignedSortOverrideControlsDirection() {
+		FakeClock highClock = new();
+		CommandResult highToLow = await RunCoreAsync(
+			[ "-b", "-n", "1", "-o", "+PID" ],
+			new FakeTerminal( highClock ),
+			highClock
+		);
+
+		FakeClock lowClock = new();
+		CommandResult lowToHigh = await RunCoreAsync(
+			[ "-b", "-n", "1", "-o", "-PID" ],
+			new FakeTerminal( lowClock ),
+			lowClock
+		);
+
+		Assert.Equal( 0, highToLow.ExitCode );
+		Assert.Equal( 0, lowToHigh.ExitCode );
+		int highBeta = highToLow.Stdout.IndexOf( "beta", StringComparison.Ordinal );
+		int highAlpha = highToLow.Stdout.IndexOf( "alpha", StringComparison.Ordinal );
+		int lowAlpha = lowToHigh.Stdout.IndexOf( "alpha", StringComparison.Ordinal );
+		int lowBeta = lowToHigh.Stdout.IndexOf( "beta", StringComparison.Ordinal );
+		Assert.True( 0 <= highBeta && highBeta < highAlpha );
+		Assert.True( 0 <= lowAlpha && lowAlpha < lowBeta );
+	}
+
+	[Fact]
 	public async Task BatchPidAndUserFiltersRestrictRenderedTasks() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock );
@@ -325,6 +351,788 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task ReverseSortRerendersWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'N' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'R' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 3, terminal.Frames.Count );
+		Assert.Contains( "202", terminal.Frames[ 1 ].Lines[ 6 ].Text, StringComparison.Ordinal );
+		Assert.Contains( "101", terminal.Frames[ 2 ].Lines[ 6 ].Text, StringComparison.Ordinal );
+		Assert.Contains(
+			"sort direction: low to high",
+			terminal.Frames[ 2 ].Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task AppearanceCommandsRerenderWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'b' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'B' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'y' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new(
+			new ProcProcessCollection(
+				[
+					CreateProcess(
+						101,
+						"alpha",
+						1000,
+						10,
+						10,
+						64UL * 1024 * 1024,
+						ProcProcessState.Running
+					),
+					CreateProcess(
+						202,
+						"beta",
+						1001,
+						20,
+						10,
+						256UL * 1024 * 1024
+					)
+				]
+			)
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 4, terminal.Frames.Count );
+		Assert.True( terminal.Frames[ 0 ].BoldEnabled );
+		Assert.Equal(
+			TopLineStyle.HighlightBold,
+			terminal.Frames[ 0 ].Lines[ 6 ].Style
+		);
+		Assert.Equal(
+			TopLineStyle.HighlightReverse,
+			terminal.Frames[ 1 ].Lines[ 6 ].Style
+		);
+		Assert.False( terminal.Frames[ 2 ].BoldEnabled );
+		Assert.Equal(
+			TopLineStyle.HighlightReverse,
+			terminal.Frames[ 2 ].Lines[ 6 ].Style
+		);
+		Assert.Equal(
+			TopLineStyle.Default,
+			terminal.Frames[ 3 ].Lines[ 6 ].Style
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task SortColumnHighlightTracksFieldScrollAndEmphasis() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'x' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'M' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Right ) );
+		terminal.Events.Enqueue( CharacterEvent( 'b' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 5, terminal.Frames.Count );
+		Assert.Null(
+			terminal.Frames[ 0 ].Lines[ 6 ].Spans
+		);
+
+		TopRenderSpan cpuSpan = Assert.Single(
+			terminal.Frames[ 1 ].Lines[ 6 ].Spans!
+		);
+		Assert.Equal( 54, cpuSpan.Start );
+		Assert.Equal( 5, cpuSpan.Length );
+		Assert.Equal(
+			TopLineStyle.HighlightBold,
+			cpuSpan.Style
+		);
+
+		TopRenderSpan memorySpan = Assert.Single(
+			terminal.Frames[ 2 ].Lines[ 6 ].Spans!
+		);
+		Assert.Equal( 60, memorySpan.Start );
+		Assert.Equal( 4, memorySpan.Length );
+		Assert.Equal(
+			TopLineStyle.HighlightBold,
+			memorySpan.Style
+		);
+
+		TopRenderSpan scrolledMemorySpan = Assert.Single(
+			terminal.Frames[ 3 ].Lines[ 6 ].Spans!
+		);
+		Assert.Equal( 52, scrolledMemorySpan.Start );
+		Assert.Equal( 4, scrolledMemorySpan.Length );
+		Assert.Equal(
+			TopLineStyle.HighlightBold,
+			scrolledMemorySpan.Style
+		);
+
+		TopRenderSpan reverseMemorySpan = Assert.Single(
+			terminal.Frames[ 4 ].Lines[ 6 ].Spans!
+		);
+		Assert.Equal( 52, reverseMemorySpan.Start );
+		Assert.Equal( 4, reverseMemorySpan.Length );
+		Assert.Equal(
+			TopLineStyle.HighlightReverse,
+			reverseMemorySpan.Style
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task JustificationCommandsRerenderWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'J' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'j' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 3, terminal.Frames.Count );
+
+		Assert.Equal(
+			"    PID",
+			terminal.Frames[ 0 ].Lines[ 5 ].Text.Substring( 0, 7 )
+		);
+		Assert.Equal(
+			"    101",
+			terminal.Frames[ 0 ].Lines[ 6 ].Text.Substring( 0, 7 )
+		);
+		Assert.Equal(
+			"PID    ",
+			terminal.Frames[ 1 ].Lines[ 5 ].Text.Substring( 0, 7 )
+		);
+		Assert.Equal(
+			"101    ",
+			terminal.Frames[ 1 ].Lines[ 6 ].Text.Substring( 0, 7 )
+		);
+		Assert.Equal(
+			"    USER",
+			terminal.Frames[ 2 ].Lines[ 5 ].Text.Substring( 8, 8 )
+		);
+		Assert.Equal(
+			"   alice",
+			terminal.Frames[ 2 ].Lines[ 6 ].Text.Substring( 8, 8 )
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task ZeroSuppressionBlanksOnlyTrueZeroFieldsWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( '0' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new(
+			new ProcProcessCollection(
+				[
+					CreateProcess(
+						101,
+						"zero",
+						1000,
+						0,
+						0,
+						0
+					),
+					CreateProcess(
+						202,
+						"tiny",
+						1001,
+						0,
+						0,
+						1
+					)
+				]
+			)
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 2, terminal.Frames.Count );
+
+		string before = terminal.Frames[ 0 ].Lines[ 6 ].Text;
+		string zeroAfter = terminal.Frames[ 1 ].Lines[ 6 ].Text;
+		string tinyAfter = terminal.Frames[ 1 ].Lines[ 7 ].Text;
+
+		Assert.False(
+			string.IsNullOrWhiteSpace( before.Substring( 25, 8 ) )
+		);
+		Assert.True(
+			string.IsNullOrWhiteSpace( zeroAfter.Substring( 25, 8 ) )
+		);
+		Assert.True(
+			string.IsNullOrWhiteSpace( zeroAfter.Substring( 34, 8 ) )
+		);
+		Assert.True(
+			string.IsNullOrWhiteSpace( zeroAfter.Substring( 54, 5 ) )
+		);
+		Assert.True(
+			string.IsNullOrWhiteSpace( zeroAfter.Substring( 60, 4 ) )
+		);
+		Assert.True(
+			string.IsNullOrWhiteSpace( zeroAfter.Substring( 65, 9 ) )
+		);
+		Assert.Equal(
+			"  0",
+			zeroAfter.Substring( 21, 3 )
+		);
+
+		Assert.False(
+			string.IsNullOrWhiteSpace( tinyAfter.Substring( 25, 8 ) )
+		);
+		Assert.False(
+			string.IsNullOrWhiteSpace( tinyAfter.Substring( 34, 8 ) )
+		);
+		Assert.False(
+			string.IsNullOrWhiteSpace( tinyAfter.Substring( 60, 4 ) )
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Theory]
+	[InlineData( 'n' )]
+	[InlineData( '#' )]
+	public async Task MaximumTaskCommandsLimitAndPageWithoutResampling(
+		char command
+	) {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( command ) );
+		terminal.Events.Enqueue( CharacterEvent( '1' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.PageDown ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new(
+			new ProcProcessCollection(
+				[
+					CreateProcess(
+						101,
+						"alpha",
+						1000,
+						0,
+						0,
+						64UL * 1024 * 1024
+					),
+					CreateProcess(
+						202,
+						"beta",
+						1000,
+						0,
+						0,
+						128UL * 1024 * 1024
+					),
+					CreateProcess(
+						303,
+						"gamma",
+						1000,
+						0,
+						0,
+						256UL * 1024 * 1024
+					)
+				]
+			)
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 5, terminal.Frames.Count );
+
+		TopRenderFrame limited = terminal.Frames[ 3 ];
+		Assert.Contains(
+			"101",
+			limited.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True(
+			string.IsNullOrEmpty( limited.Lines[ 7 ].Text )
+		);
+		Assert.Contains(
+			"maximum tasks set to 1",
+			limited.Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
+
+		TopRenderFrame paged = terminal.Frames[ 4 ];
+		Assert.Contains(
+			"202",
+			paged.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True(
+			string.IsNullOrEmpty( paged.Lines[ 7 ].Text )
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task EqualClearsIdleAndMaximumTaskLimitsWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'i' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'n' ) );
+		terminal.Events.Enqueue( CharacterEvent( '1' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( '=' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 6, terminal.Frames.Count );
+		Assert.True(
+			string.IsNullOrEmpty( terminal.Frames[ 1 ].Lines[ 6 ].Text )
+		);
+
+		TopRenderFrame reset = terminal.Frames[ 5 ];
+		Assert.Contains(
+			"101",
+			reset.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"202",
+			reset.Lines[ 7 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"display limits, filters, and scrolling reset",
+			reset.Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task FieldManagementTogglesMovesAndSortsWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'f' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'd' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'x' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'f' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Home ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Right ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Down ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( 's' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 12, terminal.Frames.Count );
+
+		Assert.Contains(
+			terminal.Frames[ 1 ].Lines,
+			line => line.Text.StartsWith( ">*S", StringComparison.Ordinal )
+				&& line.Text.Contains( "%CPU", StringComparison.Ordinal )
+		);
+		Assert.Contains(
+			terminal.Frames[ 2 ].Lines,
+			line => line.Text.StartsWith( "> S", StringComparison.Ordinal )
+				&& line.Text.Contains( "%CPU", StringComparison.Ordinal )
+		);
+
+		Assert.Null(
+			terminal.Frames[ 4 ].Lines[ 6 ].Spans
+		);
+
+		TopRenderFrame reordered = terminal.Frames[ 11 ];
+		string header = reordered.Lines[ 5 ].Text;
+		Assert.StartsWith(
+			"USER", header, StringComparison.Ordinal
+		);
+		Assert.DoesNotContain(
+			"%CPU", header, StringComparison.Ordinal
+		);
+		Assert.True(
+			header.IndexOf( "PID", StringComparison.Ordinal )
+				< header.IndexOf( "PR", StringComparison.Ordinal )
+		);
+		Assert.Contains(
+			"202",
+			reordered.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+
+		TopRenderSpan span = Assert.Single(
+			reordered.Lines[ 6 ].Spans!
+		);
+		Assert.Equal( 9, span.Start );
+		Assert.Equal( 7, span.Length );
+		Assert.Equal(
+			TopLineStyle.HighlightBold,
+			span.Style
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task OtherFiltersHonorCaseSensitivityWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'O' ) );
+		foreach ( char value in "COMMAND=ALPHA" ) {
+			terminal.Events.Enqueue( CharacterEvent( value ) );
+		}
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( '=' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'o' ) );
+		foreach ( char value in "COMMAND=ALPHA" ) {
+			terminal.Events.Enqueue( CharacterEvent( value ) );
+		}
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+
+		TopRenderFrame caseSensitive = terminal.Frames[ 15 ];
+		Assert.True(
+			string.IsNullOrEmpty( caseSensitive.Lines[ 6 ].Text )
+		);
+		Assert.Contains(
+			"Tasks:     0 total",
+			caseSensitive.Lines[ 1 ].Text,
+			StringComparison.Ordinal
+		);
+
+		TopRenderFrame caseInsensitive = terminal.Frames[ ^1 ];
+		Assert.Contains(
+			"alpha",
+			caseInsensitive.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True(
+			string.IsNullOrEmpty( caseInsensitive.Lines[ 7 ].Text )
+		);
+		Assert.Contains(
+			"filter added: COMMAND=ALPHA",
+			caseInsensitive.Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task OtherFiltersSupportRelationalExclusionAndResetWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'O' ) );
+		foreach ( char value in "!PID<200" ) {
+			terminal.Events.Enqueue( CharacterEvent( value ) );
+		}
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( '=' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+
+		TopRenderFrame filtered = terminal.Frames[ 10 ];
+		Assert.Contains(
+			"202",
+			filtered.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.DoesNotContain(
+			"101",
+			filtered.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True(
+			string.IsNullOrEmpty( filtered.Lines[ 7 ].Text )
+		);
+
+		TopRenderFrame reset = terminal.Frames[ ^1 ];
+		Assert.Contains(
+			"101",
+			reset.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"202",
+			reset.Lines[ 7 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task LocateAndLocateNextRepositionWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'L' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'b' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'e' ) );
+		terminal.Events.Enqueue( CharacterEvent( 't' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'a' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( '&' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new(
+			new ProcProcessCollection(
+				[
+					CreateProcess(
+						101,
+						"alpha",
+						1000,
+						0,
+						0,
+						64UL * 1024 * 1024
+					),
+					CreateProcess(
+						202,
+						"beta-one",
+						1000,
+						0,
+						0,
+						128UL * 1024 * 1024
+					),
+					CreateProcess(
+						303,
+						"beta-two",
+						1000,
+						0,
+						0,
+						256UL * 1024 * 1024
+					)
+				]
+			)
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 8, terminal.Frames.Count );
+		Assert.Contains(
+			"beta-one",
+			terminal.Frames[ 6 ].Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"beta-two",
+			terminal.Frames[ 7 ].Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True(
+			string.IsNullOrEmpty( terminal.Frames[ 7 ].Lines[ 7 ].Text )
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task LocateIsCaseSensitiveAndEmptyInputDisablesLocateNext() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'L' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'B' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'e' ) );
+		terminal.Events.Enqueue( CharacterEvent( 't' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'a' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( 'L' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( '&' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new(
+			new ProcProcessCollection(
+				[
+					CreateProcess(
+						101,
+						"beta",
+						1000,
+						0,
+						0,
+						64UL * 1024 * 1024
+					)
+				]
+			)
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 10, terminal.Frames.Count );
+		Assert.Contains(
+			"locate string not found: Beta",
+			terminal.Frames[ 6 ].Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"locate disabled",
+			terminal.Frames[ 8 ].Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"no locate string is active",
+			terminal.Frames[ 9 ].Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task EndKeepsLastPageBottomAlignedAfterScrollNormalization() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new TopTerminalDimensions( 100, 8 )
+		);
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.End ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new(
+			new ProcProcessCollection(
+				[
+					CreateProcess(
+						101,
+						"alpha",
+						1000,
+						0,
+						0,
+						64UL * 1024 * 1024
+					),
+					CreateProcess(
+						202,
+						"beta",
+						1000,
+						0,
+						0,
+						128UL * 1024 * 1024
+					),
+					CreateProcess(
+						303,
+						"gamma",
+						1000,
+						0,
+						0,
+						256UL * 1024 * 1024
+					)
+				]
+			)
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 2, terminal.Frames.Count );
+		Assert.Contains(
+			"202",
+			terminal.Frames[ 1 ].Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"303",
+			terminal.Frames[ 1 ].Lines[ 7 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task ImmediateRefreshInputResamplesWithoutWaitingForTimeout() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock );
@@ -526,7 +1334,8 @@ public sealed class TopCommandTests {
 		uint userId,
 		ulong userCpu,
 		ulong systemCpu,
-		ulong residentBytes
+		ulong residentBytes,
+		ProcProcessState state = ProcProcessState.Sleeping
 	) {
 		ProcessIdentity identity = new(
 			processId,
@@ -537,7 +1346,7 @@ public sealed class TopCommandTests {
 			CommandLineArguments = Exact<IReadOnlyList<string>>(
 				[ command, "--worker", processId.ToString( System.Globalization.CultureInfo.InvariantCulture ) ]
 			),
-			State = Exact( ProcProcessState.Sleeping ),
+			State = Exact( state ),
 			ParentProcessId = Exact( 1 ),
 			RealUserId = Exact( userId ),
 			EffectiveUserId = Exact( userId ),
@@ -638,8 +1447,12 @@ public sealed class TopCommandTests {
 			| ProcProcessCapabilities.Memory
 			| ProcProcessCapabilities.Priority
 			| ProcProcessCapabilities.Threads;
-		internal int CaptureCount { get; private set; }
-		internal Action? CaptureAction { get; init; }
+		internal int CaptureCount {
+			get; private set;
+		}
+		internal Action? CaptureAction {
+			get; init;
+		}
 
 		public Task<ProcProcessCollection> GetProcessesAsync( CancellationToken cancellationToken = default ) {
 			cancellationToken.ThrowIfCancellationRequested();
@@ -699,7 +1512,9 @@ public sealed class TopCommandTests {
 			| ProcSystemCapabilities.LoadAverage
 			| ProcSystemCapabilities.Uptime
 			| ProcSystemCapabilities.UserSessions;
-		internal int CaptureCount { get; private set; }
+		internal int CaptureCount {
+			get; private set;
+		}
 
 		public Task<ProcSystemSnapshot> GetSnapshotAsync( CancellationToken cancellationToken = default ) {
 			cancellationToken.ThrowIfCancellationRequested();
@@ -773,7 +1588,9 @@ public sealed class TopCommandTests {
 			this.ProcessorCount = processorCount;
 		}
 
-		internal int ProcessorCount { get; }
+		internal int ProcessorCount {
+			get;
+		}
 
 		public ValueTask<ProcessorResourceSnapshot> GetProcessorResourcesAsync(
 			CancellationToken cancellationToken = default
@@ -831,7 +1648,7 @@ public sealed class TopCommandTests {
 			if ( TimeSpan.Zero > duration ) {
 				throw new ArgumentOutOfRangeException( nameof( duration ) );
 			}
-			this.timestamp = checked( this.timestamp + duration.Ticks );
+			this.timestamp = checked(this.timestamp + duration.Ticks);
 		}
 	}
 
@@ -856,15 +1673,25 @@ public sealed class TopCommandTests {
 			this.IsInteractive = isInteractive;
 		}
 
-		public bool IsInteractive { get; }
+		public bool IsInteractive {
+			get;
+		}
 		public CancellationToken TerminationToken => CancellationToken.None;
 		internal Queue<ScheduledTerminalEvent> Events { get; } = new();
 		internal List<TimeSpan> Waits { get; } = [];
 		internal List<TopRenderFrame> Frames { get; } = [];
-		internal int OpenCount { get; private set; }
-		internal int RepaintCount { get; private set; }
-		internal int AlertCount { get; private set; }
-		internal bool Disposed { get; private set; }
+		internal int OpenCount {
+			get; private set;
+		}
+		internal int RepaintCount {
+			get; private set;
+		}
+		internal int AlertCount {
+			get; private set;
+		}
+		internal bool Disposed {
+			get; private set;
+		}
 
 		public ValueTask<ITopTerminalSession> OpenAsync(
 			CancellationToken cancellationToken = default
@@ -928,14 +1755,30 @@ public sealed class TopCommandTests {
 	}
 
 	private sealed class FakeProcessControl : ITopProcessControl {
-		internal int ParseSignalCount { get; private set; }
-		internal int SignalCount { get; private set; }
-		internal int PriorityCount { get; private set; }
-		internal int? LastSignaledProcessId { get; private set; }
-		internal ProcessIdentity? LastSignaledIdentity { get; private set; }
-		internal int? LastPriorityProcessId { get; private set; }
-		internal ProcessIdentity? LastPriorityIdentity { get; private set; }
-		internal int? LastNiceValue { get; private set; }
+		internal int ParseSignalCount {
+			get; private set;
+		}
+		internal int SignalCount {
+			get; private set;
+		}
+		internal int PriorityCount {
+			get; private set;
+		}
+		internal int? LastSignaledProcessId {
+			get; private set;
+		}
+		internal ProcessIdentity? LastSignaledIdentity {
+			get; private set;
+		}
+		internal int? LastPriorityProcessId {
+			get; private set;
+		}
+		internal ProcessIdentity? LastPriorityIdentity {
+			get; private set;
+		}
+		internal int? LastNiceValue {
+			get; private set;
+		}
 
 		public ProcessOperationResult<ProcessSignal> ParseSignal( string text ) {
 			ArgumentNullException.ThrowIfNull( text );

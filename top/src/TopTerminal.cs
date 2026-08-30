@@ -80,13 +80,23 @@ internal enum TopLineStyle {
 	Header,
 	Prompt,
 	Message,
-	Dim
+	Dim,
+	HighlightBold,
+	HighlightReverse
 }
+
+/// <summary>Represents one styled span within a rendered top line.</summary>
+internal readonly record struct TopRenderSpan(
+	int Start,
+	int Length,
+	TopLineStyle Style
+);
 
 /// <summary>Represents one rendered top line.</summary>
 internal readonly record struct TopRenderLine(
 	string Text,
-	TopLineStyle Style = TopLineStyle.Default
+	TopLineStyle Style = TopLineStyle.Default,
+	IReadOnlyList<TopRenderSpan>? Spans = null
 );
 
 /// <summary>Represents a complete top display frame.</summary>
@@ -94,7 +104,8 @@ internal sealed class TopRenderFrame {
 	internal TopRenderFrame(
 		IReadOnlyList<TopRenderLine> lines,
 		int columns,
-		int rows
+		int rows,
+		bool boldEnabled
 	) {
 		ArgumentNullException.ThrowIfNull( lines );
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( columns );
@@ -102,11 +113,13 @@ internal sealed class TopRenderFrame {
 		this.Lines = lines;
 		this.Columns = columns;
 		this.Rows = rows;
+		this.BoldEnabled = boldEnabled;
 	}
 
 	internal IReadOnlyList<TopRenderLine> Lines { get; }
 	internal int Columns { get; }
 	internal int Rows { get; }
+	internal bool BoldEnabled { get; }
 }
 
 /// <summary>Creates the terminal presentation session used by top.</summary>
@@ -149,14 +162,7 @@ internal sealed class SystemTopTerminalSessionFactory : ITopTerminalSessionFacto
 	) {
 		cancellationToken.ThrowIfCancellationRequested();
 		CursesSession session = await CursesSession.OpenAsync(
-			new CursesSessionOptions {
-				InputMode = CursesInputMode.CBreak,
-				EchoInput = false,
-				UseAlternateScreen = true,
-				EnableKeypad = true,
-				HideCursor = true
-			},
-			cancellationToken
+			cancellationToken: cancellationToken
 		).ConfigureAwait( false );
 		return new DCursesTopTerminalSession( session );
 	}
@@ -189,6 +195,16 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 		CursesColor.Default,
 		CursesColor.Default,
 		CursesTextAttributes.Dim
+	);
+	private static readonly CursesStyle HighlightBoldStyle = new(
+		CursesColor.Default,
+		CursesColor.Default,
+		CursesTextAttributes.Bold
+	);
+	private static readonly CursesStyle HighlightReverseStyle = new(
+		CursesColor.Default,
+		CursesColor.Default,
+		CursesTextAttributes.Reverse
 	);
 
 	internal DCursesTopTerminalSession( CursesSession session ) {
@@ -241,12 +257,10 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 				"A curses lifecycle event did not include its lifecycle payload."
 			);
 		return lifecycle.Kind switch {
-			CursesLifecycleEventKind.Resize => SynchronizeAndReturn(
-				this.session,
+			CursesLifecycleEventKind.Resize => new TopTerminalEvent(
 				TopTerminalEventKind.Resize
 			),
-			CursesLifecycleEventKind.Resumed => SynchronizeAndReturn(
-				this.session,
+			CursesLifecycleEventKind.Resumed => new TopTerminalEvent(
 				TopTerminalEventKind.Repaint
 			),
 			CursesLifecycleEventKind.Interrupt => new TopTerminalEvent(
@@ -278,7 +292,7 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 				continue;
 			}
 			window.Move( row, 0 );
-			window.Write( line.Text, StyleFor( line.Style ) );
+			WriteLine( window, line, frame.BoldEnabled );
 		}
 		window.Move( 0, 0 );
 		await this.session.RefreshAsync( cancellationToken ).ConfigureAwait( false );
@@ -335,21 +349,83 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 		};
 	}
 
-	private static CursesStyle StyleFor( TopLineStyle style ) => style switch {
-		TopLineStyle.Summary => SummaryStyle,
-		TopLineStyle.Header => HeaderStyle,
-		TopLineStyle.Prompt => PromptStyle,
-		TopLineStyle.Message => MessageStyle,
-		TopLineStyle.Dim => DimStyle,
-		_ => CursesStyle.Default
-	};
-
-	private static TopTerminalEvent SynchronizeAndReturn(
-		CursesSession session,
-		TopTerminalEventKind kind
+	private static void WriteLine(
+		CursesWindow window,
+		TopRenderLine line,
+		bool boldEnabled
 	) {
-		ArgumentNullException.ThrowIfNull( session );
-		_ = session.SynchronizeDimensions();
-		return new TopTerminalEvent( kind );
+		ArgumentNullException.ThrowIfNull( window );
+
+		CursesStyle baseStyle = StyleFor(
+			line.Style,
+			boldEnabled
+		);
+		if ( line.Spans is null || 0 == line.Spans.Count ) {
+			window.Write(
+				line.Text,
+				baseStyle
+			);
+			return;
+		}
+
+		int position = 0;
+		foreach ( TopRenderSpan span in line.Spans ) {
+			if (
+				0 > span.Start
+				|| 0 >= span.Length
+				|| span.Start < position
+				|| line.Text.Length < span.Start
+				|| line.Text.Length - span.Start < span.Length
+			) {
+				throw new InvalidOperationException(
+					"A top render line contained an invalid or overlapping styled span."
+				);
+			}
+			if ( position < span.Start ) {
+				window.Write(
+					line.Text[ position..span.Start ],
+					baseStyle
+				);
+			}
+			window.Write(
+				line.Text.Substring(
+					span.Start,
+					span.Length
+				),
+				StyleFor(
+					span.Style,
+					boldEnabled
+				)
+			);
+			position = span.Start + span.Length;
+		}
+		if ( position < line.Text.Length ) {
+			window.Write(
+				line.Text[ position.. ],
+				baseStyle
+			);
+		}
+	}
+
+	private static CursesStyle StyleFor(
+		TopLineStyle style,
+		bool boldEnabled
+	) {
+		CursesStyle result = style switch {
+			TopLineStyle.Summary => SummaryStyle,
+			TopLineStyle.Header => HeaderStyle,
+			TopLineStyle.Prompt => PromptStyle,
+			TopLineStyle.Message => MessageStyle,
+			TopLineStyle.Dim => DimStyle,
+			TopLineStyle.HighlightBold => HighlightBoldStyle,
+			TopLineStyle.HighlightReverse => HighlightReverseStyle,
+			_ => CursesStyle.Default
+		};
+		if ( boldEnabled ) {
+			return result;
+		}
+		return result.WithAttributes(
+			result.Attributes & ~CursesTextAttributes.Bold
+		);
 	}
 }

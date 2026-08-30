@@ -199,6 +199,7 @@ public static class Command {
 					terminal.TerminationToken
 				);
 			CancellationToken refreshToken = linkedCancellation.Token;
+			SlabSortCriterion sort = parsed.Sort;
 			while ( true ) {
 				refreshToken.ThrowIfCancellationRequested();
 				long cycleStarted = clock.GetTimestamp();
@@ -225,7 +226,7 @@ public static class Command {
 
 				SlabTopRenderFrame frame = SlabTopRenderer.RenderFrame(
 					currentEntries,
-					parsed.Sort,
+					sort,
 					parsed.Human,
 					dimensions
 				);
@@ -253,6 +254,42 @@ public static class Command {
 					if ( SlabTopTerminalEventKind.Interrupt == terminalEvent.Kind ) {
 						return Canceled;
 					}
+					if ( SlabTopTerminalEventKind.Input == terminalEvent.Kind ) {
+						if ( !terminalEvent.Input.HasValue ) {
+							continue;
+						}
+						SlabTopInputEvent input = terminalEvent.Input.Value;
+						if ( SlabTopInputKey.EndOfInput == input.Key ) {
+							return Success;
+						}
+						if (
+							SlabTopInputKey.Character != input.Key
+							|| !input.Character.HasValue
+						) {
+							continue;
+						}
+						int value = input.Character.Value.Value;
+						if ( char.MaxValue < value ) {
+							continue;
+						}
+						char command = (char)value;
+						if ( 'q' == char.ToLowerInvariant( command ) ) {
+							return Success;
+						}
+						if ( ' ' == command ) {
+							break;
+						}
+						if (
+							TryParseSort(
+								command,
+								out SlabSortCriterion requestedSort
+							)
+						) {
+							sort = requestedSort;
+							break;
+						}
+						continue;
+					}
 					if ( SlabTopTerminalEventKind.Repaint == terminalEvent.Kind ) {
 						await terminal.RepaintAsync( refreshToken ).ConfigureAwait( false );
 						continue;
@@ -272,7 +309,7 @@ public static class Command {
 
 					SlabTopRenderFrame resizedFrame = SlabTopRenderer.RenderFrame(
 						currentEntries,
-						parsed.Sort,
+						sort,
 						parsed.Human,
 						dimensions
 					);
@@ -412,19 +449,52 @@ public static class Command {
 	}
 
 	private static SlabSortCriterion ParseSort( char criterion ) {
-		return char.ToLowerInvariant( criterion ) switch {
-			'a' => SlabSortCriterion.ActiveObjects,
-			'b' => SlabSortCriterion.ObjectsPerSlab,
-			'c' => SlabSortCriterion.CacheSize,
-			'l' => SlabSortCriterion.Slabs,
-			'v' => SlabSortCriterion.ActiveSlabs,
-			'n' => SlabSortCriterion.Name,
-			'o' => SlabSortCriterion.Objects,
-			'p' => SlabSortCriterion.PagesPerSlab,
-			's' => SlabSortCriterion.ObjectSize,
-			'u' => SlabSortCriterion.Utilization,
-			_ => SlabSortCriterion.Objects
-		};
+		_ = TryParseSort(
+			criterion,
+			out SlabSortCriterion sort
+		);
+		return sort;
+	}
+
+	private static bool TryParseSort(
+		char criterion,
+		out SlabSortCriterion sort
+	) {
+		switch ( char.ToLowerInvariant( criterion ) ) {
+			case 'a':
+				sort = SlabSortCriterion.ActiveObjects;
+				return true;
+			case 'b':
+				sort = SlabSortCriterion.ObjectsPerSlab;
+				return true;
+			case 'c':
+				sort = SlabSortCriterion.CacheSize;
+				return true;
+			case 'l':
+				sort = SlabSortCriterion.Slabs;
+				return true;
+			case 'v':
+				sort = SlabSortCriterion.ActiveSlabs;
+				return true;
+			case 'n':
+				sort = SlabSortCriterion.Name;
+				return true;
+			case 'o':
+				sort = SlabSortCriterion.Objects;
+				return true;
+			case 'p':
+				sort = SlabSortCriterion.PagesPerSlab;
+				return true;
+			case 's':
+				sort = SlabSortCriterion.ObjectSize;
+				return true;
+			case 'u':
+				sort = SlabSortCriterion.Utilization;
+				return true;
+			default:
+				sort = SlabSortCriterion.Objects;
+				return false;
+		}
 	}
 
 	private static bool TryOptionValue(

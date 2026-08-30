@@ -36,7 +36,7 @@
 		<PlatformTarget>AnyCPU</PlatformTarget>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Icod.DCurses" Version="0.1.0-Alpha-14" />
+		<PackageReference Include="Icod.DCurses" Version="0.1.0" />
 		<PackageReference Include="Icod.Host" Version="1.0.0" />
 		<PackageReference Include="Icod.Processes" Version="1.0.0" />
 		<PackageReference Include="Icod.Timing" Version="1.0.0" />

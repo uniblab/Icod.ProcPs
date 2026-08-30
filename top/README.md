@@ -17,10 +17,11 @@ implementation targets the procps-ng 4.0.6 command model while using the Icod
 runtime libraries for process observation, timing, host facts, process control,
 and terminal presentation.
 
-Interactive mode opens an `Icod.DCurses` session and owns only application
-policy. Terminal modes, alternate-screen ownership, cursor state, decoded input,
-resize/resume events, and terminal restoration remain owned by `Icod.DCurses`
-and `Icod.Terminal`.
+Interactive mode opens an `Icod.DCurses 0.1.0` session and owns only
+application policy. The stable DCurses defaults provide cbreak/no-echo input,
+alternate-screen ownership, keypad mode, and a hidden cursor. Decoded input,
+resize/resume synchronization, physical-screen invalidation, and terminal
+restoration remain owned by `Icod.DCurses` and `Icod.Terminal`.
 
 Batch mode does not open a terminal and is suitable for redirection or pipelines.
 
@@ -67,6 +68,8 @@ Batch mode does not open a terminal and is suitable for redirection or pipelines
 `-o FIELD`, `--sort-override FIELD`
 : Select the initial sort field. Implemented names are `CPU`, `%CPU`, `MEM`,
   `%MEM`, `PID`, `TIME+`, `VIRT`, `RES`, `USER`, `COMMAND`, `NI`, and `S`.
+  Prefix the field with `+` to force high-to-low ordering or `-` to force
+  low-to-high ordering; without a prefix the active/default direction is kept.
 
 `-p PIDLIST`, `--pid PIDLIST`
 : Restrict the display to a comma- or whitespace-separated set of process IDs.
@@ -113,7 +116,39 @@ The following commands are implemented in the first DCurses-backed interactive
 profile:
 
 - `q` quits; Enter or Space requests an immediate refresh.
+- `0` toggles suppression of true zero values in the suppressible task
+  fields. `VIRT`, `RES`, `%CPU`, `%MEM`, and `TIME+` participate; `PR`,
+  `NI`, identity/state fields, unavailable values, and nonzero values that
+  merely round to a displayed zero remain visible.
+- `n` or `#` prompts for the maximum number of task rows to display. `0`
+  restores the unlimited setting; the terminal still caps the result to the
+  task rows physically available on screen. This is distinct from the
+  command-line `-n` / `--iterations` option.
 - `P`, `M`, `N`, and `T` sort by CPU, memory, PID, and cumulative CPU time.
+- `R` toggles the active sort direction between high-to-low and low-to-high.
+- `B` globally enables or disables use of bold rendition in the summary and
+  task areas.
+- `b` selects bold versus reverse-video emphasis for highlighted task rows
+  and sort fields.
+- `J` toggles numeric columns between right justification (the default) and
+  left justification.
+- `j` toggles character columns between left justification (the default) and
+  right justification. The trailing COMMAND value remains unpadded in the
+  default mode and gains only the minimum header width when right-justified.
+- `f` opens the single-window Fields Management screen. `*` marks displayed
+  fields, `S` marks the active sort field, and `>` marks the current selection.
+  Arrow keys, Page Up, Page Down, Home, and End navigate. `d` or Space toggles
+  field visibility, `s` designates the sort field, Right begins repositioning,
+  and Left or Enter commits the new position. `q` or Escape returns to the
+  process display. Visibility and order changes reset horizontal scrolling but
+  preserve the task display's vertical position. Alternate-window `a`/`w`
+  field-group cycling remains deferred with alternate-display mode.
+- `x` toggles highlighting of the active sort field. The highlight is clipped
+  to the visible portion of that field when the task display is horizontally
+  scrolled. A hidden sort field has no task-column highlight.
+- `y` toggles highlighting of tasks whose observed state is running. The
+  built-in monochrome profile starts with running-row highlighting enabled and
+  uses bold emphasis until `b` changes it.
 - `c` toggles short command names and observed command lines.
 - `H` toggles process/thread presentation and resamples immediately.
 - `i` toggles idle-task suppression and `V` toggles forest ordering.
@@ -123,13 +158,29 @@ profile:
 - `d` or `s` opens an in-screen line editor for the refresh delay.
 - `u` and `U` open an in-screen user-filter editor; an empty value clears the
   filter and an initial `!` inverts it.
+- `O` and `o` add Other Filter criteria using case-sensitive and
+  case-insensitive matching, respectively. Criteria use the exact displayed
+  field name, one of `=`, `<`, or `>`, and a nonempty selection value; a
+  leading `!` makes the criterion an exclusion. Equality is a substring
+  match. Relational operators compare formatted field text as strings, and
+  their selection value is padded to the field width/alignment when the
+  filter is established, matching procps behavior. Multiple criteria combine,
+  duplicate raw criteria are rejected, and criteria for hidden fields remain
+  dormant until those fields are displayed again.
+- `L` prompts for a case-sensitive string and moves the matching task row to
+  the top of the task area. Searching considers the horizontally visible
+  portion of each fully formatted task row, so command mode, forest layout,
+  justification, zero suppression, filters, and horizontal scrolling all
+  influence matches. An empty search disables locate-next.
+- `&` repeats the active locate operation starting after the current top task;
+  searches do not wrap and horizontal scrolling is never changed.
 - `k` prompts for PID and signal and performs reuse-protected delivery through
   `Icod.Processes`.
 - `r` prompts for PID and nice value and performs reuse-protected priority
   changes through `Icod.Processes`.
 - Arrow keys, Page Up, Page Down, Home, and End scroll the task display; Left and
   Right scroll horizontally.
-- `=` clears PID/user restrictions and scrolling.
+- `=` clears idle/max-task display limits, PID/user/Other Filter restrictions, locate state, and scrolling.
 - `h` or `?` displays a compact help screen.
 
 In secure mode the `d`/`s`, `k`, and `r` commands are disabled.
@@ -180,7 +231,6 @@ tranches rather than represented incompletely:
 
 - personal/system `toprc` persistence beyond the built-in-default behavior;
 - alternate-display multi-window/field-group mode;
-- the full interactive field-management screen;
 - configurable color schemes and color-management screens;
 - per-logical-CPU activity rows until the Shared metrics contract exposes them;
 - cumulative dead-child CPU time (`-S`); and

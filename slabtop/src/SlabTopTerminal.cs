@@ -21,6 +21,7 @@
 
 namespace Icod.ProcPs.SlabTop;
 
+using System.Text;
 using Icod.DCurses;
 
 /// <summary>Represents terminal geometry required by slabtop.</summary>
@@ -39,9 +40,24 @@ internal enum SlabTopTerminalEventKind {
 	Other
 }
 
+/// <summary>Identifies terminal-independent input consumed by slabtop.</summary>
+internal enum SlabTopInputKey {
+	None,
+	Character,
+	EndOfInput,
+	Other
+}
+
+/// <summary>Represents one terminal-independent input event consumed by slabtop.</summary>
+internal readonly record struct SlabTopInputEvent(
+	SlabTopInputKey Key,
+	Rune? Character
+);
+
 /// <summary>Represents one terminal event relevant to slabtop scheduling.</summary>
 internal readonly record struct SlabTopTerminalEvent(
-	SlabTopTerminalEventKind Kind
+	SlabTopTerminalEventKind Kind,
+	SlabTopInputEvent? Input = null
 );
 
 /// <summary>Creates the terminal presentation session used by slabtop.</summary>
@@ -86,14 +102,7 @@ internal sealed class SystemSlabTopTerminalSessionFactory
 	) {
 		cancellationToken.ThrowIfCancellationRequested();
 		CursesSession session = await CursesSession.OpenAsync(
-			new CursesSessionOptions {
-				InputMode = CursesInputMode.CBreak,
-				EchoInput = false,
-				UseAlternateScreen = true,
-				EnableKeypad = true,
-				HideCursor = true
-			},
-			cancellationToken
+			cancellationToken: cancellationToken
 		).ConfigureAwait( false );
 		return new DCursesSlabTopTerminalSession( session );
 	}
@@ -139,7 +148,17 @@ internal sealed class DCursesSlabTopTerminalSession : ISlabTopTerminalSession {
 			return new SlabTopTerminalEvent( SlabTopTerminalEventKind.Timeout );
 		}
 		if ( CursesEventKind.Input == cursesEvent.Kind ) {
-			return new SlabTopTerminalEvent( SlabTopTerminalEventKind.Input );
+			if ( null == cursesEvent.Input ) {
+				return new SlabTopTerminalEvent(
+					SlabTopTerminalEventKind.Other
+				);
+			}
+			return new SlabTopTerminalEvent(
+				SlabTopTerminalEventKind.Input,
+				MapInput(
+					cursesEvent.Input
+				)
+			);
 		}
 
 		CursesLifecycleEvent lifecycle = cursesEvent.Lifecycle
@@ -147,12 +166,10 @@ internal sealed class DCursesSlabTopTerminalSession : ISlabTopTerminalSession {
 				"A curses lifecycle event did not include its lifecycle payload."
 			);
 		return lifecycle.Kind switch {
-			CursesLifecycleEventKind.Resize => SynchronizeAndReturn(
-				this.session,
+			CursesLifecycleEventKind.Resize => new SlabTopTerminalEvent(
 				SlabTopTerminalEventKind.Resize
 			),
-			CursesLifecycleEventKind.Resumed => SynchronizeAndReturn(
-				this.session,
+			CursesLifecycleEventKind.Resumed => new SlabTopTerminalEvent(
 				SlabTopTerminalEventKind.Repaint
 			),
 			CursesLifecycleEventKind.Interrupt => new SlabTopTerminalEvent(
@@ -202,12 +219,37 @@ internal sealed class DCursesSlabTopTerminalSession : ISlabTopTerminalSession {
 		return this.session.DisposeAsync();
 	}
 
-	private static SlabTopTerminalEvent SynchronizeAndReturn(
-		CursesSession session,
-		SlabTopTerminalEventKind kind
+	private static SlabTopInputEvent MapInput(
+		CursesInputEvent input
 	) {
-		ArgumentNullException.ThrowIfNull( session );
-		_ = session.SynchronizeDimensions();
-		return new SlabTopTerminalEvent( kind );
+		ArgumentNullException.ThrowIfNull(
+			input
+		);
+		if ( CursesInputEventKind.EndOfInput == input.Kind ) {
+			return new SlabTopInputEvent(
+				SlabTopInputKey.EndOfInput,
+				null
+			);
+		}
+		if ( CursesInputEventKind.Text == input.Kind ) {
+			return new SlabTopInputEvent(
+				SlabTopInputKey.Character,
+				input.Character
+			);
+		}
+		return input.Key switch {
+			CursesKey.Character => new SlabTopInputEvent(
+				SlabTopInputKey.Character,
+				input.Character
+			),
+			CursesKey.Space => new SlabTopInputEvent(
+				SlabTopInputKey.Character,
+				new Rune( ' ' )
+			),
+			_ => new SlabTopInputEvent(
+				SlabTopInputKey.Other,
+				null
+			)
+		};
 	}
 }
