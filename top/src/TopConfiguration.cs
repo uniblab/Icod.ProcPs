@@ -104,7 +104,7 @@ internal readonly record struct TopSystemRestrictions(
 );
 
 /// <summary>Provides the privilege test used by procps-compatible system restrictions.</summary>
-internal static partial class TopSystemIdentity {
+internal static class TopSystemIdentity {
 	internal static bool IsPrivilegedUser() {
 		if ( !OperatingSystem.IsLinux() ) {
 			return false;
@@ -112,12 +112,12 @@ internal static partial class TopSystemIdentity {
 		return 0U == NativeMethods.GetUserId();
 	}
 
-	private static partial class NativeMethods {
-		[LibraryImport(
+	private static class NativeMethods {
+		[DllImport(
 			"libc",
 			EntryPoint = "getuid"
 		)]
-		internal static partial uint GetUserId();
+		internal static extern uint GetUserId();
 	}
 }
 
@@ -374,6 +374,7 @@ internal static class TopConfigurationCodec {
 	) {
 		ArgumentNullException.ThrowIfNull( state );
 
+		state.SynchronizeCurrentWindow();
 		return JsonSerializer.Serialize(
 			CreateDocument( state ),
 			SerializerOptions
@@ -511,6 +512,40 @@ internal static class TopConfigurationCodec {
 				state.OtherFilters.Add( filter! );
 			}
 		}
+
+		if ( document.Windows is null ) {
+			state.SynchronizeCurrentWindow();
+		} else {
+			if ( TopRuntimeState.WindowCount != document.Windows.Count ) {
+				throw new FormatException(
+					$"the configuration must contain exactly {TopRuntimeState.WindowCount} windows"
+				);
+			}
+			if (
+				document.CurrentWindowIndex is < 0
+					or >= TopRuntimeState.WindowCount
+			) {
+				throw new FormatException(
+					$"invalid current window index {document.CurrentWindowIndex}"
+				);
+			}
+			var windows = new List<TopWindowState>(
+				TopRuntimeState.WindowCount
+			);
+			for ( int index = 0; index < TopRuntimeState.WindowCount; index++ ) {
+				windows.Add(
+					BuildWindowState(
+						document.Windows[ index ],
+						index
+					)
+				);
+			}
+			state.RestoreWindows(
+				windows,
+				document.CurrentWindowIndex
+			);
+		}
+		state.AlternateDisplayMode = document.AlternateDisplayMode;
 	}
 
 	private static TopConfigurationDocument CreateDocument(
@@ -523,15 +558,17 @@ internal static class TopConfigurationCodec {
 			}
 		}
 
-		var filters = new List<TopConfigurationFilterDocument>(
-			state.OtherFilters.Count
+		var filters = CreateFilterDocuments(
+			state.OtherFilters
 		);
-		foreach ( TopOtherFilter filter in state.OtherFilters ) {
-			filters.Add(
-				new TopConfigurationFilterDocument {
-					RawText = filter.RawText,
-					CaseSensitive = filter.CaseSensitive
-				}
+		var windows = new List<TopConfigurationWindowDocument>(
+			TopRuntimeState.WindowCount
+		);
+		foreach ( TopWindowState window in state.Windows ) {
+			windows.Add(
+				CreateWindowDocument(
+					window
+				)
 			);
 		}
 
@@ -557,10 +594,150 @@ internal static class TopConfigurationCodec {
 			Forest = state.Forest,
 			IrixMode = state.IrixMode,
 			SingleCpuSummary = state.SingleCpuSummary,
+			AlternateDisplayMode = state.AlternateDisplayMode,
+			CurrentWindowIndex = state.CurrentWindowIndex,
 			FieldOrder = [ .. state.FieldOrder ],
 			VisibleFields = visibleFields,
-			OtherFilters = filters
+			OtherFilters = filters,
+			Windows = windows
 		};
+	}
+
+	private static TopConfigurationWindowDocument CreateWindowDocument(
+		TopWindowState window
+	) {
+		ArgumentNullException.ThrowIfNull( window );
+
+		var visibleFields = new List<TopFieldId>();
+		foreach ( TopFieldId field in window.FieldOrder ) {
+			if ( window.VisibleFields.Contains( field ) ) {
+				visibleFields.Add( field );
+			}
+		}
+		return new TopConfigurationWindowDocument {
+			SortField = window.SortField,
+			SortHighToLow = window.SortHighToLow,
+			HighlightBold = window.HighlightBold,
+			HighlightRunning = window.HighlightRunning,
+			HighlightSortColumn = window.HighlightSortColumn,
+			NumericLeftJustified = window.NumericLeftJustified,
+			CharacterRightJustified = window.CharacterRightJustified,
+			MaximumTasks = window.MaximumTasks,
+			ShowCommandLine = window.ShowCommandLine,
+			HideIdle = window.HideIdle,
+			Forest = window.Forest,
+			SingleCpuSummary = window.SingleCpuSummary,
+			FieldOrder = [ .. window.FieldOrder ],
+			VisibleFields = visibleFields,
+			OtherFilters = CreateFilterDocuments(
+				window.OtherFilters
+			)
+		};
+	}
+
+	private static List<TopConfigurationFilterDocument> CreateFilterDocuments(
+		IReadOnlyList<TopOtherFilter> filters
+	) {
+		ArgumentNullException.ThrowIfNull( filters );
+
+		var result = new List<TopConfigurationFilterDocument>(
+			filters.Count
+		);
+		foreach ( TopOtherFilter filter in filters ) {
+			result.Add(
+				new TopConfigurationFilterDocument {
+					RawText = filter.RawText,
+					CaseSensitive = filter.CaseSensitive
+				}
+			);
+		}
+		return result;
+	}
+
+	private static TopWindowState BuildWindowState(
+		TopConfigurationWindowDocument document,
+		int index
+	) {
+		ArgumentNullException.ThrowIfNull( document );
+		if ( index is < 0 or >= TopRuntimeState.WindowCount ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( index )
+			);
+		}
+		if ( 0 > document.MaximumTasks ) {
+			throw new FormatException(
+				$"window {index + 1} has a negative maximum task count"
+			);
+		}
+		if ( !IsKnownField( document.SortField ) ) {
+			throw new FormatException(
+				$"window {index + 1} has unknown sort field '{document.SortField}'"
+			);
+		}
+
+		var result = new TopWindowState(
+			TopRuntimeState.GetWindowName( index )
+		) {
+			SortField = document.SortField,
+			SortHighToLow = document.SortHighToLow,
+			HighlightBold = document.HighlightBold,
+			HighlightRunning = document.HighlightRunning,
+			HighlightSortColumn = document.HighlightSortColumn,
+			NumericLeftJustified = document.NumericLeftJustified,
+			CharacterRightJustified = document.CharacterRightJustified,
+			MaximumTasks = document.MaximumTasks,
+			ShowCommandLine = document.ShowCommandLine,
+			HideIdle = document.HideIdle,
+			Forest = document.Forest,
+			SingleCpuSummary = document.SingleCpuSummary
+		};
+
+		result.FieldOrder.Clear();
+		result.FieldOrder.AddRange(
+			BuildFieldOrder(
+				document.FieldOrder
+			)
+		);
+		result.VisibleFields.Clear();
+		result.VisibleFields.UnionWith(
+			BuildVisibleFields(
+				document.VisibleFields
+			)
+		);
+
+		if ( document.OtherFilters is not null ) {
+			var parsingState = new TopRuntimeState {
+				NumericLeftJustified = result.NumericLeftJustified,
+				CharacterRightJustified = result.CharacterRightJustified
+			};
+			foreach ( TopConfigurationFilterDocument persisted in document.OtherFilters ) {
+				if ( string.IsNullOrEmpty( persisted.RawText ) ) {
+					throw new FormatException(
+						$"window {index + 1} has an Other Filter with no criterion"
+					);
+				}
+				if (
+					!TopOtherFilterParser.TryParse(
+						persisted.RawText,
+						persisted.CaseSensitive,
+						parsingState,
+						out TopOtherFilter? filter,
+						out string? error
+					)
+				) {
+					throw new FormatException(
+						$"window {index + 1} Other Filter '{persisted.RawText}' is invalid: {error}"
+					);
+				}
+				parsingState.OtherFilters.Add(
+					filter!
+				);
+				result.OtherFilters.Add(
+					filter!
+				);
+			}
+		}
+		return result;
 	}
 
 	private static List<TopFieldId> BuildFieldOrder(
@@ -658,6 +835,27 @@ internal sealed class TopConfigurationDocument {
 	public bool HideIdle { get; set; }
 	public bool Forest { get; set; }
 	public bool IrixMode { get; set; } = true;
+	public bool SingleCpuSummary { get; set; } = true;
+	public bool AlternateDisplayMode { get; set; }
+	public int CurrentWindowIndex { get; set; }
+	public List<TopFieldId>? FieldOrder { get; set; }
+	public List<TopFieldId>? VisibleFields { get; set; }
+	public List<TopConfigurationFilterDocument>? OtherFilters { get; set; }
+	public List<TopConfigurationWindowDocument>? Windows { get; set; }
+}
+
+internal sealed class TopConfigurationWindowDocument {
+	public TopFieldId SortField { get; set; } = TopFieldId.Cpu;
+	public bool SortHighToLow { get; set; } = true;
+	public bool HighlightBold { get; set; } = true;
+	public bool HighlightRunning { get; set; } = true;
+	public bool HighlightSortColumn { get; set; }
+	public bool NumericLeftJustified { get; set; }
+	public bool CharacterRightJustified { get; set; }
+	public int MaximumTasks { get; set; }
+	public bool ShowCommandLine { get; set; }
+	public bool HideIdle { get; set; }
+	public bool Forest { get; set; }
 	public bool SingleCpuSummary { get; set; } = true;
 	public List<TopFieldId>? FieldOrder { get; set; }
 	public List<TopFieldId>? VisibleFields { get; set; }

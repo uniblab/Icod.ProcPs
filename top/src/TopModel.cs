@@ -50,8 +50,164 @@ internal sealed class TopUserFilter {
 	internal bool Negate { get; }
 }
 
+/// <summary>Contains the separately configurable state of one top field group/window.</summary>
+internal sealed class TopWindowState {
+	internal TopWindowState( string name ) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( name );
+		this.Name = name;
+	}
+
+	internal string Name { get; }
+	internal TopFieldId SortField { get; set; } = TopFieldId.Cpu;
+	internal bool SortHighToLow { get; set; } = true;
+	internal bool HighlightBold { get; set; } = true;
+	internal bool HighlightRunning { get; set; } = true;
+	internal bool HighlightSortColumn { get; set; }
+	internal bool NumericLeftJustified { get; set; }
+	internal bool CharacterRightJustified { get; set; }
+	internal int MaximumTasks { get; set; }
+	internal string? SearchText { get; set; }
+	internal bool ShowCommandLine { get; set; }
+	internal bool HideIdle { get; set; }
+	internal bool Forest { get; set; }
+	internal bool SingleCpuSummary { get; set; } = true;
+	internal int VerticalOffset { get; set; }
+	internal int HorizontalOffset { get; set; }
+	internal TopUserFilter? UserFilter { get; set; }
+	internal List<TopOtherFilter> OtherFilters { get; } = [];
+	internal List<TopFieldId> FieldOrder { get; } = TopFieldCatalog.CreateDefaultOrder();
+	internal HashSet<TopFieldId> VisibleFields { get; } = TopFieldCatalog.CreateDefaultVisible();
+
+	internal TopWindowState Clone() {
+		var result = new TopWindowState(
+			this.Name
+		);
+		result.CopyFrom(
+			this
+		);
+		return result;
+	}
+
+	internal void CaptureFrom(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		this.SortField = state.SortField;
+		this.SortHighToLow = state.SortHighToLow;
+		this.HighlightBold = state.HighlightBold;
+		this.HighlightRunning = state.HighlightRunning;
+		this.HighlightSortColumn = state.HighlightSortColumn;
+		this.NumericLeftJustified = state.NumericLeftJustified;
+		this.CharacterRightJustified = state.CharacterRightJustified;
+		this.MaximumTasks = state.MaximumTasks;
+		this.SearchText = state.SearchText;
+		this.ShowCommandLine = state.ShowCommandLine;
+		this.HideIdle = state.HideIdle;
+		this.Forest = state.Forest;
+		this.SingleCpuSummary = state.SingleCpuSummary;
+		this.VerticalOffset = state.VerticalOffset;
+		this.HorizontalOffset = state.HorizontalOffset;
+		this.UserFilter = state.UserFilter;
+
+		this.OtherFilters.Clear();
+		this.OtherFilters.AddRange(
+			state.OtherFilters
+		);
+		this.FieldOrder.Clear();
+		this.FieldOrder.AddRange(
+			state.FieldOrder
+		);
+		this.VisibleFields.Clear();
+		this.VisibleFields.UnionWith(
+			state.VisibleFields
+		);
+	}
+
+	internal void ApplyTo(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		state.SortField = this.SortField;
+		state.SortHighToLow = this.SortHighToLow;
+		state.HighlightBold = this.HighlightBold;
+		state.HighlightRunning = this.HighlightRunning;
+		state.HighlightSortColumn = this.HighlightSortColumn;
+		state.NumericLeftJustified = this.NumericLeftJustified;
+		state.CharacterRightJustified = this.CharacterRightJustified;
+		state.MaximumTasks = this.MaximumTasks;
+		state.SearchText = this.SearchText;
+		state.ShowCommandLine = this.ShowCommandLine;
+		state.HideIdle = this.HideIdle;
+		state.Forest = this.Forest;
+		state.SingleCpuSummary = this.SingleCpuSummary;
+		state.VerticalOffset = this.VerticalOffset;
+		state.HorizontalOffset = this.HorizontalOffset;
+		state.UserFilter = this.UserFilter;
+
+		state.OtherFilters.Clear();
+		state.OtherFilters.AddRange(
+			this.OtherFilters
+		);
+		state.FieldOrder.Clear();
+		state.FieldOrder.AddRange(
+			this.FieldOrder
+		);
+		state.VisibleFields.Clear();
+		state.VisibleFields.UnionWith(
+			this.VisibleFields
+		);
+	}
+
+	private void CopyFrom(
+		TopWindowState source
+	) {
+		ArgumentNullException.ThrowIfNull( source );
+
+		this.SortField = source.SortField;
+		this.SortHighToLow = source.SortHighToLow;
+		this.HighlightBold = source.HighlightBold;
+		this.HighlightRunning = source.HighlightRunning;
+		this.HighlightSortColumn = source.HighlightSortColumn;
+		this.NumericLeftJustified = source.NumericLeftJustified;
+		this.CharacterRightJustified = source.CharacterRightJustified;
+		this.MaximumTasks = source.MaximumTasks;
+		this.SearchText = source.SearchText;
+		this.ShowCommandLine = source.ShowCommandLine;
+		this.HideIdle = source.HideIdle;
+		this.Forest = source.Forest;
+		this.SingleCpuSummary = source.SingleCpuSummary;
+		this.VerticalOffset = source.VerticalOffset;
+		this.HorizontalOffset = source.HorizontalOffset;
+		this.UserFilter = source.UserFilter;
+
+		this.OtherFilters.Clear();
+		this.OtherFilters.AddRange(
+			source.OtherFilters
+		);
+		this.FieldOrder.Clear();
+		this.FieldOrder.AddRange(
+			source.FieldOrder
+		);
+		this.VisibleFields.Clear();
+		this.VisibleFields.UnionWith(
+			source.VisibleFields
+		);
+	}
+}
+
 /// <summary>Contains runtime presentation state shared between refreshes.</summary>
 internal sealed class TopRuntimeState {
+	internal const int WindowCount = 4;
+	private static readonly string[] WindowNames = [
+		"Def",
+		"Job",
+		"Mem",
+		"Usr"
+	];
+	private TopWindowState[] windows = CreateDefaultWindows();
+
 	internal TimeSpan Delay { get; set; } = TimeSpan.FromSeconds( 3 );
 	internal TopFieldId SortField { get; set; } = TopFieldId.Cpu;
 	internal bool SortHighToLow { get; set; } = true;
@@ -73,6 +229,8 @@ internal sealed class TopRuntimeState {
 	internal bool IrixMode { get; set; } = true;
 	internal bool SecureMode { get; set; }
 	internal bool SingleCpuSummary { get; set; } = true;
+	internal bool AlternateDisplayMode { get; set; }
+	internal int CurrentWindowIndex { get; private set; }
 	internal int VerticalOffset { get; set; }
 	internal int HorizontalOffset { get; set; }
 	internal string? Message { get; set; }
@@ -86,12 +244,100 @@ internal sealed class TopRuntimeState {
 	internal List<TopOtherFilter> OtherFilters { get; } = [];
 	internal List<TopFieldId> FieldOrder { get; } = TopFieldCatalog.CreateDefaultOrder();
 	internal HashSet<TopFieldId> VisibleFields { get; } = TopFieldCatalog.CreateDefaultVisible();
+	internal IReadOnlyList<TopWindowState> Windows => this.windows;
+	internal string CurrentWindowLabel => $"{this.CurrentWindowIndex + 1}:{GetWindowName( this.CurrentWindowIndex )}";
+
+	internal static string GetWindowName(
+		int index
+	) {
+		if ( index is < 0 or >= WindowCount ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( index )
+			);
+		}
+		return WindowNames[ index ];
+	}
+
+	internal void SynchronizeCurrentWindow() {
+		this.windows[
+			this.CurrentWindowIndex
+		].CaptureFrom(
+			this
+		);
+	}
+
+	internal void ActivateWindow(
+		int index
+	) {
+		if ( index is < 0 or >= WindowCount ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( index )
+			);
+		}
+
+		this.SynchronizeCurrentWindow();
+		this.CurrentWindowIndex = index;
+		this.windows[
+			index
+		].ApplyTo(
+			this
+		);
+		this.FieldMoveActive = false;
+	}
+
+	internal void RestoreWindows(
+		IReadOnlyList<TopWindowState> restoredWindows,
+		int currentWindowIndex
+	) {
+		ArgumentNullException.ThrowIfNull( restoredWindows );
+		if ( WindowCount != restoredWindows.Count ) {
+			throw new ArgumentException(
+				$"Exactly {WindowCount} top windows are required.",
+				nameof( restoredWindows )
+			);
+		}
+		if ( currentWindowIndex is < 0 or >= WindowCount ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( currentWindowIndex )
+			);
+		}
+
+		var replacement = new TopWindowState[
+			WindowCount
+		];
+		for ( int index = 0; index < WindowCount; index++ ) {
+			replacement[ index ] = restoredWindows[
+				index
+			].Clone();
+		}
+		this.windows = replacement;
+		this.CurrentWindowIndex = currentWindowIndex;
+		this.windows[
+			currentWindowIndex
+		].ApplyTo(
+			this
+		);
+		this.FieldMoveActive = false;
+	}
+
+	private static TopWindowState[] CreateDefaultWindows() {
+		var result = new TopWindowState[
+			WindowCount
+		];
+		for ( int index = 0; index < WindowCount; index++ ) {
+			result[ index ] = new TopWindowState(
+				WindowNames[ index ]
+			);
+		}
+		return result;
+	}
 }
 
 /// <summary>Identifies one interactive top prompt.</summary>
 internal enum TopPromptKind {
 	Delay,
 	MaximumTasks,
+	Window,
 	Locate,
 	OtherFilterCaseSensitive,
 	OtherFilterIgnoreCase,

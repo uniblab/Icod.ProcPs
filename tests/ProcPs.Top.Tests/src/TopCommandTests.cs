@@ -1441,6 +1441,56 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task AlternateDisplayCyclesWindowsWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'A' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'a' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'w' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+		var configurationStore = new SystemTopConfigurationStore(
+			_ => null,
+			systemRestrictionsPath: null,
+			privilegedUserProvider: () => false
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes,
+			configurationStore: configurationStore
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 4, terminal.Frames.Count );
+		Assert.Contains(
+			terminal.Frames[ 1 ].Lines,
+			line => line.Text.StartsWith(
+				">1:Def ",
+				StringComparison.Ordinal
+			)
+		);
+		Assert.Contains(
+			terminal.Frames[ 2 ].Lines,
+			line => line.Text.StartsWith(
+				">2:Job ",
+				StringComparison.Ordinal
+			)
+		);
+		Assert.Contains(
+			terminal.Frames[ 3 ].Lines,
+			line => line.Text.StartsWith(
+				">1:Def ",
+				StringComparison.Ordinal
+			)
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task NonInteractiveTerminalFailsBeforeSamplingAndIsDisposed() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock, isInteractive: false );

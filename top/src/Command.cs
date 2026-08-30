@@ -136,9 +136,9 @@ Options:
 
 Interactive keys:
  q quit; 0 zero suppress; n/# max tasks; P/M/N/T sort; R reverse/normal sort;
- B bold enable; b emphasis mode; J numeric justify; j character justify;
- f manage fields; x sort column; y running rows; c command line; H threads;
- i idle tasks;
+ A alternate display; a/w next/previous window; g choose window; B bold enable;
+ b emphasis mode; J numeric justify; j character justify; f manage fields;
+ x sort column; y running rows; c command line; H threads; i idle tasks;
  V forest; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
  O/o other filter; L locate; & locate next; k signal; r renice; W write config;
  = reset limits; arrows/PgUp/PgDn/Home/End scroll; h/? help.
@@ -598,14 +598,11 @@ Interactive keys:
 		}
 		int pageSize = Math.Max(
 			1,
-			dimensions.Rows - 7
+			TopRenderer.GetTaskPageSize(
+				state,
+				dimensions
+			)
 		);
-		if ( 0 < state.MaximumTasks ) {
-			pageSize = Math.Min(
-				pageSize,
-				state.MaximumTasks
-			);
-		}
 
 		if ( TopInputKey.Up == input.Key ) {
 			state.VerticalOffset = Math.Max( 0, state.VerticalOffset - 1 );
@@ -684,6 +681,32 @@ Interactive keys:
 				state.Message = state.SortHighToLow
 					? "sort direction: high to low"
 					: "sort direction: low to high";
+				return TopCommandAction.Rerender;
+			case 'A':
+				state.SynchronizeCurrentWindow();
+				state.AlternateDisplayMode = !state.AlternateDisplayMode;
+				state.Message = ( state.AlternateDisplayMode )
+					? "alternate display: all four windows visible"
+					: $"full-screen display: {state.CurrentWindowLabel}"
+				;
+				return TopCommandAction.Rerender;
+			case 'a':
+				ActivateRelativeWindow(
+					state,
+					1
+				);
+				return TopCommandAction.Rerender;
+			case 'w':
+				ActivateRelativeWindow(
+					state,
+					-1
+				);
+				return TopCommandAction.Rerender;
+			case 'g':
+				state.Prompt = new TopPromptState(
+					TopPromptKind.Window,
+					"Choose window (1-4): "
+				);
 				return TopCommandAction.Rerender;
 			case 'B':
 				state.BoldEnabled = !state.BoldEnabled;
@@ -965,6 +988,24 @@ Interactive keys:
 				state.ShowFieldManager = false;
 				state.FieldMoveActive = false;
 				return TopCommandAction.Rerender;
+			case 'a':
+				ActivateRelativeWindow(
+					state,
+					1
+				);
+				SelectCurrentSortField(
+					state
+				);
+				return TopCommandAction.Rerender;
+			case 'w':
+				ActivateRelativeWindow(
+					state,
+					-1
+				);
+				SelectCurrentSortField(
+					state
+				);
+				return TopCommandAction.Rerender;
 			case 'd':
 			case ' ': {
 				TopFieldId selected = state.FieldOrder[
@@ -986,6 +1027,43 @@ Interactive keys:
 			default:
 				return TopCommandAction.None;
 		}
+	}
+
+	private static void ActivateRelativeWindow(
+		TopRuntimeState state,
+		int delta
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		if ( delta is not -1 and not 1 ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( delta )
+			);
+		}
+
+		int windowIndex = (
+			state.CurrentWindowIndex
+			+ delta
+			+ TopRuntimeState.WindowCount
+		) % TopRuntimeState.WindowCount;
+		state.ActivateWindow(
+			windowIndex
+		);
+		state.Message = $"current window: {state.CurrentWindowLabel}";
+	}
+
+	private static void SelectCurrentSortField(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		int sortFieldIndex = state.FieldOrder.IndexOf(
+			state.SortField
+		);
+		state.FieldCursor = ( 0 <= sortFieldIndex )
+			? sortFieldIndex
+			: 0
+		;
+		state.FieldMoveActive = false;
 	}
 
 	private static void MoveFieldCursor(
@@ -1090,6 +1168,26 @@ Interactive keys:
 				state.Message = 0 == maximumTasks
 					? "maximum tasks: unlimited"
 					: $"maximum tasks set to {maximumTasks}";
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.Window:
+				state.Prompt = null;
+				if (
+					!int.TryParse(
+						text,
+						NumberStyles.None,
+						CultureInfo.InvariantCulture,
+						out int selectedWindow
+					)
+					|| selectedWindow is < 1 or > TopRuntimeState.WindowCount
+				) {
+					state.Message = $"window must be between 1 and {TopRuntimeState.WindowCount}";
+					return TopCommandAction.Rerender;
+				}
+				state.ActivateWindow(
+					selectedWindow - 1
+				);
+				state.Message = $"current window: {state.CurrentWindowLabel}";
 				return TopCommandAction.Rerender;
 
 			case TopPromptKind.Locate:

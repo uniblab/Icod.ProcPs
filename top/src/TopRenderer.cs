@@ -44,6 +44,9 @@ internal static class TopRenderer {
 		" n or #         set maximum displayed tasks",
 		" P/M/N/T        sort by CPU, memory, PID, or time",
 		" R              reverse/normal sort direction",
+		" A              toggle alternate-display mode",
+		" a / w          next / previous window",
+		" g              choose window 1 through 4",
 		" B/b/x/y        emphasis and highlighting",
 		" J / j          justify numeric / character columns",
 		" f              manage task fields",
@@ -85,6 +88,13 @@ internal static class TopRenderer {
 		}
 		if ( state.ShowHelp ) {
 			return RenderHelp( state, dimensions );
+		}
+		if ( state.AlternateDisplayMode ) {
+			return RenderAlternateInteractive(
+				sample,
+				state,
+				dimensions
+			);
 		}
 
 		List<TopTaskRow> tasks = SelectAndOrderTasks( sample, state );
@@ -175,6 +185,222 @@ internal static class TopRenderer {
 		);
 	}
 
+	private static TopRenderFrame RenderAlternateInteractive(
+		TopSample sample,
+		TopRuntimeState state,
+		TopTerminalDimensions dimensions
+	) {
+		ArgumentNullException.ThrowIfNull( sample );
+		ArgumentNullException.ThrowIfNull( state );
+
+		state.SynchronizeCurrentWindow();
+		int currentWindowIndex = state.CurrentWindowIndex;
+		int footerRows = (
+			state.Prompt is null
+			&& string.IsNullOrEmpty( state.Message )
+		)
+			? 0
+			: 1
+		;
+		var lines = new List<TopRenderLine>(
+			dimensions.Rows
+		);
+		foreach ( string line in BuildSummaryLines( sample, state ) ) {
+			lines.Add(
+				new TopRenderLine(
+					SliceForDisplay(
+						line,
+						state.HorizontalOffset,
+						dimensions.Columns
+					),
+					TopLineStyle.Summary
+				)
+			);
+		}
+
+		int windowAreaRows = dimensions.Rows - SummaryRows - footerRows;
+		if ( TopRuntimeState.WindowCount > windowAreaRows ) {
+			lines.Add(
+				new TopRenderLine(
+					LimitRunes(
+						$"alternate display requires at least {SummaryRows + TopRuntimeState.WindowCount} terminal rows",
+						dimensions.Columns
+					),
+					TopLineStyle.Message
+				)
+			);
+			while ( lines.Count < dimensions.Rows ) {
+				lines.Add(
+					new TopRenderLine( string.Empty )
+				);
+			}
+			return new TopRenderFrame(
+				lines,
+				dimensions.Columns,
+				dimensions.Rows,
+				state.BoldEnabled
+			);
+		}
+
+		int totalTaskRows = windowAreaRows - TopRuntimeState.WindowCount;
+		int baseTaskRows = totalTaskRows / TopRuntimeState.WindowCount;
+		int extraTaskRows = totalTaskRows % TopRuntimeState.WindowCount;
+
+		for ( int windowIndex = 0; windowIndex < TopRuntimeState.WindowCount; windowIndex++ ) {
+			state.ActivateWindow(
+				windowIndex
+			);
+			List<TopTaskRow> tasks = SelectAndOrderTasks(
+				sample,
+				state
+			);
+			int taskRows = baseTaskRows;
+			if ( windowIndex < extraTaskRows ) {
+				taskRows++;
+			}
+			if ( 0 < state.MaximumTasks ) {
+				taskRows = Math.Min(
+					taskRows,
+					state.MaximumTasks
+				);
+			}
+			int maxOffset = ( 0 < taskRows )
+				? Math.Max(
+					0,
+					tasks.Count - taskRows
+				)
+				: 0
+			;
+			state.VerticalOffset = Math.Clamp(
+				state.VerticalOffset,
+				0,
+				maxOffset
+			);
+			state.HorizontalOffset = Math.Max(
+				0,
+				state.HorizontalOffset
+			);
+
+			char marker = ( windowIndex == currentWindowIndex )
+				? '>'
+				: ' '
+			;
+			string windowPrefix = $"{marker}{state.CurrentWindowLabel} ";
+			int prefixLength = CountRunes(
+				windowPrefix
+			);
+			int contentWidth = Math.Max(
+				1,
+				dimensions.Columns - prefixLength
+			);
+			string windowHeader = windowPrefix + SliceForDisplay(
+				BuildHeader( state ),
+				state.HorizontalOffset,
+				contentWidth
+			);
+			lines.Add(
+				new TopRenderLine(
+					LimitRunes(
+						windowHeader,
+						dimensions.Columns
+					),
+					TopLineStyle.Header
+				)
+			);
+
+			int end = Math.Min(
+				tasks.Count,
+				state.VerticalOffset + taskRows
+			);
+			for ( int index = state.VerticalOffset; index < end; index++ ) {
+				TopTaskRow task = tasks[
+					index
+				];
+				TopFormattedTaskLine formatted = FormatTaskLine(
+					task,
+					state,
+					sample.ProcessorCount
+				);
+				string visibleContent = SliceForDisplay(
+					formatted.Text,
+					state.HorizontalOffset,
+					contentWidth
+				);
+				string visibleLine = new string(
+					' ',
+					prefixLength
+				) + visibleContent;
+				TopLineStyle lineStyle = TaskLineStyle(
+					task,
+					state
+				);
+				IReadOnlyList<TopRenderSpan>? spans = SortColumnSpans(
+					visibleContent,
+					formatted,
+					state,
+					lineStyle
+				);
+				if ( spans is not null ) {
+					spans = spans.Select(
+						span => span with {
+							Start = span.Start + prefixLength
+						}
+					).ToArray();
+				}
+				lines.Add(
+					new TopRenderLine(
+						visibleLine,
+						lineStyle,
+						spans
+					)
+				);
+			}
+			for ( int index = end - state.VerticalOffset; index < taskRows; index++ ) {
+				lines.Add(
+					new TopRenderLine( string.Empty )
+				);
+			}
+		}
+
+		state.ActivateWindow(
+			currentWindowIndex
+		);
+		while ( lines.Count < dimensions.Rows - footerRows ) {
+			lines.Add(
+				new TopRenderLine( string.Empty )
+			);
+		}
+		if ( 0 < footerRows ) {
+			if ( state.Prompt is not null ) {
+				lines.Add(
+					new TopRenderLine(
+						LimitRunes(
+							$"{state.Prompt.Label}{state.Prompt.Buffer}",
+							dimensions.Columns
+						),
+						TopLineStyle.Prompt
+					)
+				);
+			} else {
+				lines.Add(
+					new TopRenderLine(
+						LimitRunes(
+							state.Message ?? string.Empty,
+							dimensions.Columns
+						),
+						TopLineStyle.Message
+					)
+				);
+			}
+		}
+		return new TopRenderFrame(
+			lines,
+			dimensions.Columns,
+			dimensions.Rows,
+			state.BoldEnabled
+		);
+	}
+
 	internal static IReadOnlyList<string> RenderBatch(
 		TopSample sample,
 		TopRuntimeState state,
@@ -214,13 +440,9 @@ internal static class TopRenderer {
 			sample,
 			state
 		);
-		int footerRows = state.Prompt is null && string.IsNullOrEmpty( state.Message )
-			? 0
-			: 1;
-		int availableTaskRows = AvailableTaskRows(
+		int availableTaskRows = GetTaskPageSize(
 			state,
-			dimensions,
-			footerRows
+			dimensions
 		);
 		if ( 0 == tasks.Count || 0 == availableTaskRows ) {
 			return 0;
@@ -284,6 +506,52 @@ internal static class TopRenderer {
 			0,
 			dimensions.Rows - SummaryRows - TableHeaderRows - footerRows
 		);
+		if ( 0 < state.MaximumTasks ) {
+			result = Math.Min(
+				result,
+				state.MaximumTasks
+			);
+		}
+		return result;
+	}
+
+	internal static int GetTaskPageSize(
+		TopRuntimeState state,
+		TopTerminalDimensions dimensions
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
+
+		int footerRows = (
+			state.Prompt is null
+			&& string.IsNullOrEmpty( state.Message )
+		)
+			? 0
+			: 1
+		;
+		if ( !state.AlternateDisplayMode ) {
+			return AvailableTaskRows(
+				state,
+				dimensions,
+				footerRows
+			);
+		}
+
+		int windowAreaRows = Math.Max(
+			0,
+			dimensions.Rows - SummaryRows - footerRows
+		);
+		int totalTaskRows = Math.Max(
+			0,
+			windowAreaRows - TopRuntimeState.WindowCount
+		);
+		int result = totalTaskRows / TopRuntimeState.WindowCount;
+		int extraTaskRows = totalTaskRows % TopRuntimeState.WindowCount;
+		if ( state.CurrentWindowIndex < extraTaskRows ) {
+			result++;
+		}
 		if ( 0 < state.MaximumTasks ) {
 			result = Math.Min(
 				result,
@@ -416,7 +684,7 @@ internal static class TopRenderer {
 		var lines = new List<TopRenderLine>( dimensions.Rows ) {
 			new(
 				LimitRunes(
-					$"Fields Management for 1:Def - sort field: {sortDefinition.Name}",
+					$"Fields Management for {state.CurrentWindowLabel} - sort field: {sortDefinition.Name}",
 					dimensions.Columns
 				),
 				TopLineStyle.Header

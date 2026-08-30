@@ -152,9 +152,17 @@ profile:
 - `y` toggles highlighting of tasks whose observed state is running. The
   built-in monochrome profile starts with running-row highlighting enabled and
   uses bold emphasis until `b` changes it.
-- `c` toggles short command names and observed command lines.
-- `H` toggles process/thread presentation and resamples immediately.
-- `i` toggles idle-task suppression and `V` toggles forest ordering.
+- `A` toggles between full-screen mode and a four-window alternate display.
+  The first alternate display shows all four field groups: `1:Def`, `2:Job`,
+  `3:Mem`, and `4:Usr`.
+- `a` and `w` make the next or previous window current in circular order.
+  `g` prompts for an exact window number from 1 through 4. Commands and Fields
+  Management operate on the current window.
+- `c` toggles short command names and observed command lines for the current
+  window.
+- `H` toggles process/thread presentation globally and resamples immediately.
+- `i` toggles current-window idle-task suppression and `V` toggles its forest
+  ordering.
 - `I` toggles Irix CPU normalization, where 100% represents one processor, and
   total-capacity normalization.
 - `E` and `e` cycle summary and task memory scales.
@@ -181,7 +189,7 @@ profile:
   `Icod.Processes`.
 - `r` prompts for PID and nice value and performs reuse-protected priority
   changes through `Icod.Processes`.
-- `W` atomically writes the supported persistent single-window state to the
+- `W` atomically writes the supported persistent four-window state to the
   personal Icod top configuration file without resampling processes.
 - Arrow keys, Page Up, Page Down, Home, and End scroll the task display; Left and
   Right scroll horizontally.
@@ -207,15 +215,17 @@ absolute `APPDATA` directory. `$HOME/.icod-toprc.json` is accepted as a legacy
 Icod read fallback.
 
 The distinct `icod-toprc.json` name is deliberate. Native procps `top` uses a
-versioned multi-window format in `procps/toprc`; this single-window tranche does
-not overwrite or claim wire compatibility with that personal file. `W` always
-writes the preferred Icod path.
+versioned multi-window format in `procps/toprc`; this implementation now has the
+matching four-window runtime model but does not yet claim native wire-format
+compatibility. `W` always writes the preferred Icod JSON path.
 
-Persisted state includes delay, sort field/direction, emphasis and justification
-toggles, zero suppression, maximum tasks, memory scales, command/thread/idle/
-forest/Irix/CPU-summary states, field order/visibility, and active Other Filters.
-PID monitoring, user filtering, locate text, scrolling, prompts, field-manager
-cursor state, and secure mode remain transient.
+Persisted state includes delay, alternate-display/current-window selection,
+global bold enable, memory scales, thread/Irix/zero-suppression state, and each
+window's sort field/direction, emphasis and justification toggles, maximum tasks,
+command/idle/forest/CPU-summary state, field order/visibility, and active Other Filters.
+The alpha.13/14 single-window JSON remains readable and initializes `1:Def` when
+no window array is present. PID monitoring, user filtering, locate text,
+scrolling, prompts, field-manager cursor state, and secure mode remain transient.
 
 ## CPU ACCOUNTING
 
@@ -263,7 +273,8 @@ tranches rather than represented incompletely:
 
 - native procps personal `toprc` wire-format interoperability plus system-wide
   `topdefaultrc` defaults;
-- alternate-display multi-window/field-group mode;
+- advanced window visibility/naming controls beyond the four-window alternate
+  display foundation;
 - configurable color schemes and color-management screens;
 - per-logical-CPU activity rows until the Shared metrics contract exposes them;
 - cumulative dead-child CPU time (`-S`); and
