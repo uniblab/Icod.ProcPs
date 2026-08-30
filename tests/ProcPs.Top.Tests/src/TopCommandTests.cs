@@ -1365,6 +1365,82 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task ApplyDefaultsStillHonorsSystemRestrictions() {
+		string root = CreateConfigurationDirectory();
+		try {
+			string restrictionsPath = Path.Combine(
+				root,
+				"toprc"
+			);
+			await File.WriteAllTextAsync(
+				restrictionsPath,
+				"s\n5.0\n"
+			);
+			var configurationStore = new SystemTopConfigurationStore(
+				_ => null,
+				restrictionsPath,
+				() => false
+			);
+			FakeClock clock = new();
+			FakeTerminal terminal = new( clock );
+			terminal.Events.Enqueue( CharacterEvent( 'd' ) );
+			terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+			FakeProcessProvider processes = new( CreateProcesses() );
+
+			CommandResult result = await RunCoreAsync(
+				[ "-A" ],
+				terminal,
+				clock,
+				processes,
+				configurationStore: configurationStore
+			);
+
+			Assert.Equal( 0, result.ExitCode );
+			Assert.Equal( 1, processes.CaptureCount );
+			Assert.Equal( 2, terminal.Frames.Count );
+			Assert.Contains(
+				"secure mode: changing the delay is disabled",
+				terminal.Frames[ 1 ].Lines[ ^1 ].Text,
+				StringComparison.Ordinal
+			);
+			Assert.True( terminal.Disposed );
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
+	public async Task ForcedSecureModeRejectsCommandLineDelayRegardlessOfOrder() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		FakeProcessProvider processes = new( CreateProcesses() );
+		var configurationStore = new SystemTopConfigurationStore(
+			_ => null,
+			systemRestrictionsPath: null,
+			privilegedUserProvider: () => false
+		);
+
+		CommandResult result = await RunCoreAsync(
+			[ "-d", "1", "-s" ],
+			terminal,
+			clock,
+			processes,
+			configurationStore: configurationStore
+		);
+
+		Assert.Equal( 1, result.ExitCode );
+		Assert.Contains(
+			"-d/--delay is unavailable in secure mode",
+			result.Stderr,
+			StringComparison.Ordinal
+		);
+		Assert.Equal( 0, processes.CaptureCount );
+	}
+
+	[Fact]
 	public async Task NonInteractiveTerminalFailsBeforeSamplingAndIsDisposed() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock, isInteractive: false );
@@ -1413,7 +1489,8 @@ public sealed class TopCommandTests {
 		FakeProcessorProvider? processorProvider = null,
 		ITopProcessControl? processControl = null,
 		CancellationToken cancellationToken = default,
-		Func<string, string?>? environmentVariableProvider = null
+		Func<string, string?>? environmentVariableProvider = null,
+		SystemTopConfigurationStore? configurationStore = null
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		ArgumentNullException.ThrowIfNull( terminal );
@@ -1435,7 +1512,8 @@ public sealed class TopCommandTests {
 			() => 9999,
 			terminal,
 			processControl ?? new FakeProcessControl(),
-			cancellationToken
+			cancellationToken,
+			configurationStore
 		);
 		return new CommandResult(
 			exitCode,

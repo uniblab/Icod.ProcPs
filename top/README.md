@@ -28,8 +28,9 @@ Batch mode does not open a terminal and is suitable for redirection or pipelines
 ## OPTIONS
 
 `-A`, `--apply-defaults`
-: Use the built-in defaults and ignore personal Icod top configuration. As with
-  procps `top`, this option must be the only command-line option.
+: Use the built-in defaults and ignore personal Icod top configuration while
+  still honoring Linux `/etc/toprc` system restrictions. As with procps `top`,
+  this option must be the only command-line option.
 
 `-b`, `--batch`
 : Run without interactive terminal input. Output is written to standard output.
@@ -40,7 +41,8 @@ Batch mode does not open a terminal and is suitable for redirection or pipelines
 
 `-d SECONDS`, `--delay SECONDS`
 : Set the refresh interval. Fractional and zero-second delays are accepted;
-  negative, non-finite, and overflowing values are rejected.
+  negative, non-finite, and overflowing values are rejected. This option is
+  unavailable when secure mode is forced.
 
 `-E SCALE`, `--scale-summary-mem SCALE`
 : Select the summary memory scale. `k`, `m`, `g`, `t`, `p`, and `e` select KiB,
@@ -76,7 +78,9 @@ Batch mode does not open a terminal and is suitable for redirection or pipelines
   accepted. PID zero selects the current `top`/`procps` process.
 
 `-s`, `--secure-mode`
-: Disable the interactive delay-changing, signal, and renice commands.
+: Force secure mode, including for a privileged Linux user. Secure mode disables
+  command-line and interactive delay changes plus interactive signal and renice
+  commands.
 
 `-S`, `--accum-time-toggle`
 : Not currently available. The shared process snapshot does not expose the
@@ -188,16 +192,24 @@ In secure mode the `d`/`s`, `k`, and `r` commands are disabled.
 
 ## CONFIGURATION
 
-Personal configuration is loaded before command-line overrides. The preferred
-file is `procps/icod-toprc.json` beneath an absolute `XDG_CONFIG_HOME`; otherwise
-`$HOME/.config/procps/icod-toprc.json` is used. When neither path is usable,
-Windows-style environments may fall back to an absolute `APPDATA` directory.
-`$HOME/.icod-toprc.json` is accepted as a legacy Icod read fallback.
+On Linux, `/etc/toprc` is honored as the native procps system restrictions file.
+If the file contains a first line, ordinary users enter secure mode. A valid
+nonnegative numeric value at the start of line two supplies the enforced refresh
+delay; otherwise the built-in delay is retained. Linux UID 0 is exempt from this
+system restriction, while `-s` forces secure mode even for a privileged user.
+`-A` skips personal configuration but does not bypass `/etc/toprc`.
+
+Personal configuration is then loaded before command-line overrides. The
+preferred file is `procps/icod-toprc.json` beneath an absolute
+`XDG_CONFIG_HOME`; otherwise `$HOME/.config/procps/icod-toprc.json` is used.
+When neither path is usable, Windows-style environments may fall back to an
+absolute `APPDATA` directory. `$HOME/.icod-toprc.json` is accepted as a legacy
+Icod read fallback.
 
 The distinct `icod-toprc.json` name is deliberate. Native procps `top` uses a
 versioned multi-window format in `procps/toprc`; this single-window tranche does
-not overwrite or claim wire compatibility with that file. `W` always writes the
-preferred Icod path, while `-A` skips personal configuration loading.
+not overwrite or claim wire compatibility with that personal file. `W` always
+writes the preferred Icod path.
 
 Persisted state includes delay, sort field/direction, emphasis and justification
 toggles, zero suppression, maximum tasks, memory scales, command/thread/idle/
@@ -249,8 +261,8 @@ This tranche establishes the production monitor engine and terminal lifecycle.
 The following large procps `top` subsystems are intentionally left for later
 tranches rather than represented incompletely:
 
-- native procps `toprc` wire-format interoperability plus system-wide
-  `topdefaultrc` defaults and `/etc/toprc` secure-mode restrictions;
+- native procps personal `toprc` wire-format interoperability plus system-wide
+  `topdefaultrc` defaults;
 - alternate-display multi-window/field-group mode;
 - configurable color schemes and color-management screens;
 - per-logical-CPU activity rows until the Shared metrics contract exposes them;

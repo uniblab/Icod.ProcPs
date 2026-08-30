@@ -113,7 +113,7 @@ Usage:
  top [options]
 
 Options:
- -A, --apply-defaults          use built-in defaults (no personal top configuration)
+ -A, --apply-defaults          use built-in defaults plus system restrictions
  -b, --batch                   run in non-interactive batch mode
  -c, --cmdline-toggle          reverse the remembered command name/line state
  -d, --delay SECONDS           set the refresh delay; fractional seconds are accepted
@@ -125,7 +125,7 @@ Options:
  -O, --list-fields             list fields implemented by this top and exit
  -o, --sort-override FIELD     sort by PID, USER, PR, NI, VIRT, RES, SHR, S, %CPU, %MEM, TIME+, or COMMAND
  -p, --pid PIDLIST             monitor only the selected process IDs (maximum 20)
- -s, --secure-mode             disable interactive delay, signal, and renice commands
+ -s, --secure-mode             force secure mode, including for privileged users
  -S, --accum-time-toggle       not available: child CPU counters are not yet observed
  -U, --filter-any-user USER    filter by any observed real/effective user ID
  -u, --filter-only-euser USER  filter by effective user ID
@@ -205,7 +205,8 @@ Interactive keys:
 		Func<int>? currentProcessIdProvider,
 		ITopTerminalSessionFactory terminalFactory,
 		ITopProcessControl processControl,
-		CancellationToken cancellationToken
+		CancellationToken cancellationToken,
+		SystemTopConfigurationStore? configurationStore = null
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		ArgumentNullException.ThrowIfNull( terminalFactory );
@@ -216,7 +217,7 @@ Interactive keys:
 		IProcAccountDisplayResolver accounts = accountResolver ?? SystemProcAccountDisplayResolver.Instance;
 		Func<string, string?> environment = environmentVariableProvider ?? Environment.GetEnvironmentVariable;
 		int currentProcessId = currentProcessIdProvider?.Invoke() ?? Environment.ProcessId;
-		var configurationStore = new SystemTopConfigurationStore(
+		configurationStore ??= new SystemTopConfigurationStore(
 			environment
 		);
 		TopRuntimeState startupState = new();
@@ -224,6 +225,7 @@ Interactive keys:
 			try {
 				await configurationStore.LoadAsync(
 					startupState,
+					ShouldLoadPersonalConfiguration( args ),
 					cancellationToken
 				).ConfigureAwait( false );
 			} catch ( OperationCanceledException ) {
@@ -240,6 +242,9 @@ Interactive keys:
 				).ConfigureAwait( false );
 				return Failure;
 			}
+		}
+		if ( ForcesSecureMode( args ) ) {
+			startupState.SecureMode = true;
 		}
 		ParsedArguments parsed = Parse(
 			args,
@@ -1278,9 +1283,6 @@ Interactive keys:
 		ArgumentNullException.ThrowIfNull( args );
 
 		foreach ( string argument in args ) {
-			if ( argument is "-A" or "--apply-defaults" ) {
-				return false;
-			}
 			if (
 				argument is "-h" or "--help"
 					or "-V" or "--version"
@@ -1290,6 +1292,32 @@ Interactive keys:
 			}
 		}
 		return true;
+	}
+
+	private static bool ShouldLoadPersonalConfiguration(
+		IReadOnlyList<string> args
+	) {
+		ArgumentNullException.ThrowIfNull( args );
+
+		foreach ( string argument in args ) {
+			if ( argument is "-A" or "--apply-defaults" ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static bool ForcesSecureMode(
+		IReadOnlyList<string> args
+	) {
+		ArgumentNullException.ThrowIfNull( args );
+
+		foreach ( string argument in args ) {
+			if ( argument is "-s" or "--secure-mode" ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	private static ParsedArguments Parse(
@@ -1365,7 +1393,9 @@ Interactive keys:
 			}
 
 			if ( TryOptionValue( args, ref index, argument, "-d", "--delay", out string? delayText ) ) {
-				if ( !TryParseDelay( delayText!, out TimeSpan delay ) ) {
+				if ( result.State.SecureMode ) {
+					result.Fail( "-d/--delay is unavailable in secure mode" );
+				} else if ( !TryParseDelay( delayText!, out TimeSpan delay ) ) {
 					result.Fail( $"invalid delay '{delayText}'" );
 				} else {
 					result.State.Delay = delay;

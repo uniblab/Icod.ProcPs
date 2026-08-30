@@ -21,6 +21,8 @@
 
 namespace Icod.ProcPs.Top;
 
+using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -96,58 +98,99 @@ internal readonly record struct TopConfigurationPaths(
 	}
 }
 
-/// <summary>Uses the process environment and filesystem for personal top configuration.</summary>
+/// <summary>Contains the effective restrictions read from the Linux system file.</summary>
+internal readonly record struct TopSystemRestrictions(
+	TimeSpan? Delay
+);
+
+/// <summary>Provides the privilege test used by procps-compatible system restrictions.</summary>
+internal static partial class TopSystemIdentity {
+	internal static bool IsPrivilegedUser() {
+		if ( !OperatingSystem.IsLinux() ) {
+			return false;
+		}
+		return 0U == NativeMethods.GetUserId();
+	}
+
+	private static partial class NativeMethods {
+		[LibraryImport(
+			"libc",
+			EntryPoint = "getuid"
+		)]
+		internal static partial uint GetUserId();
+	}
+}
+
+/// <summary>Uses the process environment and filesystem for top configuration.</summary>
 internal sealed class SystemTopConfigurationStore {
+	private const string LinuxSystemRestrictionsPath = "/etc/toprc";
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
 	private readonly TopConfigurationPaths paths;
+	private readonly string? systemRestrictionsPath;
+	private readonly Func<bool> privilegedUserProvider;
 
 	internal SystemTopConfigurationStore(
 		Func<string, string?> environmentVariableProvider
+	) : this(
+		environmentVariableProvider,
+		( OperatingSystem.IsLinux() )
+			? LinuxSystemRestrictionsPath
+			: null,
+		TopSystemIdentity.IsPrivilegedUser
+	) {
+	}
+
+	internal SystemTopConfigurationStore(
+		Func<string, string?> environmentVariableProvider,
+		string? systemRestrictionsPath,
+		Func<bool> privilegedUserProvider
 	) {
 		ArgumentNullException.ThrowIfNull( environmentVariableProvider );
+		ArgumentNullException.ThrowIfNull( privilegedUserProvider );
+		if (
+			systemRestrictionsPath is not null
+			&& string.IsNullOrWhiteSpace( systemRestrictionsPath )
+		) {
+			throw new ArgumentException(
+				"The system restrictions path cannot be empty.",
+				nameof( systemRestrictionsPath )
+			);
+		}
+
 		this.paths = TopConfigurationPaths.Resolve(
 			environmentVariableProvider
 		);
+		this.systemRestrictionsPath = systemRestrictionsPath;
+		this.privilegedUserProvider = privilegedUserProvider;
 	}
 
 	internal async ValueTask LoadAsync(
 		TopRuntimeState state,
+		bool loadPersonalConfiguration,
 		CancellationToken cancellationToken
 	) {
 		ArgumentNullException.ThrowIfNull( state );
 		cancellationToken.ThrowIfCancellationRequested();
 
-		string? path = null;
-		if (
-			this.paths.PersonalPath is not null
-			&& File.Exists( this.paths.PersonalPath )
-		) {
-			path = this.paths.PersonalPath;
-		} else if (
-			this.paths.LegacyPath is not null
-			&& File.Exists( this.paths.LegacyPath )
-		) {
-			path = this.paths.LegacyPath;
-		}
-		if ( path is null ) {
-			return;
-		}
-
-		string text = await File.ReadAllTextAsync(
-			path,
-			Utf8,
+		TimeSpan builtInDelay = state.Delay;
+		TopSystemRestrictions? restrictions = await ReadSystemRestrictionsAsync(
 			cancellationToken
 		).ConfigureAwait( false );
-		try {
-			TopConfigurationCodec.Apply(
-				text,
-				state
-			);
-		} catch ( FormatException exception ) {
-			throw new FormatException(
-				$"configuration file '{path}' is invalid: {exception.Message}",
-				exception
-			);
+
+		if ( loadPersonalConfiguration ) {
+			await LoadPersonalConfigurationAsync(
+				state,
+				cancellationToken
+			).ConfigureAwait( false );
+		}
+
+		if (
+			restrictions.HasValue
+			&& !this.privilegedUserProvider()
+		) {
+			state.SecureMode = true;
+			state.Delay = restrictions.Value.Delay
+				?? builtInDelay;
 		}
 	}
 
@@ -190,6 +233,117 @@ internal sealed class SystemTopConfigurationStore {
 			TryDeleteTemporaryFile( temporaryPath );
 		}
 		return path;
+	}
+
+	private async ValueTask LoadPersonalConfigurationAsync(
+		TopRuntimeState state,
+		CancellationToken cancellationToken
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		cancellationToken.ThrowIfCancellationRequested();
+
+		string? path = null;
+		if (
+			this.paths.PersonalPath is not null
+			&& File.Exists( this.paths.PersonalPath )
+		) {
+			path = this.paths.PersonalPath;
+		} else if (
+			this.paths.LegacyPath is not null
+			&& File.Exists( this.paths.LegacyPath )
+		) {
+			path = this.paths.LegacyPath;
+		}
+		if ( path is null ) {
+			return;
+		}
+
+		string text = await File.ReadAllTextAsync(
+			path,
+			Utf8,
+			cancellationToken
+		).ConfigureAwait( false );
+		try {
+			TopConfigurationCodec.Apply(
+				text,
+				state
+			);
+		} catch ( FormatException exception ) {
+			throw new FormatException(
+				$"configuration file '{path}' is invalid: {exception.Message}",
+				exception
+			);
+		}
+	}
+
+	private async ValueTask<TopSystemRestrictions?> ReadSystemRestrictionsAsync(
+		CancellationToken cancellationToken
+	) {
+		cancellationToken.ThrowIfCancellationRequested();
+		if (
+			this.systemRestrictionsPath is null
+			|| !File.Exists( this.systemRestrictionsPath )
+		) {
+			return null;
+		}
+
+		string[] lines = await File.ReadAllLinesAsync(
+			this.systemRestrictionsPath,
+			Utf8,
+			cancellationToken
+		).ConfigureAwait( false );
+		if ( 0 == lines.Length ) {
+			return null;
+		}
+
+		TimeSpan? delay = null;
+		if (
+			1 < lines.Length
+			&& TryParseSystemRestrictionDelay(
+				lines[ 1 ],
+				out TimeSpan parsedDelay
+			)
+		) {
+			delay = parsedDelay;
+		}
+		return new TopSystemRestrictions(
+			delay
+		);
+	}
+
+	private static bool TryParseSystemRestrictionDelay(
+		string text,
+		out TimeSpan delay
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+
+		delay = default;
+		int commentIndex = text.IndexOf( '#' );
+		string value = ( 0 <= commentIndex )
+			? text[ ..commentIndex ]
+			: text
+		;
+		value = value.Trim();
+		if (
+			!double.TryParse(
+				value,
+				NumberStyles.Float,
+				CultureInfo.InvariantCulture,
+				out double seconds
+			)
+			|| !double.IsFinite( seconds )
+			|| 0.0 > seconds
+		) {
+			return false;
+		}
+		try {
+			delay = TimeSpan.FromSeconds(
+				seconds
+			);
+			return true;
+		} catch ( OverflowException ) {
+			return false;
+		}
 	}
 
 	private static void TryDeleteTemporaryFile(

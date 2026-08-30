@@ -138,4 +138,133 @@ public sealed class TopConfigurationTests {
 			paths.PersonalPath
 		);
 	}
+
+	[Fact]
+	public async Task SystemRestrictionsApplySecureDelayForOrdinaryUser() {
+		string root = CreateTemporaryDirectory();
+		try {
+			string restrictionsPath = Path.Combine(
+				root,
+				"toprc"
+			);
+			await File.WriteAllTextAsync(
+				restrictionsPath,
+				"s\n5.0 # enforced delay\n"
+			);
+			var store = new SystemTopConfigurationStore(
+				_ => null,
+				restrictionsPath,
+				() => false
+			);
+			TopRuntimeState state = new() {
+				Delay = TimeSpan.FromSeconds( 3 )
+			};
+
+			await store.LoadAsync(
+				state,
+				loadPersonalConfiguration: false,
+				CancellationToken.None
+			);
+
+			Assert.True( state.SecureMode );
+			Assert.Equal(
+				TimeSpan.FromSeconds( 5 ),
+				state.Delay
+			);
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
+	public async Task SystemRestrictionsDoNotConstrainPrivilegedUser() {
+		string root = CreateTemporaryDirectory();
+		try {
+			string restrictionsPath = Path.Combine(
+				root,
+				"toprc"
+			);
+			await File.WriteAllTextAsync(
+				restrictionsPath,
+				"s\n5.0\n"
+			);
+			var store = new SystemTopConfigurationStore(
+				_ => null,
+				restrictionsPath,
+				() => true
+			);
+			TopRuntimeState state = new() {
+				Delay = TimeSpan.FromSeconds( 2 )
+			};
+
+			await store.LoadAsync(
+				state,
+				loadPersonalConfiguration: false,
+				CancellationToken.None
+			);
+
+			Assert.False( state.SecureMode );
+			Assert.Equal(
+				TimeSpan.FromSeconds( 2 ),
+				state.Delay
+			);
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
+	public async Task InvalidSystemRestrictionDelayRetainsBuiltInDelay() {
+		string root = CreateTemporaryDirectory();
+		try {
+			string restrictionsPath = Path.Combine(
+				root,
+				"toprc"
+			);
+			await File.WriteAllTextAsync(
+				restrictionsPath,
+				"s\nnot-a-delay\n"
+			);
+			var store = new SystemTopConfigurationStore(
+				_ => null,
+				restrictionsPath,
+				() => false
+			);
+			TopRuntimeState state = new() {
+				Delay = TimeSpan.FromSeconds( 3 )
+			};
+
+			await store.LoadAsync(
+				state,
+				loadPersonalConfiguration: false,
+				CancellationToken.None
+			);
+
+			Assert.True( state.SecureMode );
+			Assert.Equal(
+				TimeSpan.FromSeconds( 3 ),
+				state.Delay
+			);
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	private static string CreateTemporaryDirectory() {
+		string path = Path.Combine(
+			Path.GetTempPath(),
+			$"icod-procps-top-config-{Guid.NewGuid():N}"
+		);
+		Directory.CreateDirectory( path );
+		return path;
+	}
 }
