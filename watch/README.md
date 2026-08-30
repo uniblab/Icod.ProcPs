@@ -44,7 +44,7 @@ child finishes; `--precise` uses monotonic fixed-rate scheduling.
 -n, --interval <secs>        seconds between updates
 -p, --precise                include child running time in the requested cadence
 -r, --no-rerun               redraw, rather than rerun, solely because of resize
--s, --shotsdir <dir>         accepted for procps compatibility; screenshots deferred
+-s, --shotsdir <dir>         directory used by the interactive screenshot command
 -t, --no-title               suppress the two-row header
 -w, --no-wrap                truncate long lines instead of wrapping
 -x, --exec                   execute directly instead of through a shell
@@ -53,6 +53,23 @@ child finishes; `--precise` uses monotonic fixed-rate scheduling.
 ```
 
 `--follow` conflicts with difference and comparison-driven exit modes.
+
+## KEY CONTROL
+
+Interactive key handling follows the procps-ng 4.0.6 profile:
+
+- Space requests the next command execution immediately. If input arrived while
+  the child was running, it is consumed after that child completes and the next
+  execution begins without the remaining interval delay.
+- `q` exits successfully after the current child has completed.
+- `s` writes a plain UTF-8 screenshot of the current visible frame. By default
+  screenshots are written to the current working directory; `--shotsdir`
+  selects another existing directory.
+
+Screenshot filenames use `watch_YYYYMMDD-HHMMSS`, with a `-NNN` collision
+suffix when needed, and existing files are never overwritten. Repeated `s`
+input during one wait interval produces only one screenshot, matching the
+idempotent procps-ng key loop.
 
 ## TERMINAL AND DISPLAY MODEL
 
@@ -69,7 +86,9 @@ ignore style-only changes and off-screen output.
 Resize events reset comparison baselines so geometry changes cannot trigger a
 false `--chgexit`. `--no-rerun` redraws the most recent captured output at the
 new geometry without launching another child merely because the terminal was
-resized.
+resized. Screenshots serialize this same visible model rather than scraping the
+physical terminal, so terminal styles are omitted while visible Unicode text,
+header rows, body rows, and geometry are preserved.
 
 ## EXIT STATUS
 

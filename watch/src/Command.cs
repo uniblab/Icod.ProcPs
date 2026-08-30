@@ -166,6 +166,7 @@ public static class Command {
 			long iteration = 0;
 			long unchangedCycles = 1;
 			WatchScreen? previousScreen = null;
+			WatchRenderFrame? currentFrame = null;
 			bool[]? permanentDifferences = null;
 			string? previousRawOutput = null;
 			int previousStatus = Success;
@@ -175,6 +176,7 @@ public static class Command {
 				refreshToken.ThrowIfCancellationRequested();
 
 				if ( 0 < iteration ) {
+					bool screenshotTaken = false;
 					while ( true ) {
 						TimeSpan delay = GetRemainingDelay(
 							parsed,
@@ -196,6 +198,43 @@ public static class Command {
 						}
 						if ( WatchTerminalEventKind.Interrupt == terminalEvent.Kind ) {
 							return Canceled;
+						}
+						if ( WatchTerminalEventKind.Input == terminalEvent.Kind ) {
+							if ( !terminalEvent.Input.HasValue ) {
+								continue;
+							}
+							WatchInputEvent input = terminalEvent.Input.Value;
+							if ( WatchInputKey.EndOfInput == input.Key ) {
+								return Success;
+							}
+							if (
+								WatchInputKey.Character != input.Key
+								|| !input.Character.HasValue
+								|| char.MaxValue < input.Character.Value.Value
+							) {
+								continue;
+							}
+							char command = (char)input.Character.Value.Value;
+							if ( 'q' == command ) {
+								return Success;
+							}
+							if ( ' ' == command ) {
+								break;
+							}
+							if (
+								's' == command
+								&& !screenshotTaken
+								&& currentFrame is not null
+							) {
+								_ = await WatchScreenshot.WriteAsync(
+									currentFrame,
+									parsed.ShotsDirectory,
+									currentTime(),
+									refreshToken
+								).ConfigureAwait( false );
+								screenshotTaken = true;
+							}
+							continue;
 						}
 						if ( WatchTerminalEventKind.Repaint == terminalEvent.Kind ) {
 							await terminal.RepaintAsync( refreshToken ).ConfigureAwait( false );
@@ -235,6 +274,7 @@ public static class Command {
 								refreshToken
 							).ConfigureAwait( false );
 							previousScreen = redrawScreen;
+							currentFrame = redrawFrame;
 							continue;
 						}
 
@@ -364,6 +404,7 @@ public static class Command {
 					await terminal.AlertAsync( refreshToken ).ConfigureAwait( false );
 				}
 				await terminal.RenderAsync( frame, refreshToken ).ConfigureAwait( false );
+				currentFrame = frame;
 
 				previousRawOutput = childOutput;
 				previousStatus = status;
@@ -904,7 +945,7 @@ public static class Command {
 		" -n, --interval <secs>       seconds between updates",
 		" -p, --precise               include command running time in the interval",
 		" -r, --no-rerun              do not rerun command because of a resize",
-		" -s, --shotsdir <dir>        reserve screenshot directory compatibility",
+		" -s, --shotsdir <dir>        directory to store screenshots",
 		" -t, --no-title              turn off the header",
 		" -w, --no-wrap               truncate long lines instead of wrapping",
 		" -x, --exec                  execute command directly instead of through a shell",

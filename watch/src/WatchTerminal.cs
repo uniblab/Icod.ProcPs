@@ -21,6 +21,7 @@
 
 namespace Icod.ProcPs.Watch;
 
+using System.Text;
 using Icod.DCurses;
 
 /// <summary>Represents terminal geometry required by the watch presentation model.</summary>
@@ -39,9 +40,24 @@ internal enum WatchTerminalEventKind {
 	Other
 }
 
+/// <summary>Identifies terminal-independent input consumed by watch.</summary>
+internal enum WatchInputKey {
+	None,
+	Character,
+	EndOfInput,
+	Other
+}
+
+/// <summary>Represents one terminal-independent input event consumed by watch.</summary>
+internal readonly record struct WatchInputEvent(
+	WatchInputKey Key,
+	Rune? Character
+);
+
 /// <summary>Represents one terminal event relevant to watch scheduling.</summary>
 internal readonly record struct WatchTerminalEvent(
-	WatchTerminalEventKind Kind
+	WatchTerminalEventKind Kind,
+	WatchInputEvent? Input = null
 );
 
 /// <summary>Creates the terminal presentation session used by watch.</summary>
@@ -152,7 +168,17 @@ internal sealed class DCursesWatchTerminalSession
 			return new WatchTerminalEvent( WatchTerminalEventKind.Timeout );
 		}
 		if ( CursesEventKind.Input == cursesEvent.Kind ) {
-			return new WatchTerminalEvent( WatchTerminalEventKind.Input );
+			if ( null == cursesEvent.Input ) {
+				return new WatchTerminalEvent(
+					WatchTerminalEventKind.Other
+				);
+			}
+			return new WatchTerminalEvent(
+				WatchTerminalEventKind.Input,
+				MapInput(
+					cursesEvent.Input
+				)
+			);
 		}
 
 		CursesLifecycleEvent lifecycle = cursesEvent.Lifecycle
@@ -252,5 +278,39 @@ internal sealed class DCursesWatchTerminalSession
 
 	public ValueTask DisposeAsync() {
 		return this.session.DisposeAsync();
+	}
+
+	private static WatchInputEvent MapInput(
+		CursesInputEvent input
+	) {
+		ArgumentNullException.ThrowIfNull(
+			input
+		);
+		if ( CursesInputEventKind.EndOfInput == input.Kind ) {
+			return new WatchInputEvent(
+				WatchInputKey.EndOfInput,
+				null
+			);
+		}
+		if ( CursesInputEventKind.Text == input.Kind ) {
+			return new WatchInputEvent(
+				WatchInputKey.Character,
+				input.Character
+			);
+		}
+		return input.Key switch {
+			CursesKey.Character => new WatchInputEvent(
+				WatchInputKey.Character,
+				input.Character
+			),
+			CursesKey.Space => new WatchInputEvent(
+				WatchInputKey.Character,
+				new Rune( ' ' )
+			),
+			_ => new WatchInputEvent(
+				WatchInputKey.Other,
+				null
+			)
+		};
 	}
 }

@@ -450,6 +450,158 @@ public sealed class WatchCommandTests {
 	}
 
 	[Fact]
+	public async Task QuitInputExitsBeforeNextExecution() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new WatchTerminalDimensions( 40, 5 )
+		);
+		terminal.Events.Enqueue(
+			Input(
+				'q'
+			)
+		);
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "first" )
+		);
+
+		CommandResult result = await RunAsync(
+			[ "--exec", "tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Single( executor.Options );
+		Assert.Single( terminal.Frames );
+		Assert.Single( terminal.Waits );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task SpaceInputRequestsImmediateExecution() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new WatchTerminalDimensions( 40, 5 )
+		);
+		terminal.Events.Enqueue(
+			Input(
+				' '
+			)
+		);
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "same" ),
+			Execution.Success( "same" )
+		);
+
+		CommandResult result = await RunAsync(
+			[ "--exec", "--equexit=1", "tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 2, executor.Options.Count );
+		Assert.Equal( 2, terminal.Frames.Count );
+		Assert.Single( terminal.Waits );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task ScreenshotInputWritesVisibleFrameOncePerWait() {
+		string directory = Path.Combine(
+			Path.GetTempPath(),
+			"Icod.ProcPs.Watch.Tests",
+			Guid.NewGuid().ToString(
+				"N"
+			)
+		);
+		Directory.CreateDirectory(
+			directory
+		);
+		try {
+			FakeClock clock = new();
+			FakeTerminal terminal = new(
+				clock,
+				new WatchTerminalDimensions( 40, 5 )
+			);
+			terminal.Events.Enqueue(
+				Input(
+					's'
+				)
+			);
+			terminal.Events.Enqueue(
+				Input(
+					's'
+				)
+			);
+			terminal.Events.Enqueue(
+				Input(
+					'q'
+				)
+			);
+			FakeExecutor executor = new(
+				clock,
+				Execution.Success( "capture" )
+			);
+
+			CommandResult result = await RunAsync(
+				[ "--exec", "--shotsdir", directory, "tool" ],
+				terminal,
+				executor,
+				clock
+			);
+
+			Assert.Equal( 0, result.ExitCode );
+			string[] files = Directory.GetFiles(
+				directory
+			);
+			Assert.Single( files );
+			Assert.Equal(
+				"watch_20260825-123456",
+				Path.GetFileName(
+					files[ 0 ]
+				)
+			);
+
+			string content = await File.ReadAllTextAsync(
+				files[ 0 ]
+			);
+			string[] lines = content.Split(
+				'\n'
+			);
+			Assert.Equal( 6, lines.Length );
+			Assert.StartsWith(
+				"Every 2s: tool",
+				lines[ 0 ],
+				StringComparison.Ordinal
+			);
+			Assert.StartsWith(
+				"capture",
+				lines[ 2 ],
+				StringComparison.Ordinal
+			);
+			for ( int index = 0; index < 5; index++ ) {
+				Assert.Equal(
+					40,
+					lines[ index ].Length
+				);
+			}
+			Assert.True( terminal.Disposed );
+		} finally {
+			Directory.Delete(
+				directory,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
 	public async Task VersionDoesNotOpenInteractiveTerminal() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock, new WatchTerminalDimensions( 40, 5 ) );
@@ -540,6 +692,18 @@ public sealed class WatchCommandTests {
 			}
 		}
 		return builder.ToString();
+	}
+
+	private static ScheduledTerminalEvent Input(
+		char value
+	) {
+		return new ScheduledTerminalEvent(
+			WatchTerminalEventKind.Input,
+			Input: new WatchInputEvent(
+				WatchInputKey.Character,
+				new Rune( value )
+			)
+		);
 	}
 
 	private static async Task<CommandResult> RunAsync(
@@ -708,7 +872,8 @@ public sealed class WatchCommandTests {
 
 	private sealed record ScheduledTerminalEvent(
 		WatchTerminalEventKind Kind,
-		WatchTerminalDimensions? Dimensions = null
+		WatchTerminalDimensions? Dimensions = null,
+		WatchInputEvent? Input = null
 	);
 
 	private sealed class FakeTerminal : IWatchTerminalSession {
@@ -783,7 +948,10 @@ public sealed class WatchCommandTests {
 					this.dimensions = scripted.Dimensions.Value;
 				}
 				return ValueTask.FromResult(
-					new WatchTerminalEvent( scripted.Kind )
+					new WatchTerminalEvent(
+						scripted.Kind,
+						scripted.Input
+					)
 				);
 			}
 

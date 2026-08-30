@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.2 normalizes watch, slabtop, and top against the stable Icod.DCurses 0.1.0 session and lifecycle contract, and includes procps-compatible slabtop interactive sorting, refresh, and quit commands.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.3 closes the procps-ng watch interactive-control contract with immediate refresh, quit, and visible-screen screenshot commands, including --shotsdir screenshot placement and deterministic text capture.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>
