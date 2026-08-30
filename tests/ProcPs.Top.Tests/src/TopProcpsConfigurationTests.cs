@@ -25,7 +25,7 @@ using System.Globalization;
 using System.Text;
 using Xunit;
 
-/// <summary>Exercises transformed procps-ng 4.x rcfile reading and discovery.</summary>
+/// <summary>Exercises procps-ng top configuration compatibility and discovery.</summary>
 public sealed class TopProcpsConfigurationTests {
 	[Fact]
 	public void CurrentProcpsConfigurationMapsSupportedState() {
@@ -74,11 +74,75 @@ public sealed class TopProcpsConfigurationTests {
 		Assert.True( filter.CaseSensitive );
 	}
 
+	[Theory]
+	[InlineData( 'f' )]
+	[InlineData( 'g' )]
+	[InlineData( 'h' )]
+	[InlineData( 'i' )]
+	[InlineData( 'j' )]
+	public void Procps33CharacterConfigurationMapsSupportedState(
+		char version
+	) {
+		string configuration = BuildLegacyConfiguration(
+			version,
+			currentWindow: 2
+		);
+		TopRuntimeState state = new();
+
+		TopProcpsConfigurationCodec.Apply(
+			configuration,
+			state
+		);
+
+		Assert.True( state.AlternateDisplayMode );
+		Assert.False( state.IrixMode );
+		Assert.Equal( 2, state.CurrentWindowIndex );
+		Assert.Equal( "3:Mem", state.CurrentWindowLabel );
+		Assert.Equal( TopFieldId.Memory, state.SortField );
+		Assert.True( state.SortHighToLow );
+		Assert.True( state.ShowCommandLine );
+		Assert.Contains( TopFieldId.Pid, state.VisibleFields );
+		Assert.Contains( TopFieldId.Memory, state.VisibleFields );
+		Assert.DoesNotContain( TopFieldId.Cpu, state.VisibleFields );
+		if ( 'f' == version ) {
+			Assert.False( state.NumericLeftJustified );
+		}
+	}
+
 	[Fact]
-	public void PreIntegerProcpsConfigurationIsRejectedExplicitly() {
-		const string configuration = """
+	public void Procps328ConfigurationConvertsOldFieldsFlagsAndSort() {
+		string configuration = BuildProcps328Configuration();
+		TopRuntimeState state = new();
+
+		TopProcpsConfigurationCodec.Apply(
+			configuration,
+			state
+		);
+
+		Assert.False( state.BoldEnabled );
+		Assert.True( state.TaskDisplayVisible );
+		Assert.Equal( TopFieldId.User, state.SortField );
+		Assert.True( state.SortHighToLow );
+		Assert.True( state.ShowCommandLine );
+		Assert.True( state.HighlightSortColumn );
+		Assert.False( state.NumericLeftJustified );
+		Assert.Contains( TopFieldId.Pid, state.VisibleFields );
+		Assert.Contains( TopFieldId.User, state.VisibleFields );
+		Assert.Equal( TopFieldId.Pid, state.FieldOrder[ 0 ] );
+		Assert.Equal( TopFieldId.User, state.FieldOrder[ 1 ] );
+	}
+
+	[Theory]
+	[InlineData( 'b' )]
+	[InlineData( 'c' )]
+	[InlineData( 'd' )]
+	[InlineData( 'e' )]
+	public void ReservedLegacyConfigurationVersionIsRejected(
+		char version
+	) {
+		string configuration = $"""
 top's Config File (Linux processes with windows)
-Id:j, Mode_altscr=0, Mode_irixps=1, Delay_time=3.0, Curwin=0
+Id:{version}, Mode_altscr=0, Mode_irixps=1, Delay_time=3.0, Curwin=0
 """;
 		TopRuntimeState state = new();
 
@@ -90,10 +154,53 @@ Id:j, Mode_altscr=0, Mode_irixps=1, Delay_time=3.0, Curwin=0
 		);
 
 		Assert.Contains(
-			"transformed 4.x format",
+			"not supported",
 			exception.Message,
 			StringComparison.Ordinal
 		);
+	}
+
+	[Fact]
+	public async Task StoreReadsLegacyHighBitFieldsAsLatin1() {
+		string root = CreateTemporaryDirectory();
+		try {
+			string path = Path.Combine(
+				root,
+				".toprc"
+			);
+			await File.WriteAllTextAsync(
+				path,
+				BuildLegacyConfiguration( 'j' ),
+				Encoding.Latin1
+			);
+
+			var environment = new Dictionary<string, string?> {
+				[ "HOME" ] = root
+			};
+			var store = new SystemTopConfigurationStore(
+				name => environment.GetValueOrDefault( name ),
+				systemRestrictionsPath: null,
+				privilegedUserProvider: () => false,
+				systemDefaultsPath: null,
+				nativeConfigurationEnabled: true
+			);
+			TopRuntimeState state = new();
+
+			await store.LoadAsync(
+				state,
+				loadPersonalConfiguration: true,
+				CancellationToken.None
+			);
+
+			Assert.Contains( TopFieldId.Pid, state.VisibleFields );
+			Assert.Contains( TopFieldId.User, state.VisibleFields );
+			Assert.DoesNotContain( TopFieldId.Cpu, state.VisibleFields );
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
 	}
 
 	[Fact]
@@ -236,6 +343,154 @@ Id:j, Mode_altscr=0, Mode_irixps=1, Delay_time=3.0, Curwin=0
 				recursive: true
 			);
 		}
+	}
+
+	private static string BuildLegacyConfiguration(
+		char version,
+		int currentWindow = 0
+	) {
+		int legacyFieldCount = version switch {
+			'f' or 'g' => 55,
+			'h' or 'i' => 70,
+			'j' => 86,
+			_ => throw new ArgumentOutOfRangeException(
+				nameof( version )
+			)
+		};
+		const int baseFlags = 0x000004
+			| 0x000010
+			| 0x000020
+			| 0x000080
+			| 0x000100
+			| 0x000200
+			| 0x000400
+			| 0x040000;
+		var builder = new StringBuilder();
+		builder.AppendLine(
+			"top's Config File (Linux processes with windows)"
+		);
+		builder.Append(
+			"Id:"
+		);
+		builder.Append(
+			version
+		);
+		builder.AppendLine(
+			$", Mode_altscr=1, Mode_irixps=0, Delay_time=1.500, Curwin={currentWindow}"
+		);
+
+		string[] names = [
+			"Def",
+			"Job",
+			"Mem",
+			"Usr"
+		];
+		int[] sorts = [
+			18,
+			0,
+			21,
+			3
+		];
+		for ( int index = 0; index < TopRuntimeState.WindowCount; index++ ) {
+			builder.Append(
+				names[ index ]
+			);
+			builder.Append(
+				"\tfieldscur="
+			);
+			for ( int nativeField = 0; nativeField < legacyFieldCount; nativeField++ ) {
+				int encoded = nativeField + 37;
+				if ( 18 != nativeField ) {
+					encoded |= 0x80;
+				}
+				builder.Append(
+					(char)encoded
+				);
+			}
+			builder.AppendLine();
+
+			int flags = baseFlags;
+			if ( 2 == index ) {
+				flags |= 0x000008;
+			}
+			builder.Append(
+				"\twinflags="
+			);
+			builder.Append(
+				flags.ToString(
+					CultureInfo.InvariantCulture
+				)
+			);
+			builder.Append(
+				", sortindx="
+			);
+			builder.Append(
+				sorts[ index ].ToString(
+					CultureInfo.InvariantCulture
+				)
+			);
+			builder.AppendLine(
+				", maxtasks=0, graph_cpus=0, graph_mems=0, double_up=0, combine_cpus=0"
+			);
+			builder.AppendLine(
+				"\tsummclr=1, msgsclr=1, headclr=1, taskclr=1"
+			);
+		}
+
+		builder.AppendLine(
+			"Fixed_widest=0, Summ_mscale=2, Task_mscale=1, Zero_suppress=1, Tics_scaled=0"
+		);
+		return builder.ToString();
+	}
+
+	private static string BuildProcps328Configuration() {
+		const int oldFlags = 0x000001
+			| 0x000008
+			| 0x000010
+			| 0x000080
+			| 0x000200
+			| 0x010000;
+		const string oldFields = "AbcdEfghijklmnopqrstuvwxyz";
+		var builder = new StringBuilder();
+		builder.AppendLine(
+			"top's Config File (Linux processes with windows)"
+		);
+		builder.AppendLine(
+			"Id:a, Mode_altscr=1, Mode_irixps=0, Delay_time=3.000, Curwin=0"
+		);
+
+		string[] names = [
+			"Def",
+			"Job",
+			"Mem",
+			"Usr"
+		];
+		foreach ( string name in names ) {
+			builder.Append(
+				name
+			);
+			builder.Append(
+				"\tfieldscur="
+			);
+			builder.AppendLine(
+				oldFields
+			);
+			builder.Append(
+				"\twinflags="
+			);
+			builder.Append(
+				oldFlags.ToString(
+					CultureInfo.InvariantCulture
+				)
+			);
+			builder.AppendLine(
+				", sortindx=4, maxtasks=0"
+			);
+			builder.AppendLine(
+				"\tsummclr=1, msgsclr=1, headclr=1, taskclr=1"
+			);
+		}
+		return builder.ToString();
 	}
 
 	private static string BuildNativeConfiguration(

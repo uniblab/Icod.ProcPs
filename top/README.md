@@ -232,12 +232,15 @@ procps configuration in the same order used by procps itself: legacy
 `$HOME/.config/procps/toprc`. If no personal native file exists,
 `/etc/topdefaultrc` supplies system-wide defaults.
 
-Native reading supports the transformed integer procps 4.x rc formats `k`
-through current format `n`. Supported window names, field order/visibility,
-sort state, task limits, presentation flags, memory scales, alternate/Irix
-modes, delay, and Other Filters are translated into the Icod four-window model.
-Older character-encoded procps rc formats are rejected explicitly rather than
-being guessed at.
+Native reading now supports procps 3.2.8 format `a`, procps-ng 3.3.x formats
+`f` through `j`, and the transformed integer 4.x formats `k` through current
+format `n`. Reserved historical formats `b` through `e` remain rejected.
+Character-encoded files are decoded byte-for-byte as Latin-1 so their high-bit
+field-visibility markers survive. The compatibility transform mirrors procps:
+3.2.8 field, window-flag, and sort-index remapping plus the historical 3.3.x
+field-table expansions. Supported window names, field order/visibility, sort
+state, task limits, presentation flags, memory scales, alternate/Irix modes,
+delay, and Other Filters are translated into the Icod four-window model.
 
 `W` continues to write only `icod-toprc.json`. This is intentional: native
 procps files can contain fields, color state, graph state, and Inspection
@@ -299,7 +302,7 @@ This tranche establishes the production monitor engine and terminal lifecycle.
 The following large procps `top` subsystems are intentionally left for later
 tranches rather than represented incompletely:
 
-- native procps rcfile writing and pre-4.x character-field conversion;
+- native procps rcfile writing;
 - configurable color schemes and color-management screens;
 - per-logical-CPU activity rows until the Shared metrics contract exposes them;
 - cumulative dead-child CPU time (`-S`); and

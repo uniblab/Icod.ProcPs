@@ -149,6 +149,7 @@ internal sealed class SystemTopConfigurationStore {
 	private const string LinuxSystemRestrictionsPath = "/etc/toprc";
 	private const string LinuxSystemDefaultsPath = "/etc/topdefaultrc";
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
+	private static readonly Encoding NativeConfigurationEncoding = Encoding.Latin1;
 	private readonly TopConfigurationPaths paths;
 	private readonly string? systemRestrictionsPath;
 	private readonly Func<bool> privilegedUserProvider;
@@ -369,7 +370,7 @@ internal sealed class SystemTopConfigurationStore {
 
 		string text = await File.ReadAllTextAsync(
 			path,
-			Utf8,
+			NativeConfigurationEncoding,
 			cancellationToken
 		).ConfigureAwait( false );
 		try {

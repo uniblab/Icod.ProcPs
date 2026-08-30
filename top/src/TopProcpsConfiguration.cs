@@ -25,10 +25,20 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
-/// <summary>Reads the transformed integer rcfile format used by procps-ng 4.x top.</summary>
+/// <summary>Reads native procps-ng top configuration formats from 3.2.8 through current 4.x.</summary>
 internal static partial class TopProcpsConfigurationCodec {
+	private const char NativeTransformedVersion = 'k';
 	private const int NativeFieldOffset = 37;
 	private const int NativeFieldVisibleMask = 1;
+	private const int LegacyFieldVisibleMask = 0x80;
+	private const int LegacyFieldValueMask = 0x7f;
+	private const int LegacyFieldCount = 86;
+	private const int LegacyOldFieldLimit = 28;
+	private const string LegacyAddedThroughH = @"\]^_`abcdefghij";
+	private const string LegacyAddedThroughJ = "klmnopqrstuvwxyz";
+	private const string LegacyConversionFields = "%&*'(-0346789:;<=>?@ACDEFGML)+,./125BHIJKNOPQRSTUVWXYZ["
+		+ LegacyAddedThroughH
+		+ LegacyAddedThroughJ;
 
 	private const int QsrtNormal = 0x000004;
 	private const int ViewNoBold = 0x000008;
@@ -116,11 +126,9 @@ internal static partial class TopProcpsConfigurationCodec {
 		char version = header.Groups[
 			"id"
 		].Value[ 0 ];
-		if ( version is < 'k' or > 'n' ) {
-			throw new FormatException(
-				$"procps rc version '{version}' is not a supported transformed 4.x format"
-			);
-		}
+		ValidateVersion(
+			version
+		);
 
 		bool alternateDisplayMode = ParseBooleanInteger(
 			header.Groups[ "alt" ].Value,
@@ -160,7 +168,8 @@ internal static partial class TopProcpsConfigurationCodec {
 				ParseWindow(
 					lines,
 					ref lineIndex,
-					windowIndex
+					windowIndex,
+					version
 				)
 			);
 		}
@@ -231,10 +240,24 @@ internal static partial class TopProcpsConfigurationCodec {
 		return result;
 	}
 
+	private static void ValidateVersion(
+		char version
+	) {
+		if (
+			version is < 'a' or > 'n'
+			|| version is 'b' or 'c' or 'd' or 'e'
+		) {
+			throw new FormatException(
+				$"procps rc version '{version}' is not supported"
+			);
+		}
+	}
+
 	private static ParsedWindow ParseWindow(
 		IReadOnlyList<string> lines,
 		ref int lineIndex,
-		int windowIndex
+		int windowIndex,
+		char version
 	) {
 		ArgumentNullException.ThrowIfNull( lines );
 		if ( windowIndex is < 0 or >= TopRuntimeState.WindowCount ) {
@@ -326,6 +349,19 @@ internal static partial class TopProcpsConfigurationCodec {
 			settings,
 			"maxtasks"
 		);
+		IReadOnlyList<int>? legacyFields = null;
+		if ( NativeTransformedVersion > version ) {
+			LegacyWindowConfiguration legacy = ConvertLegacyWindowConfiguration(
+				version,
+				fieldsText.ToString(),
+				winFlags,
+				sortIndex,
+				windowIndex
+			);
+			legacyFields = legacy.Fields;
+			winFlags = legacy.WinFlags;
+			sortIndex = legacy.SortIndex;
+		}
 		if ( 0 > maximumTasks ) {
 			throw new FormatException(
 				$"procps window {windowIndex + 1} has a negative maximum task count"
@@ -381,15 +417,377 @@ internal static partial class TopProcpsConfigurationCodec {
 			)
 		};
 
-		ApplyFieldConfiguration(
-			fieldsText.ToString(),
-			state,
-			windowIndex
-		);
+		if ( legacyFields is null ) {
+			ApplyFieldConfiguration(
+				fieldsText.ToString(),
+				state,
+				windowIndex
+			);
+		} else {
+			ApplyEncodedFieldConfiguration(
+				legacyFields,
+				state,
+				windowIndex
+			);
+		}
 		return new ParsedWindow(
 			state,
 			winFlags
 		);
+	}
+
+	private static LegacyWindowConfiguration ConvertLegacyWindowConfiguration(
+		char version,
+		string text,
+		int winFlags,
+		int sortIndex,
+		int windowIndex
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+
+		byte[] fields = ReadLegacyFields(
+			text,
+			windowIndex
+		);
+		if ( 'a' == version ) {
+			return ConvertProcps328WindowConfiguration(
+				fields,
+				winFlags,
+				sortIndex,
+				windowIndex
+			);
+		}
+
+		if ( 'f' == version ) {
+			winFlags |= ShowJustifyNumericRightFlag;
+		}
+		if ( version is 'f' or 'g' ) {
+			fields = AppendLegacyFields(
+				fields,
+				LegacyAddedThroughH
+			);
+		}
+		if ( version is 'f' or 'g' or 'h' or 'i' ) {
+			fields = AppendLegacyFields(
+				fields,
+				LegacyAddedThroughJ
+			);
+		}
+		if ( LegacyFieldCount > fields.Length ) {
+			throw new FormatException(
+				$"procps window {windowIndex + 1} has an incomplete legacy fieldscur list"
+			);
+		}
+		if ( LegacyFieldCount < fields.Length ) {
+			fields = fields[
+				..LegacyFieldCount
+			];
+		}
+		if ( sortIndex is < 0 or >= LegacyFieldCount ) {
+			throw new FormatException(
+				$"procps window {windowIndex + 1} has invalid legacy sort index {sortIndex}"
+			);
+		}
+
+		return new LegacyWindowConfiguration(
+			EncodeLegacyFields(
+				fields,
+				windowIndex
+			),
+			winFlags,
+			sortIndex
+		);
+	}
+
+	private static LegacyWindowConfiguration ConvertProcps328WindowConfiguration(
+		byte[] fields,
+		int winFlags,
+		int sortIndex,
+		int windowIndex
+	) {
+		ArgumentNullException.ThrowIfNull( fields );
+
+		if ( LegacyOldFieldLimit <= fields.Length ) {
+			throw new FormatException(
+				$"procps window {windowIndex + 1} has too many release 3.2.8 fields"
+			);
+		}
+		if ( sortIndex is < 0 or >= 26 ) {
+			throw new FormatException(
+				$"procps window {windowIndex + 1} has invalid release 3.2.8 sort index {sortIndex}"
+			);
+		}
+
+		byte[] sourceFields = Encoding.ASCII.GetBytes(
+			LegacyConversionFields
+		);
+		byte[] conversion = [
+			.. sourceFields
+		];
+		byte[] normalized = [
+			.. fields
+		];
+		int suseOomScorePosition = -1;
+		int suseOomAdjustmentPosition = -1;
+		for ( int index = 0; index < normalized.Length; index++ ) {
+			if ( '[' == normalized[ index ] ) {
+				normalized[ index ] = (byte)'{';
+				suseOomScorePosition = index;
+			} else if ( '\\' == normalized[ index ] ) {
+				normalized[ index ] = (byte)'|';
+				suseOomAdjustmentPosition = index;
+			}
+
+			byte value = normalized[ index ];
+			byte lower = AsciiLower(
+				value
+			);
+			int legacyIndex = lower - 'a';
+			if ( legacyIndex is < 0 or >= LegacyOldFieldLimit ) {
+				throw new FormatException(
+					$"procps window {windowIndex + 1} has invalid release 3.2.8 field byte 0x{value:X2}"
+				);
+			}
+
+			byte mapped = sourceFields[
+				legacyIndex
+			];
+			if ( IsAsciiUpper( value ) ) {
+				mapped |= LegacyFieldVisibleMask;
+			}
+			conversion[
+				index
+			] = mapped;
+		}
+		if ( 0 <= suseOomScorePosition ) {
+			conversion[
+				suseOomScorePosition
+			] |= LegacyFieldVisibleMask;
+		}
+		if ( 0 <= suseOomAdjustmentPosition ) {
+			conversion[
+				suseOomAdjustmentPosition
+			] |= LegacyFieldVisibleMask;
+		}
+
+		byte sortName = (byte)(
+			'a'
+			+ sortIndex
+		);
+		int sortPosition = -1;
+		for ( int index = 0; index < normalized.Length; index++ ) {
+			if ( sortName == AsciiLower( normalized[ index ] ) ) {
+				sortPosition = index;
+				break;
+			}
+		}
+		int convertedSortIndex = 0;
+		if ( 0 <= sortPosition ) {
+			convertedSortIndex = (
+				conversion[
+					sortPosition
+				]
+				& LegacyFieldValueMask
+			) - NativeFieldOffset;
+		}
+
+		int convertedFlags = ConvertProcps328WindowFlags(
+			winFlags
+		);
+		convertedFlags |= ShowJustifyNumericRightFlag;
+		return new LegacyWindowConfiguration(
+			EncodeLegacyFields(
+				conversion,
+				windowIndex
+			),
+			convertedFlags,
+			convertedSortIndex
+		);
+	}
+
+	private static int ConvertProcps328WindowFlags(
+		int flags
+	) {
+		const int oldViewNoBold = 0x000001;
+		const int oldShowTaskOn = 0x000008;
+		const int oldQsrtNormal = 0x000010;
+		const int oldShowHighlightColumns = 0x000200;
+		const int oldShowThreads = 0x010000;
+
+		int remaining = flags;
+		int converted = 0;
+		MoveLegacyFlag(
+			ref remaining,
+			ref converted,
+			oldViewNoBold,
+			ViewNoBold
+		);
+		MoveLegacyFlag(
+			ref remaining,
+			ref converted,
+			oldShowTaskOn,
+			ShowTaskOn
+		);
+		MoveLegacyFlag(
+			ref remaining,
+			ref converted,
+			oldQsrtNormal,
+			QsrtNormal
+		);
+		MoveLegacyFlag(
+			ref remaining,
+			ref converted,
+			oldShowHighlightColumns,
+			ShowHighlightColumnsFlag
+		);
+		remaining &= ~oldShowThreads;
+		return converted | remaining;
+	}
+
+	private static void MoveLegacyFlag(
+		ref int source,
+		ref int destination,
+		int oldFlag,
+		int newFlag
+	) {
+		if ( 0 == ( source & oldFlag ) ) {
+			return;
+		}
+
+		source &= ~oldFlag;
+		destination |= newFlag;
+	}
+
+	private static byte[] ReadLegacyFields(
+		string text,
+		int windowIndex
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+
+		string value = text.Trim();
+		if ( 0 == value.Length ) {
+			throw new FormatException(
+				$"procps window {windowIndex + 1} has an empty legacy fieldscur list"
+			);
+		}
+		if ( LegacyFieldCount < value.Length ) {
+			throw new FormatException(
+				$"procps window {windowIndex + 1} has too many legacy fields"
+			);
+		}
+
+		var result = new byte[
+			value.Length
+		];
+		for ( int index = 0; index < value.Length; index++ ) {
+			char character = value[
+				index
+			];
+			if (
+				byte.MaxValue < character
+				|| char.IsWhiteSpace( character )
+			) {
+				throw new FormatException(
+					$"procps window {windowIndex + 1} has an invalid legacy fieldscur character"
+				);
+			}
+			result[
+				index
+			] = (byte)character;
+		}
+		return result;
+	}
+
+	private static byte[] AppendLegacyFields(
+		IReadOnlyCollection<byte> fields,
+		string suffix
+	) {
+		ArgumentNullException.ThrowIfNull( fields );
+		ArgumentNullException.ThrowIfNull( suffix );
+
+		byte[] suffixBytes = Encoding.ASCII.GetBytes(
+			suffix
+		);
+		var result = new byte[
+			fields.Count
+			+ suffixBytes.Length
+		];
+		int index = 0;
+		foreach ( byte field in fields ) {
+			result[
+				index++
+			] = field;
+		}
+		Array.Copy(
+			suffixBytes,
+			0,
+			result,
+			index,
+			suffixBytes.Length
+		);
+		return result;
+	}
+
+	private static IReadOnlyList<int> EncodeLegacyFields(
+		IReadOnlyList<byte> fields,
+		int windowIndex
+	) {
+		ArgumentNullException.ThrowIfNull( fields );
+
+		var result = new int[
+			fields.Count
+		];
+		var seen = new HashSet<int>();
+		for ( int index = 0; index < fields.Count; index++ ) {
+			byte field = fields[
+				index
+			];
+			int nativeField = (
+				field
+				& LegacyFieldValueMask
+			) - NativeFieldOffset;
+			if (
+				nativeField is < 0 or >= LegacyFieldCount
+				|| !seen.Add( nativeField )
+			) {
+				throw new FormatException(
+					$"procps window {windowIndex + 1} has an invalid or duplicate legacy fieldscur value 0x{field:X2}"
+				);
+			}
+
+			int visibility = ( 0 != (
+				field
+				& LegacyFieldVisibleMask
+			) )
+				? NativeFieldVisibleMask
+				: 0
+			;
+			result[
+				index
+			] = (
+				( nativeField + NativeFieldOffset )
+				<< 1
+			) | visibility;
+		}
+		return result;
+	}
+
+	private static bool IsAsciiUpper(
+		byte value
+	) {
+		return value is >= (byte)'A' and <= (byte)'Z';
+	}
+
+	private static byte AsciiLower(
+		byte value
+	) {
+		return ( IsAsciiUpper( value ) )
+			? (byte)(
+				value
+				+ ( 'a' - 'A' )
+			)
+			: value
+		;
 	}
 
 	private static void ApplyFieldConfiguration(
@@ -411,15 +809,43 @@ internal static partial class TopProcpsConfigurationCodec {
 			);
 		}
 
+		var encodedFields = new List<int>(
+			parts.Length
+		);
+		foreach ( string part in parts ) {
+			encodedFields.Add(
+				ParseInteger(
+					part,
+					"fieldscur"
+				)
+			);
+		}
+		ApplyEncodedFieldConfiguration(
+			encodedFields,
+			state,
+			windowIndex
+		);
+	}
+
+	private static void ApplyEncodedFieldConfiguration(
+		IReadOnlyList<int> encodedFields,
+		TopWindowState state,
+		int windowIndex
+	) {
+		ArgumentNullException.ThrowIfNull( encodedFields );
+		ArgumentNullException.ThrowIfNull( state );
+
+		if ( 0 == encodedFields.Count ) {
+			throw new FormatException(
+				$"procps window {windowIndex + 1} has an empty fieldscur list"
+			);
+		}
+
 		var nativeSeen = new HashSet<int>();
 		var supportedSeen = new HashSet<TopFieldId>();
 		var order = new List<TopFieldId>();
 		var visible = new HashSet<TopFieldId>();
-		foreach ( string part in parts ) {
-			int encoded = ParseInteger(
-				part,
-				"fieldscur"
-			);
+		foreach ( int encoded in encodedFields ) {
 			if ( 0 >= encoded ) {
 				throw new FormatException(
 					$"procps window {windowIndex + 1} has invalid fieldscur value {encoded}"
@@ -935,5 +1361,11 @@ internal static partial class TopProcpsConfigurationCodec {
 	private sealed record ParsedWindow(
 		TopWindowState State,
 		int WinFlags
+	);
+
+	private sealed record LegacyWindowConfiguration(
+		IReadOnlyList<int> Fields,
+		int WinFlags,
+		int SortIndex
 	);
 }
