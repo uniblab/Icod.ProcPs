@@ -27,13 +27,17 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-/// <summary>Resolved personal configuration paths for the current environment.</summary>
+/// <summary>Resolved Icod and native procps configuration paths for the current environment.</summary>
 internal readonly record struct TopConfigurationPaths(
 	string? PersonalPath,
-	string? LegacyPath
+	string? LegacyPath,
+	string? NativePersonalPath,
+	string? NativeLegacyPath
 ) {
 	private const string ConfigurationFileName = "icod-toprc.json";
 	private const string LegacyConfigurationFileName = ".icod-toprc.json";
+	private const string NativeConfigurationFileName = "toprc";
+	private const string NativeLegacyConfigurationFileName = ".toprc";
 
 	internal static TopConfigurationPaths Resolve(
 		Func<string, string?> environmentVariableProvider
@@ -51,11 +55,17 @@ internal readonly record struct TopConfigurationPaths(
 		);
 
 		string? personalPath = null;
+		string? nativePersonalPath = null;
 		if ( xdg is not null ) {
 			personalPath = Path.Combine(
 				xdg,
 				"procps",
 				ConfigurationFileName
+			);
+			nativePersonalPath = Path.Combine(
+				xdg,
+				"procps",
+				NativeConfigurationFileName
 			);
 		} else if ( home is not null ) {
 			personalPath = Path.Combine(
@@ -63,6 +73,12 @@ internal readonly record struct TopConfigurationPaths(
 				".config",
 				"procps",
 				ConfigurationFileName
+			);
+			nativePersonalPath = Path.Combine(
+				home,
+				".config",
+				"procps",
+				NativeConfigurationFileName
 			);
 		} else if ( appData is not null ) {
 			personalPath = Path.Combine(
@@ -73,15 +89,22 @@ internal readonly record struct TopConfigurationPaths(
 		}
 
 		string? legacyPath = null;
+		string? nativeLegacyPath = null;
 		if ( home is not null ) {
 			legacyPath = Path.Combine(
 				home,
 				LegacyConfigurationFileName
 			);
+			nativeLegacyPath = Path.Combine(
+				home,
+				NativeLegacyConfigurationFileName
+			);
 		}
 		return new TopConfigurationPaths(
 			personalPath,
-			legacyPath
+			legacyPath,
+			nativePersonalPath,
+			nativeLegacyPath
 		);
 	}
 
@@ -124,10 +147,13 @@ internal static class TopSystemIdentity {
 /// <summary>Uses the process environment and filesystem for top configuration.</summary>
 internal sealed class SystemTopConfigurationStore {
 	private const string LinuxSystemRestrictionsPath = "/etc/toprc";
+	private const string LinuxSystemDefaultsPath = "/etc/topdefaultrc";
 	private static readonly Encoding Utf8 = new UTF8Encoding( false );
 	private readonly TopConfigurationPaths paths;
 	private readonly string? systemRestrictionsPath;
 	private readonly Func<bool> privilegedUserProvider;
+	private readonly string? systemDefaultsPath;
+	private readonly bool nativeConfigurationEnabled;
 
 	internal SystemTopConfigurationStore(
 		Func<string, string?> environmentVariableProvider
@@ -136,7 +162,11 @@ internal sealed class SystemTopConfigurationStore {
 		( OperatingSystem.IsLinux() )
 			? LinuxSystemRestrictionsPath
 			: null,
-		TopSystemIdentity.IsPrivilegedUser
+		TopSystemIdentity.IsPrivilegedUser,
+		( OperatingSystem.IsLinux() )
+			? LinuxSystemDefaultsPath
+			: null,
+		OperatingSystem.IsLinux()
 	) {
 	}
 
@@ -144,24 +174,40 @@ internal sealed class SystemTopConfigurationStore {
 		Func<string, string?> environmentVariableProvider,
 		string? systemRestrictionsPath,
 		Func<bool> privilegedUserProvider
+	) : this(
+		environmentVariableProvider,
+		systemRestrictionsPath,
+		privilegedUserProvider,
+		systemDefaultsPath: null,
+		nativeConfigurationEnabled: false
+	) {
+	}
+
+	internal SystemTopConfigurationStore(
+		Func<string, string?> environmentVariableProvider,
+		string? systemRestrictionsPath,
+		Func<bool> privilegedUserProvider,
+		string? systemDefaultsPath,
+		bool nativeConfigurationEnabled
 	) {
 		ArgumentNullException.ThrowIfNull( environmentVariableProvider );
 		ArgumentNullException.ThrowIfNull( privilegedUserProvider );
-		if (
-			systemRestrictionsPath is not null
-			&& string.IsNullOrWhiteSpace( systemRestrictionsPath )
-		) {
-			throw new ArgumentException(
-				"The system restrictions path cannot be empty.",
-				nameof( systemRestrictionsPath )
-			);
-		}
+		ValidateOptionalPath(
+			systemRestrictionsPath,
+			nameof( systemRestrictionsPath )
+		);
+		ValidateOptionalPath(
+			systemDefaultsPath,
+			nameof( systemDefaultsPath )
+		);
 
 		this.paths = TopConfigurationPaths.Resolve(
 			environmentVariableProvider
 		);
 		this.systemRestrictionsPath = systemRestrictionsPath;
 		this.privilegedUserProvider = privilegedUserProvider;
+		this.systemDefaultsPath = systemDefaultsPath;
+		this.nativeConfigurationEnabled = nativeConfigurationEnabled;
 	}
 
 	internal async ValueTask LoadAsync(
@@ -178,10 +224,29 @@ internal sealed class SystemTopConfigurationStore {
 		).ConfigureAwait( false );
 
 		if ( loadPersonalConfiguration ) {
-			await LoadPersonalConfigurationAsync(
+			bool loaded = await LoadIcodPersonalConfigurationAsync(
 				state,
 				cancellationToken
 			).ConfigureAwait( false );
+			if (
+				!loaded
+				&& this.nativeConfigurationEnabled
+			) {
+				loaded = await LoadNativePersonalConfigurationAsync(
+					state,
+					cancellationToken
+				).ConfigureAwait( false );
+			}
+			if (
+				!loaded
+				&& this.nativeConfigurationEnabled
+			) {
+				await LoadNativeConfigurationAsync(
+					this.systemDefaultsPath,
+					state,
+					cancellationToken
+				).ConfigureAwait( false );
+			}
 		}
 
 		if (
@@ -235,27 +300,19 @@ internal sealed class SystemTopConfigurationStore {
 		return path;
 	}
 
-	private async ValueTask LoadPersonalConfigurationAsync(
+	private async ValueTask<bool> LoadIcodPersonalConfigurationAsync(
 		TopRuntimeState state,
 		CancellationToken cancellationToken
 	) {
 		ArgumentNullException.ThrowIfNull( state );
 		cancellationToken.ThrowIfCancellationRequested();
 
-		string? path = null;
-		if (
-			this.paths.PersonalPath is not null
-			&& File.Exists( this.paths.PersonalPath )
-		) {
-			path = this.paths.PersonalPath;
-		} else if (
-			this.paths.LegacyPath is not null
-			&& File.Exists( this.paths.LegacyPath )
-		) {
-			path = this.paths.LegacyPath;
-		}
+		string? path = FirstExistingPath(
+			this.paths.PersonalPath,
+			this.paths.LegacyPath
+		);
 		if ( path is null ) {
-			return;
+			return false;
 		}
 
 		string text = await File.ReadAllTextAsync(
@@ -269,9 +326,110 @@ internal sealed class SystemTopConfigurationStore {
 				state
 			);
 		} catch ( FormatException exception ) {
-			throw new FormatException(
-				$"configuration file '{path}' is invalid: {exception.Message}",
+			throw ConfigurationFormatException(
+				path,
 				exception
+			);
+		}
+		return true;
+	}
+
+	private async ValueTask<bool> LoadNativePersonalConfigurationAsync(
+		TopRuntimeState state,
+		CancellationToken cancellationToken
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		cancellationToken.ThrowIfCancellationRequested();
+
+		string? path = FirstExistingPath(
+			this.paths.NativeLegacyPath,
+			this.paths.NativePersonalPath
+		);
+		return await LoadNativeConfigurationAsync(
+			path,
+			state,
+			cancellationToken
+		).ConfigureAwait( false );
+	}
+
+	private static async ValueTask<bool> LoadNativeConfigurationAsync(
+		string? path,
+		TopRuntimeState state,
+		CancellationToken cancellationToken
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		cancellationToken.ThrowIfCancellationRequested();
+
+		if (
+			path is null
+			|| !File.Exists( path )
+		) {
+			return false;
+		}
+
+		string text = await File.ReadAllTextAsync(
+			path,
+			Utf8,
+			cancellationToken
+		).ConfigureAwait( false );
+		try {
+			TopProcpsConfigurationCodec.Apply(
+				text,
+				state
+			);
+		} catch ( FormatException exception ) {
+			throw ConfigurationFormatException(
+				path,
+				exception
+			);
+		}
+		return true;
+	}
+
+	private static string? FirstExistingPath(
+		string? first,
+		string? second
+	) {
+		if (
+			first is not null
+			&& File.Exists( first )
+		) {
+			return first;
+		}
+		if (
+			second is not null
+			&& File.Exists( second )
+		) {
+			return second;
+		}
+		return null;
+	}
+
+	private static FormatException ConfigurationFormatException(
+		string path,
+		FormatException exception
+	) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( path );
+		ArgumentNullException.ThrowIfNull( exception );
+
+		return new FormatException(
+			$"configuration file '{path}' is invalid: {exception.Message}",
+			exception
+		);
+	}
+
+	private static void ValidateOptionalPath(
+		string? path,
+		string parameterName
+	) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( parameterName );
+		if (
+			path is not null
+			&& string.IsNullOrWhiteSpace( path )
+		) {
+			throw new ArgumentException(
+				"The configuration path cannot be empty.",
+				parameterName
 			);
 		}
 	}

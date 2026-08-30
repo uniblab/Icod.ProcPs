@@ -216,21 +216,35 @@ If the file contains a first line, ordinary users enter secure mode. A valid
 nonnegative numeric value at the start of line two supplies the enforced refresh
 delay; otherwise the built-in delay is retained. Linux UID 0 is exempt from this
 system restriction, while `-s` forces secure mode even for a privileged user.
-`-A` skips personal configuration but does not bypass `/etc/toprc`.
+`-A` skips personal and system-default configuration but does not bypass
+`/etc/toprc`.
 
-Personal configuration is then loaded before command-line overrides. The
-preferred file is `procps/icod-toprc.json` beneath an absolute
-`XDG_CONFIG_HOME`; otherwise `$HOME/.config/procps/icod-toprc.json` is used.
-When neither path is usable, Windows-style environments may fall back to an
-absolute `APPDATA` directory. `$HOME/.icod-toprc.json` is accepted as a legacy
-Icod read fallback.
+Personal configuration is loaded before command-line overrides. Icod first
+looks for its lossless JSON configuration at
+`$XDG_CONFIG_HOME/procps/icod-toprc.json`, or
+`$HOME/.config/procps/icod-toprc.json` when no absolute XDG configuration
+directory is available. Windows-style environments may use an absolute
+`APPDATA` fallback. `$HOME/.icod-toprc.json` remains an Icod legacy fallback.
 
-The distinct `icod-toprc.json` name is deliberate. Native procps `top` uses a
-versioned multi-window format in `procps/toprc`; this implementation now has the
-matching four-window runtime model but does not yet claim native wire-format
-compatibility. `W` always writes the preferred Icod JSON path.
+On Linux, when no Icod JSON configuration exists, `top` next reads the native
+procps configuration in the same order used by procps itself: legacy
+`$HOME/.toprc` first, then `$XDG_CONFIG_HOME/procps/toprc` or
+`$HOME/.config/procps/toprc`. If no personal native file exists,
+`/etc/topdefaultrc` supplies system-wide defaults.
 
-Persisted state includes delay, alternate-display/current-window selection,
+Native reading supports the transformed integer procps 4.x rc formats `k`
+through current format `n`. Supported window names, field order/visibility,
+sort state, task limits, presentation flags, memory scales, alternate/Irix
+modes, delay, and Other Filters are translated into the Icod four-window model.
+Older character-encoded procps rc formats are rejected explicitly rather than
+being guessed at.
+
+`W` continues to write only `icod-toprc.json`. This is intentional: native
+procps files can contain fields, color state, graph state, and Inspection
+entries that Icod does not yet model losslessly, so overwriting a native `toprc`
+would risk destroying configuration owned by procps.
+
+The Icod JSON persists delay, alternate-display/current-window selection,
 global bold enable, memory scales, thread/Irix/zero-suppression state, and each
 window's name, task-display visibility, sort field/direction, emphasis and
 justification toggles, maximum tasks, command/idle/forest/CPU-summary state,
@@ -285,8 +299,7 @@ This tranche establishes the production monitor engine and terminal lifecycle.
 The following large procps `top` subsystems are intentionally left for later
 tranches rather than represented incompletely:
 
-- native procps personal `toprc` wire-format interoperability plus system-wide
-  `topdefaultrc` defaults;
+- native procps rcfile writing and pre-4.x character-field conversion;
 - configurable color schemes and color-management screens;
 - per-logical-CPU activity rows until the Shared metrics contract exposes them;
 - cumulative dead-child CPU time (`-S`); and

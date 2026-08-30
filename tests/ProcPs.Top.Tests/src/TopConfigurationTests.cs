@@ -23,7 +23,7 @@ namespace Icod.ProcPs.Top.Tests;
 
 using Xunit;
 
-/// <summary>Exercises the single-window Icod top configuration contract.</summary>
+/// <summary>Exercises the Icod and procps-compatible top configuration contracts.</summary>
 public sealed class TopConfigurationTests {
 	[Fact]
 	public void RoundTripsSupportedPersistentStateOnly() {
@@ -109,7 +109,7 @@ public sealed class TopConfigurationTests {
 	}
 
 	[Fact]
-	public void ResolvesSafePersonalPathsWithoutUsingNativeToprc() {
+	public void ResolvesIcodAndNativePersonalPaths() {
 		string root = Path.GetFullPath(
 			Path.Combine(
 				Path.GetTempPath(),
@@ -133,9 +133,13 @@ public sealed class TopConfigurationTests {
 			Path.Combine( root, ".icod-toprc.json" ),
 			paths.LegacyPath
 		);
-		Assert.NotEqual(
+		Assert.Equal(
 			Path.Combine( root, "procps", "toprc" ),
-			paths.PersonalPath
+			paths.NativePersonalPath
+		);
+		Assert.Equal(
+			Path.Combine( root, ".toprc" ),
+			paths.NativeLegacyPath
 		);
 	}
 

@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.15 completes the four-window top alternate-display tranche with A/a/w/g navigation, G naming, -/_ visibility toggles, =/+ window reset semantics, procps-style pane sizing, per-window persistence, and the alpha.14 interop correction.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.16 adds read interoperability with current procps 4.x top configuration files, native ~/.toprc and XDG fallback discovery, /etc/topdefaultrc defaults, field/window/filter translation, and preserves lossless Icod JSON writes.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>
