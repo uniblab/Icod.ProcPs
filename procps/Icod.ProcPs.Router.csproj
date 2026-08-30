@@ -32,7 +32,6 @@
 		<AssemblyName>procps</AssemblyName>
 		<RootNamespace>Icod.ProcPs.Router</RootNamespace>
 		<Version>$(IcodProcPsSuiteVersion)</Version>
-		<AssemblyVersion>$(IcodProcPsSuiteVersion).0</AssemblyVersion>
 	</PropertyGroup>
 	<PropertyGroup>
 		<PackageVersion>$(IcodProcPsSuiteVersion)</PackageVersion>
