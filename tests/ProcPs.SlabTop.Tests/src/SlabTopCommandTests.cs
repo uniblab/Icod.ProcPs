@@ -457,15 +457,176 @@ public sealed class SlabTopCommandTests {
 		Assert.True( terminal.Disposed );
 	}
 
-	[Fact]
-	public async Task InputEventsDoNotForceResampleOrExit() {
+	[Theory]
+	[InlineData( 'q' )]
+	[InlineData( 'Q' )]
+	public async Task QuitCommandReturnsSuccessAndDisposes( char command ) {
 		FakeClock clock = new();
 		FakeTerminal terminal = new(
 			clock,
 			new SlabTopTerminalDimensions( 90, 14 )
 		);
-		terminal.Events.Enqueue( new ScheduledTerminalEvent( SlabTopTerminalEventKind.Input ) );
-		terminal.Events.Enqueue( new ScheduledTerminalEvent( SlabTopTerminalEventKind.Interrupt ) );
+		terminal.Events.Enqueue(
+			Input(
+				command
+			)
+		);
+		FakeSlabProvider provider = new( AvailableSlabs() );
+
+		CommandResult result = await RunInteractiveAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			provider
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, provider.CaptureCount );
+		Assert.Single( terminal.Frames );
+		Assert.Single( terminal.Waits );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task SortCommandChangesSortAndRequestsFreshSample() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new SlabTopTerminalDimensions( 90, 14 )
+		);
+		terminal.Events.Enqueue(
+			Input(
+				'N'
+			)
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent(
+				SlabTopTerminalEventKind.Interrupt
+			)
+		);
+		FakeSlabProvider provider = new(
+			AvailableSlabs(),
+			AvailableSlabs()
+		);
+
+		CommandResult result = await RunInteractiveAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			provider
+		);
+
+		Assert.Equal( 130, result.ExitCode );
+		Assert.Equal( 2, provider.CaptureCount );
+		Assert.Equal( 2, terminal.Frames.Count );
+
+		string firstFrame = string.Join(
+			Environment.NewLine,
+			terminal.Frames[ 0 ].Lines
+		);
+		string secondFrame = string.Join(
+			Environment.NewLine,
+			terminal.Frames[ 1 ].Lines
+		);
+		Assert.True(
+			firstFrame.IndexOf( "z_large_cache", StringComparison.Ordinal )
+				< firstFrame.IndexOf( "a_small_cache", StringComparison.Ordinal )
+		);
+		Assert.True(
+			secondFrame.IndexOf( "a_small_cache", StringComparison.Ordinal )
+				< secondFrame.IndexOf( "z_large_cache", StringComparison.Ordinal )
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task SpaceRequestsImmediateFreshSample() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new SlabTopTerminalDimensions( 90, 14 )
+		);
+		terminal.Events.Enqueue(
+			Input(
+				' '
+			)
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent(
+				SlabTopTerminalEventKind.Interrupt
+			)
+		);
+		FakeSlabProvider provider = new(
+			AvailableSlabs(),
+			AvailableSlabs()
+		);
+
+		CommandResult result = await RunInteractiveAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			provider
+		);
+
+		Assert.Equal( 130, result.ExitCode );
+		Assert.Equal( 2, provider.CaptureCount );
+		Assert.Equal( 2, terminal.Frames.Count );
+		Assert.Equal( 2, terminal.Waits.Count );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task EndOfInputReturnsSuccessAndDisposes() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new SlabTopTerminalDimensions( 90, 14 )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent(
+				SlabTopTerminalEventKind.Input,
+				Input: new SlabTopInputEvent(
+					SlabTopInputKey.EndOfInput,
+					null
+				)
+			)
+		);
+		FakeSlabProvider provider = new( AvailableSlabs() );
+
+		CommandResult result = await RunInteractiveAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			provider
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, provider.CaptureCount );
+		Assert.Single( terminal.Frames );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task UnsupportedInputDoesNotForceResampleOrExit() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new SlabTopTerminalDimensions( 90, 14 )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent(
+				SlabTopTerminalEventKind.Input,
+				Input: new SlabTopInputEvent(
+					SlabTopInputKey.Other,
+					null
+				)
+			)
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent(
+				SlabTopTerminalEventKind.Interrupt
+			)
+		);
 		FakeSlabProvider provider = new( AvailableSlabs() );
 
 		CommandResult result = await RunInteractiveAsync(
@@ -496,6 +657,18 @@ public sealed class SlabTopCommandTests {
 			entries,
 			ProcObservationSource.LinuxProcfs,
 			ProcObservationFidelity.Exact
+		);
+	}
+
+	private static ScheduledTerminalEvent Input(
+		char value
+	) {
+		return new ScheduledTerminalEvent(
+			SlabTopTerminalEventKind.Input,
+			Input: new SlabTopInputEvent(
+				SlabTopInputKey.Character,
+				new Rune( value )
+			)
 		);
 	}
 
@@ -639,7 +812,8 @@ public sealed class SlabTopCommandTests {
 
 	private sealed record ScheduledTerminalEvent(
 		SlabTopTerminalEventKind Kind,
-		SlabTopTerminalDimensions? Dimensions = null
+		SlabTopTerminalDimensions? Dimensions = null,
+		SlabTopInputEvent? Input = null
 	);
 
 	private sealed class FakeTerminal : ISlabTopTerminalSession {
@@ -692,7 +866,10 @@ public sealed class SlabTopCommandTests {
 					this.clock.Advance( timeout );
 				}
 				return ValueTask.FromResult(
-					new SlabTopTerminalEvent( scripted.Kind )
+					new SlabTopTerminalEvent(
+						scripted.Kind,
+						scripted.Input
+					)
 				);
 			}
 

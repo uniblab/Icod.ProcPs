@@ -94,10 +94,18 @@ extra `/proc/slabinfo` read. Resume events synchronize dimensions and invalidate
 the physical screen before repainting. An interrupt or termination event returns
 status 130.
 
-Interactive key bindings are not implemented in this tranche. Ordinary input
-events are ignored and do not force a resample or change the selected sort key;
-use the command-line `--sort` option and a terminal interrupt such as `Ctrl+C`
-to terminate the interactive display.
+Interactive commands follow the procps-ng `slabtop` profile:
+
+- `a`, `b`, `c`, `l`, `v`, `n`, `o`, `p`, `s`, and `u` change the active sort
+  criterion; uppercase and lowercase letters are accepted.
+- Space requests an immediate fresh sample and redraw.
+- `q` or `Q` exits successfully.
+
+A sort-key command also requests an immediate fresh sample so the newly selected
+order is applied to current data. Unsupported input is ignored without changing
+the refresh deadline. Terminal end-of-input exits successfully. `Ctrl+C` and
+terminal interrupt/termination lifecycle events remain cancellation and return
+status 130.
 
 ## DATA SOURCE AND AVAILABILITY
 
