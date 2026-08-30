@@ -14,9 +14,10 @@ watch [options] command
 
 This managed implementation follows the procps-ng 4.0.6 `watch` command model.
 It repeatedly executes a command, captures standard output and standard error,
-and displays the visible result through `Icod.DCurses` over `Icod.Terminal`.
-The terminal session owns alternate-screen, cursor, keypad, resize,
-suspend/resume, interrupt, and restoration behavior; `watch` owns only command
+and displays the visible result through `Icod.DCurses 0.1.0` over
+`Icod.Terminal`. The stable DCurses defaults and lifecycle contract own
+alternate-screen, cursor, keypad, resize, suspend/resume, physical-screen
+invalidation, interrupt, and restoration behavior; `watch` owns only command
 policy and the visible screen model.
 
 By default, the command is reconstructed and executed through the host shell.

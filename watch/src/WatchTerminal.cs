@@ -97,14 +97,7 @@ internal sealed class SystemWatchTerminalSessionFactory
 	) {
 		cancellationToken.ThrowIfCancellationRequested();
 		CursesSession session = await CursesSession.OpenAsync(
-			new CursesSessionOptions {
-				InputMode = CursesInputMode.CBreak,
-				EchoInput = false,
-				UseAlternateScreen = true,
-				EnableKeypad = true,
-				HideCursor = true
-			},
-			cancellationToken
+			cancellationToken: cancellationToken
 		).ConfigureAwait( false );
 		return new DCursesWatchTerminalSession( session );
 	}
@@ -167,12 +160,10 @@ internal sealed class DCursesWatchTerminalSession
 				"A curses lifecycle event did not include its lifecycle payload."
 			);
 		return lifecycle.Kind switch {
-			CursesLifecycleEventKind.Resize => SynchronizeAndReturn(
-				this.session,
+			CursesLifecycleEventKind.Resize => new WatchTerminalEvent(
 				WatchTerminalEventKind.Resize
 			),
-			CursesLifecycleEventKind.Resumed => SynchronizeAndReturn(
-				this.session,
+			CursesLifecycleEventKind.Resumed => new WatchTerminalEvent(
 				WatchTerminalEventKind.Repaint
 			),
 			CursesLifecycleEventKind.Interrupt => new WatchTerminalEvent(
@@ -261,14 +252,5 @@ internal sealed class DCursesWatchTerminalSession
 
 	public ValueTask DisposeAsync() {
 		return this.session.DisposeAsync();
-	}
-
-	private static WatchTerminalEvent SynchronizeAndReturn(
-		CursesSession session,
-		WatchTerminalEventKind kind
-	) {
-		ArgumentNullException.ThrowIfNull( session );
-		_ = session.SynchronizeDimensions();
-		return new WatchTerminalEvent( kind );
 	}
 }

@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>Move GNU regular-expression dependencies from Icod.ProcPs.Shared to pgrep, pkill, and pidwait.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.2 normalizes watch, slabtop, and top against the stable Icod.DCurses 0.1.0 session and lifecycle contract, and includes procps-compatible slabtop interactive sorting, refresh, and quit commands.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

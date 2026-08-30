@@ -17,10 +17,11 @@ implementation targets the procps-ng 4.0.6 command model while using the Icod
 runtime libraries for process observation, timing, host facts, process control,
 and terminal presentation.
 
-Interactive mode opens an `Icod.DCurses` session and owns only application
-policy. Terminal modes, alternate-screen ownership, cursor state, decoded input,
-resize/resume events, and terminal restoration remain owned by `Icod.DCurses`
-and `Icod.Terminal`.
+Interactive mode opens an `Icod.DCurses 0.1.0` session and owns only
+application policy. The stable DCurses defaults provide cbreak/no-echo input,
+alternate-screen ownership, keypad mode, and a hidden cursor. Decoded input,
+resize/resume synchronization, physical-screen invalidation, and terminal
+restoration remain owned by `Icod.DCurses` and `Icod.Terminal`.
 
 Batch mode does not open a terminal and is suitable for redirection or pipelines.
 

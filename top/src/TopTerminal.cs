@@ -149,14 +149,7 @@ internal sealed class SystemTopTerminalSessionFactory : ITopTerminalSessionFacto
 	) {
 		cancellationToken.ThrowIfCancellationRequested();
 		CursesSession session = await CursesSession.OpenAsync(
-			new CursesSessionOptions {
-				InputMode = CursesInputMode.CBreak,
-				EchoInput = false,
-				UseAlternateScreen = true,
-				EnableKeypad = true,
-				HideCursor = true
-			},
-			cancellationToken
+			cancellationToken: cancellationToken
 		).ConfigureAwait( false );
 		return new DCursesTopTerminalSession( session );
 	}
@@ -241,12 +234,10 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 				"A curses lifecycle event did not include its lifecycle payload."
 			);
 		return lifecycle.Kind switch {
-			CursesLifecycleEventKind.Resize => SynchronizeAndReturn(
-				this.session,
+			CursesLifecycleEventKind.Resize => new TopTerminalEvent(
 				TopTerminalEventKind.Resize
 			),
-			CursesLifecycleEventKind.Resumed => SynchronizeAndReturn(
-				this.session,
+			CursesLifecycleEventKind.Resumed => new TopTerminalEvent(
 				TopTerminalEventKind.Repaint
 			),
 			CursesLifecycleEventKind.Interrupt => new TopTerminalEvent(
@@ -343,13 +334,4 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 		TopLineStyle.Dim => DimStyle,
 		_ => CursesStyle.Default
 	};
-
-	private static TopTerminalEvent SynchronizeAndReturn(
-		CursesSession session,
-		TopTerminalEventKind kind
-	) {
-		ArgumentNullException.ThrowIfNull( session );
-		_ = session.SynchronizeDimensions();
-		return new TopTerminalEvent( kind );
-	}
 }
