@@ -557,6 +557,85 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task ZeroSuppressionBlanksOnlyTrueZeroFieldsWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( '0' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new(
+			new ProcProcessCollection(
+				[
+					CreateProcess(
+						101,
+						"zero",
+						1000,
+						0,
+						0,
+						0
+					),
+					CreateProcess(
+						202,
+						"tiny",
+						1001,
+						0,
+						0,
+						1
+					)
+				]
+			)
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 2, terminal.Frames.Count );
+
+		string before = terminal.Frames[ 0 ].Lines[ 6 ].Text;
+		string zeroAfter = terminal.Frames[ 1 ].Lines[ 6 ].Text;
+		string tinyAfter = terminal.Frames[ 1 ].Lines[ 7 ].Text;
+
+		Assert.False(
+			string.IsNullOrWhiteSpace( before.Substring( 25, 8 ) )
+		);
+		Assert.True(
+			string.IsNullOrWhiteSpace( zeroAfter.Substring( 25, 8 ) )
+		);
+		Assert.True(
+			string.IsNullOrWhiteSpace( zeroAfter.Substring( 34, 8 ) )
+		);
+		Assert.True(
+			string.IsNullOrWhiteSpace( zeroAfter.Substring( 54, 5 ) )
+		);
+		Assert.True(
+			string.IsNullOrWhiteSpace( zeroAfter.Substring( 60, 4 ) )
+		);
+		Assert.True(
+			string.IsNullOrWhiteSpace( zeroAfter.Substring( 65, 9 ) )
+		);
+		Assert.Equal(
+			"  0",
+			zeroAfter.Substring( 21, 3 )
+		);
+
+		Assert.False(
+			string.IsNullOrWhiteSpace( tinyAfter.Substring( 25, 8 ) )
+		);
+		Assert.False(
+			string.IsNullOrWhiteSpace( tinyAfter.Substring( 34, 8 ) )
+		);
+		Assert.False(
+			string.IsNullOrWhiteSpace( tinyAfter.Substring( 60, 4 ) )
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task ImmediateRefreshInputResamplesWithoutWaitingForTimeout() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock );

@@ -40,6 +40,7 @@ internal static class TopRenderer {
 		"top help -- core interactive commands",
 		" q              quit",
 		" Enter/Space    refresh now",
+		" 0              toggle zero suppression",
 		" P/M/N/T        sort by CPU, memory, PID, or time",
 		" R              reverse/normal sort direction",
 		" B/b/x/y        emphasis and highlighting",
@@ -472,6 +473,56 @@ internal static class TopRenderer {
 		string nice = process.NiceValue.HasValue
 			? process.NiceValue.Value.ToString( CultureInfo.InvariantCulture )
 			: "?";
+
+		string virtualMemory = FormatTaskMemory(
+			process.VirtualMemoryBytes,
+			state.TaskScale
+		);
+		if (
+			state.SuppressZeros
+			&& process.VirtualMemoryBytes.HasValue
+			&& 0UL == process.VirtualMemoryBytes.Value
+		) {
+			virtualMemory = string.Empty;
+		}
+
+		string residentMemory = FormatTaskMemory(
+			process.ResidentMemoryBytes,
+			state.TaskScale
+		);
+		if (
+			state.SuppressZeros
+			&& process.ResidentMemoryBytes.HasValue
+			&& 0UL == process.ResidentMemoryBytes.Value
+		) {
+			residentMemory = string.Empty;
+		}
+
+		string cpuText = cpu.ToString(
+			"0.0",
+			CultureInfo.InvariantCulture
+		);
+		if ( state.SuppressZeros && 0.0 == cpu ) {
+			cpuText = string.Empty;
+		}
+
+		string memoryPercent = row.MemoryPercent.ToString(
+			"0.0",
+			CultureInfo.InvariantCulture
+		);
+		if ( state.SuppressZeros && 0.0 == row.MemoryPercent ) {
+			memoryPercent = string.Empty;
+		}
+
+		string cpuTime = cpuTime;
+		if (
+			state.SuppressZeros
+			&& row.CpuSeconds.HasValue
+			&& 0.0 == row.CpuSeconds.Value
+		) {
+			cpuTime = string.Empty;
+		}
+
 		string[] fields = [
 			AlignField(
 				process.ProcessId.ToString( CultureInfo.InvariantCulture ),
@@ -494,12 +545,12 @@ internal static class TopRenderer {
 				state.NumericLeftJustified
 			),
 			AlignField(
-				FormatTaskMemory( process.VirtualMemoryBytes, state.TaskScale ),
+				virtualMemory,
 				8,
 				state.NumericLeftJustified
 			),
 			AlignField(
-				FormatTaskMemory( process.ResidentMemoryBytes, state.TaskScale ),
+				residentMemory,
 				8,
 				state.NumericLeftJustified
 			),
@@ -514,12 +565,12 @@ internal static class TopRenderer {
 				!state.CharacterRightJustified
 			),
 			AlignField(
-				cpu.ToString( "0.0", CultureInfo.InvariantCulture ),
+				cpuText,
 				5,
 				state.NumericLeftJustified
 			),
 			AlignField(
-				row.MemoryPercent.ToString( "0.0", CultureInfo.InvariantCulture ),
+				memoryPercent,
 				4,
 				state.NumericLeftJustified
 			),

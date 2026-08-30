@@ -116,6 +116,10 @@ The following commands are implemented in the first DCurses-backed interactive
 profile:
 
 - `q` quits; Enter or Space requests an immediate refresh.
+- `0` toggles suppression of true zero values in the suppressible task
+  fields. `VIRT`, `RES`, `%CPU`, `%MEM`, and `TIME+` participate; `PR`,
+  `NI`, identity/state fields, unavailable values, and nonzero values that
+  merely round to a displayed zero remain visible.
 - `P`, `M`, `N`, and `T` sort by CPU, memory, PID, and cumulative CPU time.
 - `R` toggles the active sort direction between high-to-low and low-to-high.
 - `B` globally enables or disables use of bold rendition in the summary and

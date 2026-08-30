@@ -135,11 +135,11 @@ Options:
  -h, --help                    display this help and exit
 
 Interactive keys:
- q quit; P/M/N/T sort; R reverse/normal sort; B bold enable; b emphasis mode;
- J numeric justify; j character justify; x sort column; y running rows;
- c command line; H threads; i idle tasks; V forest; I CPU normalization;
- E/e memory scale; d/s delay; u/U user filter; k signal; r renice;
- arrows/PgUp/PgDn/Home/End scroll; h/? help.
+ q quit; 0 zero suppress; P/M/N/T sort; R reverse/normal sort; B bold enable;
+ b emphasis mode; J numeric justify; j character justify; x sort column;
+ y running rows; c command line; H threads; i idle tasks; V forest;
+ I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
+ k signal; r renice; arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
 
 	/// <summary>Runs <c>top</c> synchronously.</summary>
@@ -607,6 +607,9 @@ Interactive keys:
 			case 'T':
 				state.SortField = TopSortField.Time;
 				state.VerticalOffset = 0;
+				return TopCommandAction.Rerender;
+			case '0':
+				state.SuppressZeros = !state.SuppressZeros;
 				return TopCommandAction.Rerender;
 			case 'R':
 				state.SortHighToLow = !state.SortHighToLow;
