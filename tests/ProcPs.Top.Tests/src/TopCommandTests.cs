@@ -809,10 +809,10 @@ public sealed class TopCommandTests {
 		TopRenderFrame reordered = terminal.Frames[ 11 ];
 		string header = reordered.Lines[ 5 ].Text;
 		Assert.StartsWith(
-			"USER", header, StringComparison.Ordinal )
+			"USER", header, StringComparison.Ordinal
 		);
-		Assert.False(
-			header.Contains( "%CPU", header, StringComparison.Ordinal )
+		Assert.DoesNotContain(
+			"%CPU", header, StringComparison.Ordinal
 		);
 		Assert.True(
 			header.IndexOf( "PID", StringComparison.Ordinal )
