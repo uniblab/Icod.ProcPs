@@ -510,6 +510,53 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task JustificationCommandsRerenderWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'J' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'j' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 3, terminal.Frames.Count );
+
+		Assert.Equal(
+			"    PID",
+			terminal.Frames[ 0 ].Lines[ 5 ].Text.Substring( 0, 7 )
+		);
+		Assert.Equal(
+			"    101",
+			terminal.Frames[ 0 ].Lines[ 6 ].Text.Substring( 0, 7 )
+		);
+		Assert.Equal(
+			"PID    ",
+			terminal.Frames[ 1 ].Lines[ 5 ].Text.Substring( 0, 7 )
+		);
+		Assert.Equal(
+			"101    ",
+			terminal.Frames[ 1 ].Lines[ 6 ].Text.Substring( 0, 7 )
+		);
+		Assert.Equal(
+			"    USER",
+			terminal.Frames[ 2 ].Lines[ 5 ].Text.Substring( 8, 8 )
+		);
+		Assert.Equal(
+			"   alice",
+			terminal.Frames[ 2 ].Lines[ 6 ].Text.Substring( 8, 8 )
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task ImmediateRefreshInputResamplesWithoutWaitingForTimeout() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock );

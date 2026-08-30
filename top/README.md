@@ -122,6 +122,11 @@ profile:
   task areas.
 - `b` selects bold versus reverse-video emphasis for highlighted task rows
   and sort fields.
+- `J` toggles numeric columns between right justification (the default) and
+  left justification.
+- `j` toggles character columns between left justification (the default) and
+  right justification. The trailing COMMAND value remains unpadded in the
+  default mode and gains only the minimum header width when right-justified.
 - `x` toggles highlighting of the active sort field. The highlight is clipped
   to the visible portion of that field when the task display is horizontally
   scrolled.

@@ -42,7 +42,8 @@ internal static class TopRenderer {
 		" Enter/Space    refresh now",
 		" P/M/N/T        sort by CPU, memory, PID, or time",
 		" R              reverse/normal sort direction",
-		" B / b / x / y  bold, emphasis, sort column, running rows",
+		" B/b/x/y        emphasis and highlighting",
+		" J / j          justify numeric / character columns",
 		" c              toggle command name / command line",
 		" H              toggle thread display",
 		" i              toggle idle-task suppression",
@@ -92,7 +93,7 @@ internal static class TopRenderer {
 			) );
 		}
 		lines.Add( new TopRenderLine(
-			SliceForDisplay( BuildHeader(), state.HorizontalOffset, dimensions.Columns ),
+			SliceForDisplay( BuildHeader( state ), state.HorizontalOffset, dimensions.Columns ),
 			TopLineStyle.Header
 		) );
 
@@ -163,7 +164,7 @@ internal static class TopRenderer {
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
 		var lines = new List<string>();
 		lines.AddRange( BuildSummaryLines( sample, state ).Select( line => LimitRunes( line, width ) ) );
-		lines.Add( LimitRunes( BuildHeader(), width ) );
+		lines.Add( LimitRunes( BuildHeader( state ), width ) );
 		foreach ( TopTaskRow task in SelectAndOrderTasks( sample, state ) ) {
 			lines.Add( LimitRunes(
 				FormatTaskLine(
@@ -425,8 +426,29 @@ internal static class TopRenderer {
 		);
 	}
 
-	private static string BuildHeader() =>
-		"    PID USER       PR  NI     VIRT      RES      SHR S  %CPU %MEM     TIME+ COMMAND";
+	private static string BuildHeader(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		return string.Join(
+			" ",
+			[
+				AlignField( "PID", 7, state.NumericLeftJustified ),
+				AlignField( "USER", 8, !state.CharacterRightJustified ),
+				AlignField( "PR", 3, state.NumericLeftJustified ),
+				AlignField( "NI", 3, state.NumericLeftJustified ),
+				AlignField( "VIRT", 8, state.NumericLeftJustified ),
+				AlignField( "RES", 8, state.NumericLeftJustified ),
+				AlignField( "SHR", 8, state.NumericLeftJustified ),
+				AlignField( "S", 1, !state.CharacterRightJustified ),
+				AlignField( "%CPU", 5, state.NumericLeftJustified ),
+				AlignField( "%MEM", 4, state.NumericLeftJustified ),
+				AlignField( "TIME+", 9, state.NumericLeftJustified ),
+				AlignField( "COMMAND", 7, !state.CharacterRightJustified )
+			]
+		);
+	}
 
 	private static TopFormattedTaskLine FormatTaskLine(
 		TopTaskRow row,
@@ -451,62 +473,65 @@ internal static class TopRenderer {
 			? process.NiceValue.Value.ToString( CultureInfo.InvariantCulture )
 			: "?";
 		string[] fields = [
-			string.Format(
-				CultureInfo.InvariantCulture,
-				"{0,7}",
-				process.ProcessId
+			AlignField(
+				process.ProcessId.ToString( CultureInfo.InvariantCulture ),
+				7,
+				state.NumericLeftJustified
 			),
-			string.Format(
-				CultureInfo.InvariantCulture,
-				"{0,-8}",
-				TruncateUser( row.User )
+			AlignField(
+				TruncateUser( row.User ),
+				8,
+				!state.CharacterRightJustified
 			),
-			string.Format(
-				CultureInfo.InvariantCulture,
-				"{0,3}",
-				priority
+			AlignField(
+				priority,
+				3,
+				state.NumericLeftJustified
 			),
-			string.Format(
-				CultureInfo.InvariantCulture,
-				"{0,3}",
-				nice
+			AlignField(
+				nice,
+				3,
+				state.NumericLeftJustified
 			),
-			string.Format(
-				CultureInfo.InvariantCulture,
-				"{0,8}",
-				FormatTaskMemory( process.VirtualMemoryBytes, state.TaskScale )
+			AlignField(
+				FormatTaskMemory( process.VirtualMemoryBytes, state.TaskScale ),
+				8,
+				state.NumericLeftJustified
 			),
-			string.Format(
-				CultureInfo.InvariantCulture,
-				"{0,8}",
-				FormatTaskMemory( process.ResidentMemoryBytes, state.TaskScale )
+			AlignField(
+				FormatTaskMemory( process.ResidentMemoryBytes, state.TaskScale ),
+				8,
+				state.NumericLeftJustified
 			),
-			string.Format(
-				CultureInfo.InvariantCulture,
-				"{0,8}",
-				"-"
+			AlignField(
+				"-",
+				8,
+				state.NumericLeftJustified
 			),
-			string.Format(
-				CultureInfo.InvariantCulture,
-				"{0,1}",
-				StateCode( process )
+			AlignField(
+				StateCode( process ),
+				1,
+				!state.CharacterRightJustified
 			),
-			string.Format(
-				CultureInfo.InvariantCulture,
-				"{0,5:0.0}",
-				cpu
+			AlignField(
+				cpu.ToString( "0.0", CultureInfo.InvariantCulture ),
+				5,
+				state.NumericLeftJustified
 			),
-			string.Format(
-				CultureInfo.InvariantCulture,
-				"{0,4:0.0}",
-				row.MemoryPercent
+			AlignField(
+				row.MemoryPercent.ToString( "0.0", CultureInfo.InvariantCulture ),
+				4,
+				state.NumericLeftJustified
 			),
-			string.Format(
-				CultureInfo.InvariantCulture,
-				"{0,9}",
-				FormatCpuTime( row.CpuSeconds )
+			AlignField(
+				FormatCpuTime( row.CpuSeconds ),
+				9,
+				state.NumericLeftJustified
 			),
-			command
+			FormatCommandField(
+				command,
+				state.CharacterRightJustified
+			)
 		];
 
 		int sortIndex = SortFieldIndex( state.SortField );
@@ -534,6 +559,51 @@ internal static class TopRenderer {
 			builder.ToString(),
 			sortFieldStart,
 			sortFieldLength
+		);
+	}
+
+	private static string AlignField(
+		string text,
+		int width,
+		bool leftJustified
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
+
+		int length = CountRunes( text );
+		if ( width <= length ) {
+			return text;
+		}
+
+		string padding = new(
+			' ',
+			width - length
+		);
+		if ( leftJustified ) {
+			return string.Concat(
+				text,
+				padding
+			);
+		}
+		return string.Concat(
+			padding,
+			text
+		);
+	}
+
+	private static string FormatCommandField(
+		string command,
+		bool rightJustified
+	) {
+		ArgumentNullException.ThrowIfNull( command );
+
+		if ( !rightJustified ) {
+			return command;
+		}
+		return AlignField(
+			command,
+			7,
+			leftJustified: false
 		);
 	}
 

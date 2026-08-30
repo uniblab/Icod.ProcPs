@@ -73,6 +73,8 @@ internal sealed class TopRuntimeState {
 	internal bool HighlightBold { get; set; } = true;
 	internal bool HighlightRunning { get; set; } = true;
 	internal bool HighlightSortColumn { get; set; }
+	internal bool NumericLeftJustified { get; set; }
+	internal bool CharacterRightJustified { get; set; }
 	internal TopMemoryScale SummaryScale { get; set; } = TopMemoryScale.Mebibytes;
 	internal TopMemoryScale TaskScale { get; set; } = TopMemoryScale.Kibibytes;
 	internal bool ShowCommandLine { get; set; }

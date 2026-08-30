@@ -136,9 +136,10 @@ Options:
 
 Interactive keys:
  q quit; P/M/N/T sort; R reverse/normal sort; B bold enable; b emphasis mode;
- x sort column; y running rows; c command line; H threads; i idle tasks;
- V forest; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
- k signal; r renice; arrows/PgUp/PgDn/Home/End scroll; h/? help.
+ J numeric justify; j character justify; x sort column; y running rows;
+ c command line; H threads; i idle tasks; V forest; I CPU normalization;
+ E/e memory scale; d/s delay; u/U user filter; k signal; r renice;
+ arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
 
 	/// <summary>Runs <c>top</c> synchronously.</summary>
@@ -619,6 +620,12 @@ Interactive keys:
 				return TopCommandAction.Rerender;
 			case 'b':
 				state.HighlightBold = !state.HighlightBold;
+				return TopCommandAction.Rerender;
+			case 'J':
+				state.NumericLeftJustified = !state.NumericLeftJustified;
+				return TopCommandAction.Rerender;
+			case 'j':
+				state.CharacterRightJustified = !state.CharacterRightJustified;
 				return TopCommandAction.Rerender;
 			case 'x':
 				state.HighlightSortColumn = !state.HighlightSortColumn;
