@@ -837,6 +837,113 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task OtherFiltersHonorCaseSensitivityWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'O' ) );
+		foreach ( char value in "COMMAND=ALPHA" ) {
+			terminal.Events.Enqueue( CharacterEvent( value ) );
+		}
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( '=' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'o' ) );
+		foreach ( char value in "COMMAND=ALPHA" ) {
+			terminal.Events.Enqueue( CharacterEvent( value ) );
+		}
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+
+		TopRenderFrame caseSensitive = terminal.Frames[ 15 ];
+		Assert.True(
+			string.IsNullOrEmpty( caseSensitive.Lines[ 6 ].Text )
+		);
+		Assert.Contains(
+			"Tasks:     0 total",
+			caseSensitive.Lines[ 1 ].Text,
+			StringComparison.Ordinal
+		);
+
+		TopRenderFrame caseInsensitive = terminal.Frames[ ^1 ];
+		Assert.Contains(
+			"alpha",
+			caseInsensitive.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True(
+			string.IsNullOrEmpty( caseInsensitive.Lines[ 7 ].Text )
+		);
+		Assert.Contains(
+			"filter added: COMMAND=ALPHA",
+			caseInsensitive.Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task OtherFiltersSupportRelationalExclusionAndResetWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'O' ) );
+		foreach ( char value in "!PID<200" ) {
+			terminal.Events.Enqueue( CharacterEvent( value ) );
+		}
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( '=' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+
+		TopRenderFrame filtered = terminal.Frames[ 10 ];
+		Assert.Contains(
+			"202",
+			filtered.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.DoesNotContain(
+			"101",
+			filtered.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True(
+			string.IsNullOrEmpty( filtered.Lines[ 7 ].Text )
+		);
+
+		TopRenderFrame reset = terminal.Frames[ ^1 ];
+		Assert.Contains(
+			"101",
+			reset.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.Contains(
+			"202",
+			reset.Lines[ 7 ].Text,
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task LocateAndLocateNextRepositionWithoutResampling() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock );

@@ -83,6 +83,7 @@ internal sealed class TopRuntimeState {
 	internal TopPromptState? Prompt { get; set; }
 	internal HashSet<int> ProcessIds { get; } = [];
 	internal TopUserFilter? UserFilter { get; set; }
+	internal List<TopOtherFilter> OtherFilters { get; } = [];
 	internal List<TopFieldId> FieldOrder { get; } = TopFieldCatalog.CreateDefaultOrder();
 	internal HashSet<TopFieldId> VisibleFields { get; } = TopFieldCatalog.CreateDefaultVisible();
 }
@@ -92,6 +93,8 @@ internal enum TopPromptKind {
 	Delay,
 	MaximumTasks,
 	Locate,
+	OtherFilterCaseSensitive,
+	OtherFilterIgnoreCase,
 	KillProcessId,
 	KillSignal,
 	ReniceProcessId,

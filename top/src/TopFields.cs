@@ -455,4 +455,24 @@ internal static class TopFieldCatalog {
 				return false;
 		}
 	}
+
+	internal static bool TryParseHeaderName(
+		string text,
+		out TopFieldId field
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+
+		foreach ( TopFieldDefinition definition in FieldDefinitions ) {
+			if ( string.Equals(
+				definition.Name,
+				text,
+				StringComparison.Ordinal
+			) ) {
+				field = definition.Id;
+				return true;
+			}
+		}
+		field = default;
+		return false;
+	}
 }

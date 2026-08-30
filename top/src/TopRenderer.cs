@@ -55,6 +55,7 @@ internal static class TopRenderer {
 		" E / e          cycle summary / task memory scale",
 		" d or s         change refresh delay",
 		" u / U          filter by effective / any observed user",
+		" O / o          add case-sensitive / insensitive Other Filter",
 		" L / &          locate string / locate next",
 		" k              signal a process",
 		" r              change a process nice value",
@@ -516,7 +517,11 @@ internal static class TopRenderer {
 		TopRuntimeState state
 	) {
 		string taskLabel = state.ShowThreads ? "Threads" : "Tasks";
-		IReadOnlyList<TopTaskRow> visible = ApplyFilters( sample.Tasks, state ).ToList().AsReadOnly();
+		IReadOnlyList<TopTaskRow> visible = ApplyFilters(
+			sample.Tasks,
+			state,
+			sample.ProcessorCount
+		).ToList().AsReadOnly();
 		int running = visible.Count( row => IsState( row, ProcProcessState.Running ) );
 		int sleeping = visible.Count( row => IsState( row, ProcProcessState.Sleeping ) );
 		int stopped = visible.Count( row => IsState( row, ProcProcessState.Stopped ) || IsState( row, ProcProcessState.TracingStop ) );
@@ -693,32 +698,12 @@ internal static class TopRenderer {
 				continue;
 			}
 
-			TopFieldDefinition definition = TopFieldCatalog.Get(
-				field
-			);
-			string fieldText = definition.Formatter(
+			string fieldText = FieldDisplayValue(
 				row,
 				state,
-				processorCount
+				processorCount,
+				field
 			);
-			if ( TopFieldId.Command == field ) {
-				fieldText = FormatCommandField(
-					fieldText,
-					state.CharacterRightJustified
-				);
-			} else {
-				bool leftJustified;
-				if ( definition.Numeric ) {
-					leftJustified = state.NumericLeftJustified;
-				} else {
-					leftJustified = !state.CharacterRightJustified;
-				}
-				fieldText = AlignField(
-					fieldText,
-					definition.Width,
-					leftJustified
-				);
-			}
 
 			if ( !first ) {
 				builder.Append( ' ' );
@@ -741,6 +726,53 @@ internal static class TopRenderer {
 			sortFieldLength
 		);
 	}
+
+	internal static string FieldDisplayValue(
+		TopTaskRow row,
+		TopRuntimeState state,
+		int processorCount,
+		TopFieldId field
+	) {
+		ArgumentNullException.ThrowIfNull( row );
+		ArgumentNullException.ThrowIfNull( state );
+
+		TopFieldDefinition definition = TopFieldCatalog.Get(
+			field
+		);
+		string fieldText = definition.Formatter(
+			row,
+			state,
+			processorCount
+		);
+		if ( TopFieldId.Command == field ) {
+			return FormatCommandField(
+				fieldText,
+				state.CharacterRightJustified
+			);
+		}
+
+		bool leftJustified;
+		if ( definition.Numeric ) {
+			leftJustified = state.NumericLeftJustified;
+		} else {
+			leftJustified = !state.CharacterRightJustified;
+		}
+		return AlignField(
+			fieldText,
+			definition.Width,
+			leftJustified
+		);
+	}
+
+	internal static string FieldAlign(
+		string text,
+		int width,
+		bool leftJustified
+	) => AlignField(
+		text,
+		width,
+		leftJustified
+	);
 
 	private static string AlignField(
 		string text,
@@ -791,7 +823,11 @@ internal static class TopRenderer {
 		TopSample sample,
 		TopRuntimeState state
 	) {
-		List<TopTaskRow> tasks = ApplyFilters( sample.Tasks, state ).ToList();
+		List<TopTaskRow> tasks = ApplyFilters(
+			sample.Tasks,
+			state,
+			sample.ProcessorCount
+		).ToList();
 		if ( state.HideIdle ) {
 			tasks = tasks.Where( row => 0.0001 < row.CpuPercentIrix || IsState( row, ProcProcessState.Running ) ).ToList();
 		}
@@ -811,7 +847,8 @@ internal static class TopRenderer {
 
 	private static IEnumerable<TopTaskRow> ApplyFilters(
 		IReadOnlyList<TopTaskRow> tasks,
-		TopRuntimeState state
+		TopRuntimeState state,
+		int processorCount
 	) {
 		IEnumerable<TopTaskRow> filtered = tasks;
 		if ( 0 < state.ProcessIds.Count ) {
@@ -830,7 +867,72 @@ internal static class TopRenderer {
 				return filter.Negate ? !matches : matches;
 			} );
 		}
+		if ( 0 < state.OtherFilters.Count ) {
+			filtered = filtered.Where(
+				row => MatchesOtherFilters(
+					row,
+					state,
+					processorCount
+				)
+			);
+		}
 		return filtered;
+	}
+
+	private static bool MatchesOtherFilters(
+		TopTaskRow row,
+		TopRuntimeState state,
+		int processorCount
+	) {
+		ArgumentNullException.ThrowIfNull( row );
+		ArgumentNullException.ThrowIfNull( state );
+
+		foreach ( TopOtherFilter filter in state.OtherFilters ) {
+			if ( !state.VisibleFields.Contains( filter.Field ) ) {
+				continue;
+			}
+
+			string fieldText = FieldDisplayValue(
+				row,
+				state,
+				processorCount,
+				filter.Field
+			);
+			StringComparison comparison = filter.CaseSensitive
+				? StringComparison.Ordinal
+				: StringComparison.OrdinalIgnoreCase;
+			bool matches;
+			switch ( filter.Operator ) {
+				case TopOtherFilterOperator.Equality:
+					matches = fieldText.Contains(
+						filter.SelectionValue,
+						comparison
+					);
+					break;
+				case TopOtherFilterOperator.LessThan:
+					matches = 0 > string.Compare(
+						fieldText,
+						filter.SelectionValue,
+						comparison
+					);
+					break;
+				case TopOtherFilterOperator.GreaterThan:
+					matches = 0 < string.Compare(
+						fieldText,
+						filter.SelectionValue,
+						comparison
+					);
+					break;
+				default:
+					throw new InvalidOperationException(
+						"The Other Filter operator was not recognized."
+					);
+			}
+			if ( filter.Include != matches ) {
+				return false;
+			}
+		}
+		return true;
 	}
 
 	private static bool MatchesObservedUser( ProcProcessSnapshot process, uint userId ) =>

@@ -158,6 +158,15 @@ profile:
 - `d` or `s` opens an in-screen line editor for the refresh delay.
 - `u` and `U` open an in-screen user-filter editor; an empty value clears the
   filter and an initial `!` inverts it.
+- `O` and `o` add Other Filter criteria using case-sensitive and
+  case-insensitive matching, respectively. Criteria use the exact displayed
+  field name, one of `=`, `<`, or `>`, and a nonempty selection value; a
+  leading `!` makes the criterion an exclusion. Equality is a substring
+  match. Relational operators compare formatted field text as strings, and
+  their selection value is padded to the field width/alignment when the
+  filter is established, matching procps behavior. Multiple criteria combine,
+  duplicate raw criteria are rejected, and criteria for hidden fields remain
+  dormant until those fields are displayed again.
 - `L` prompts for a case-sensitive string and moves the matching task row to
   the top of the task area. Searching considers the horizontally visible
   portion of each fully formatted task row, so command mode, forest layout,
@@ -171,7 +180,7 @@ profile:
   changes through `Icod.Processes`.
 - Arrow keys, Page Up, Page Down, Home, and End scroll the task display; Left and
   Right scroll horizontally.
-- `=` clears idle/max-task display limits, PID/user restrictions, locate state, and scrolling.
+- `=` clears idle/max-task display limits, PID/user/Other Filter restrictions, locate state, and scrolling.
 - `h` or `?` displays a compact help screen.
 
 In secure mode the `d`/`s`, `k`, and `r` commands are disabled.

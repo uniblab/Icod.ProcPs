@@ -140,7 +140,7 @@ Interactive keys:
  f manage fields; x sort column; y running rows; c command line; H threads;
  i idle tasks;
  V forest; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
- L locate; & locate next; k signal; r renice; = reset limits;
+ O/o other filter; L locate; & locate next; k signal; r renice; = reset limits;
  arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
 
@@ -713,6 +713,20 @@ Interactive keys:
 					"Maximum tasks (0 for unlimited): "
 				);
 				return TopCommandAction.Rerender;
+			case 'O':
+				state.Message = null;
+				state.Prompt = new TopPromptState(
+					TopPromptKind.OtherFilterCaseSensitive,
+					"Other filter (case sensitive): "
+				);
+				return TopCommandAction.Rerender;
+			case 'o':
+				state.Message = null;
+				state.Prompt = new TopPromptState(
+					TopPromptKind.OtherFilterIgnoreCase,
+					"Other filter (ignore case): "
+				);
+				return TopCommandAction.Rerender;
 			case 'L':
 				state.Message = null;
 				state.Prompt = new TopPromptState(
@@ -779,6 +793,7 @@ Interactive keys:
 			case '=':
 				state.ProcessIds.Clear();
 				state.UserFilter = null;
+				state.OtherFilters.Clear();
 				state.HideIdle = false;
 				state.MaximumTasks = 0;
 				state.SearchText = null;
@@ -1043,6 +1058,30 @@ Interactive keys:
 				} else {
 					state.Message = $"locate string not found: {locateText}";
 				}
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.OtherFilterCaseSensitive:
+			case TopPromptKind.OtherFilterIgnoreCase:
+				state.Prompt = null;
+				bool caseSensitive = TopPromptKind.OtherFilterCaseSensitive == prompt.Kind;
+				if (
+					!TopOtherFilterParser.TryParse(
+						prompt.Buffer,
+						caseSensitive,
+						state,
+						out TopOtherFilter? otherFilter,
+						out string? filterError
+					)
+				) {
+					state.Message = filterError ?? "invalid other filter";
+					return TopCommandAction.Rerender;
+				}
+				state.OtherFilters.Insert(
+					0,
+					otherFilter!
+				);
+				state.VerticalOffset = 0;
+				state.Message = $"filter added: {otherFilter!.RawText}";
 				return TopCommandAction.Rerender;
 
 			case TopPromptKind.KillProcessId:
