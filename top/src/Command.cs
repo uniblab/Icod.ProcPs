@@ -135,9 +135,10 @@ Options:
  -h, --help                    display this help and exit
 
 Interactive keys:
- q quit; P/M/N/T sort; c command line; H threads; i idle tasks; V forest;
- I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
- k signal; r renice; arrows/PgUp/PgDn/Home/End scroll; h/? help.
+ q quit; P/M/N/T sort; R reverse/normal sort; c command line; H threads;
+ i idle tasks; V forest; I CPU normalization; E/e memory scale; d/s delay;
+ u/U user filter; k signal; r renice; arrows/PgUp/PgDn/Home/End scroll;
+ h/? help.
 """;
 
 	/// <summary>Runs <c>top</c> synchronously.</summary>
@@ -605,6 +606,13 @@ Interactive keys:
 				state.SortField = TopSortField.Time;
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
+			case 'R':
+				state.SortHighToLow = !state.SortHighToLow;
+				state.VerticalOffset = 0;
+				state.Message = state.SortHighToLow
+					? "sort direction: high to low"
+					: "sort direction: low to high";
+				return TopCommandAction.Rerender;
 			case 'c':
 				state.ShowCommandLine = !state.ShowCommandLine;
 				return TopCommandAction.Rerender;
@@ -973,10 +981,19 @@ Interactive keys:
 				continue;
 			}
 			if ( TryOptionValue( args, ref index, argument, "-o", "--sort-override", out string? sortText ) ) {
-				if ( !TopRenderer.TryParseSortField( sortText!, out TopSortField sortField ) ) {
+				if (
+					!TopRenderer.TryParseSortOverride(
+						sortText!,
+						out TopSortField sortField,
+						out bool? sortHighToLow
+					)
+				) {
 					result.Fail( $"unknown sort field '{sortText}'" );
 				} else {
 					result.State.SortField = sortField;
+					if ( sortHighToLow.HasValue ) {
+						result.State.SortHighToLow = sortHighToLow.Value;
+					}
 				}
 				continue;
 			}

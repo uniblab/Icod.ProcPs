@@ -119,6 +119,32 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task SignedSortOverrideControlsDirection() {
+		FakeClock highClock = new();
+		CommandResult highToLow = await RunCoreAsync(
+			[ "-b", "-n", "1", "-o", "+PID" ],
+			new FakeTerminal( highClock ),
+			highClock
+		);
+
+		FakeClock lowClock = new();
+		CommandResult lowToHigh = await RunCoreAsync(
+			[ "-b", "-n", "1", "-o", "-PID" ],
+			new FakeTerminal( lowClock ),
+			lowClock
+		);
+
+		Assert.Equal( 0, highToLow.ExitCode );
+		Assert.Equal( 0, lowToHigh.ExitCode );
+		int highBeta = highToLow.Stdout.IndexOf( "beta", StringComparison.Ordinal );
+		int highAlpha = highToLow.Stdout.IndexOf( "alpha", StringComparison.Ordinal );
+		int lowAlpha = lowToHigh.Stdout.IndexOf( "alpha", StringComparison.Ordinal );
+		int lowBeta = lowToHigh.Stdout.IndexOf( "beta", StringComparison.Ordinal );
+		Assert.True( 0 <= highBeta && highBeta < highAlpha );
+		Assert.True( 0 <= lowAlpha && lowAlpha < lowBeta );
+	}
+
+	[Fact]
 	public async Task BatchPidAndUserFiltersRestrictRenderedTasks() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock );
@@ -321,6 +347,35 @@ public sealed class TopCommandTests {
 		Assert.Equal( 2, terminal.Frames.Count );
 		Assert.Contains( "101", terminal.Frames[ 0 ].Lines[ 6 ].Text, StringComparison.Ordinal );
 		Assert.Contains( "202", terminal.Frames[ 1 ].Lines[ 6 ].Text, StringComparison.Ordinal );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task ReverseSortRerendersWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'N' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'R' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 3, terminal.Frames.Count );
+		Assert.Contains( "202", terminal.Frames[ 1 ].Lines[ 6 ].Text, StringComparison.Ordinal );
+		Assert.Contains( "101", terminal.Frames[ 2 ].Lines[ 6 ].Text, StringComparison.Ordinal );
+		Assert.Contains(
+			"sort direction: low to high",
+			terminal.Frames[ 2 ].Lines[ ^1 ].Text,
+			StringComparison.Ordinal
+		);
 		Assert.True( terminal.Disposed );
 	}
 

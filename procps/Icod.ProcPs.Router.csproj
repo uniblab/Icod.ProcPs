@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.3 closes the procps-ng watch interactive-control contract with immediate refresh, quit, and visible-screen screenshot commands, including --shotsdir screenshot placement and deterministic text capture.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.4 closes top sort-direction compatibility: signed -o/--sort-override values now control high-to-low versus low-to-high ordering, and interactive R toggles the active sort direction without resampling.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

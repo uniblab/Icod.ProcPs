@@ -68,6 +68,8 @@ Batch mode does not open a terminal and is suitable for redirection or pipelines
 `-o FIELD`, `--sort-override FIELD`
 : Select the initial sort field. Implemented names are `CPU`, `%CPU`, `MEM`,
   `%MEM`, `PID`, `TIME+`, `VIRT`, `RES`, `USER`, `COMMAND`, `NI`, and `S`.
+  Prefix the field with `+` to force high-to-low ordering or `-` to force
+  low-to-high ordering; without a prefix the active/default direction is kept.
 
 `-p PIDLIST`, `--pid PIDLIST`
 : Restrict the display to a comma- or whitespace-separated set of process IDs.
@@ -115,6 +117,7 @@ profile:
 
 - `q` quits; Enter or Space requests an immediate refresh.
 - `P`, `M`, `N`, and `T` sort by CPU, memory, PID, and cumulative CPU time.
+- `R` toggles the active sort direction between high-to-low and low-to-high.
 - `c` toggles short command names and observed command lines.
 - `H` toggles process/thread presentation and resamples immediately.
 - `i` toggles idle-task suppression and `V` toggles forest ordering.

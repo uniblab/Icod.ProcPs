@@ -68,6 +68,7 @@ internal sealed class TopUserFilter {
 internal sealed class TopRuntimeState {
 	internal TimeSpan Delay { get; set; } = TimeSpan.FromSeconds( 3 );
 	internal TopSortField SortField { get; set; } = TopSortField.Cpu;
+	internal bool SortHighToLow { get; set; } = true;
 	internal TopMemoryScale SummaryScale { get; set; } = TopMemoryScale.Mebibytes;
 	internal TopMemoryScale TaskScale { get; set; } = TopMemoryScale.Kibibytes;
 	internal bool ShowCommandLine { get; set; }

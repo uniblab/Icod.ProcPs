@@ -155,7 +155,7 @@ internal static class TopRenderer {
 
 	internal static bool TryParseSortField( string text, out TopSortField field ) {
 		ArgumentNullException.ThrowIfNull( text );
-		string normalized = text.Trim().TrimStart( '+', '-' ).ToUpperInvariant();
+		string normalized = text.Trim().ToUpperInvariant();
 		field = normalized switch {
 			"%CPU" or "CPU" or "P" => TopSortField.Cpu,
 			"%MEM" or "MEM" or "M" => TopSortField.Memory,
@@ -176,6 +176,32 @@ internal static class TopRenderer {
 			or "VIRT" or "RES" or "USER"
 			or "COMMAND" or "CMD" or "NI" or "NICE"
 			or "S" or "STATE";
+	}
+
+	internal static bool TryParseSortOverride(
+		string text,
+		out TopSortField field,
+		out bool? highToLow
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+
+		string normalized = text.Trim();
+		highToLow = null;
+		if ( 0 < normalized.Length ) {
+			if ( '+' == normalized[ 0 ] ) {
+				highToLow = true;
+				normalized = normalized[ 1.. ];
+			} else if ( '-' == normalized[ 0 ] ) {
+				highToLow = false;
+				normalized = normalized[ 1.. ];
+			}
+		}
+		if ( TryParseSortField( normalized, out field ) ) {
+			return true;
+		}
+
+		highToLow = null;
+		return false;
 	}
 
 	internal static TopMemoryScale NextScale( TopMemoryScale scale ) => scale switch {
@@ -403,7 +429,10 @@ internal static class TopRenderer {
 		if ( state.HideIdle ) {
 			tasks = tasks.Where( row => 0.0001 < row.CpuPercentIrix || IsState( row, ProcProcessState.Running ) ).ToList();
 		}
-		Comparison<TopTaskRow> comparison = SortComparison( state.SortField );
+		Comparison<TopTaskRow> comparison = SortComparison(
+			state.SortField,
+			state.SortHighToLow
+		);
 		if ( state.Forest ) {
 			return OrderForest( tasks, comparison );
 		}
@@ -490,18 +519,26 @@ internal static class TopRenderer {
 		return result;
 	}
 
-	private static Comparison<TopTaskRow> SortComparison( TopSortField field ) => field switch {
-		TopSortField.Memory => ( left, right ) => Descending( left.MemoryPercent, right.MemoryPercent, left, right ),
-		TopSortField.Pid => ( left, right ) => left.Process.ProcessId.CompareTo( right.Process.ProcessId ),
-		TopSortField.Time => ( left, right ) => Descending( left.CpuSeconds ?? 0.0, right.CpuSeconds ?? 0.0, left, right ),
-		TopSortField.VirtualMemory => ( left, right ) => Descending( ObservedOrZero( left.Process.VirtualMemoryBytes ), ObservedOrZero( right.Process.VirtualMemoryBytes ), left, right ),
-		TopSortField.ResidentMemory => ( left, right ) => Descending( ObservedOrZero( left.Process.ResidentMemoryBytes ), ObservedOrZero( right.Process.ResidentMemoryBytes ), left, right ),
-		TopSortField.User => ( left, right ) => TieBreak( string.Compare( left.User, right.User, StringComparison.Ordinal ), left, right ),
-		TopSortField.Command => ( left, right ) => TieBreak( string.Compare( FormatCommand( left.Process, false ), FormatCommand( right.Process, false ), StringComparison.Ordinal ), left, right ),
-		TopSortField.Nice => ( left, right ) => TieBreak( ObservedNice( left.Process ).CompareTo( ObservedNice( right.Process ) ), left, right ),
-		TopSortField.State => ( left, right ) => TieBreak( string.Compare( StateCode( left.Process ), StateCode( right.Process ), StringComparison.Ordinal ), left, right ),
-		_ => ( left, right ) => Descending( left.CpuPercentIrix, right.CpuPercentIrix, left, right )
-	};
+	private static Comparison<TopTaskRow> SortComparison(
+		TopSortField field,
+		bool highToLow
+	) {
+		Comparison<TopTaskRow> comparison = field switch {
+			TopSortField.Memory => ( left, right ) => Descending( left.MemoryPercent, right.MemoryPercent, left, right ),
+			TopSortField.Pid => ( left, right ) => Descending( left.Process.ProcessId, right.Process.ProcessId, left, right ),
+			TopSortField.Time => ( left, right ) => Descending( left.CpuSeconds ?? 0.0, right.CpuSeconds ?? 0.0, left, right ),
+			TopSortField.VirtualMemory => ( left, right ) => Descending( ObservedOrZero( left.Process.VirtualMemoryBytes ), ObservedOrZero( right.Process.VirtualMemoryBytes ), left, right ),
+			TopSortField.ResidentMemory => ( left, right ) => Descending( ObservedOrZero( left.Process.ResidentMemoryBytes ), ObservedOrZero( right.Process.ResidentMemoryBytes ), left, right ),
+			TopSortField.User => ( left, right ) => Descending( left.User, right.User, left, right ),
+			TopSortField.Command => ( left, right ) => Descending( FormatCommand( left.Process, false ), FormatCommand( right.Process, false ), left, right ),
+			TopSortField.Nice => ( left, right ) => Descending( ObservedNice( left.Process ), ObservedNice( right.Process ), left, right ),
+			TopSortField.State => ( left, right ) => Descending( StateCode( left.Process ), StateCode( right.Process ), left, right ),
+			_ => ( left, right ) => Descending( left.CpuPercentIrix, right.CpuPercentIrix, left, right )
+		};
+		return highToLow
+			? comparison
+			: ( left, right ) => comparison( right, left );
+	}
 
 	private static int Descending<T>( T left, T right, TopTaskRow leftRow, TopTaskRow rightRow )
 		where T : IComparable<T> {
