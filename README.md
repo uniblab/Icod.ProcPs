@@ -3,6 +3,7 @@
 ![Icod.ProcPs](https://raw.githubusercontent.com/uniblab/Icod.ProcPs/v1.1.0/Icod.ProcPs.banner.png)
 
 [![PR build and test](https://github.com/uniblab/Icod.ProcPs/actions/workflows/pr-build-and-test.yaml/badge.svg)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/pr-build-and-test.yaml)
+[![Package validation](https://github.com/uniblab/Icod.ProcPs/actions/workflows/distribution-validation.yaml/badge.svg?branch=main)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/push-main.yaml)
 [![Main build and test](https://github.com/uniblab/Icod.ProcPs/actions/workflows/push-main.yaml/badge.svg?branch=main)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/push-main.yaml)
 [![Release package](https://github.com/uniblab/Icod.ProcPs/actions/workflows/release.yaml/badge.svg?branch=main)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/release.yaml)
 
