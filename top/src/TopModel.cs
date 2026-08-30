@@ -27,20 +27,6 @@ using Icod.Processes;
 using Icod.ProcPs.Shared;
 using Icod.Timing;
 
-/// <summary>Identifies the task field used to order top rows.</summary>
-internal enum TopSortField {
-	Cpu,
-	Memory,
-	Pid,
-	Time,
-	VirtualMemory,
-	ResidentMemory,
-	User,
-	Command,
-	Nice,
-	State
-}
-
 /// <summary>Identifies a binary memory scale used by top.</summary>
 internal enum TopMemoryScale {
 	Kibibytes,
@@ -67,7 +53,7 @@ internal sealed class TopUserFilter {
 /// <summary>Contains runtime presentation state shared between refreshes.</summary>
 internal sealed class TopRuntimeState {
 	internal TimeSpan Delay { get; set; } = TimeSpan.FromSeconds( 3 );
-	internal TopSortField SortField { get; set; } = TopSortField.Cpu;
+	internal TopFieldId SortField { get; set; } = TopFieldId.Cpu;
 	internal bool SortHighToLow { get; set; } = true;
 	internal bool BoldEnabled { get; set; } = true;
 	internal bool HighlightBold { get; set; } = true;
@@ -91,9 +77,14 @@ internal sealed class TopRuntimeState {
 	internal int HorizontalOffset { get; set; }
 	internal string? Message { get; set; }
 	internal bool ShowHelp { get; set; }
+	internal bool ShowFieldManager { get; set; }
+	internal int FieldCursor { get; set; }
+	internal bool FieldMoveActive { get; set; }
 	internal TopPromptState? Prompt { get; set; }
 	internal HashSet<int> ProcessIds { get; } = [];
 	internal TopUserFilter? UserFilter { get; set; }
+	internal List<TopFieldId> FieldOrder { get; } = TopFieldCatalog.CreateDefaultOrder();
+	internal HashSet<TopFieldId> VisibleFields { get; } = TopFieldCatalog.CreateDefaultVisible();
 }
 
 /// <summary>Identifies one interactive top prompt.</summary>

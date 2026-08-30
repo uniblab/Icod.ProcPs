@@ -763,6 +763,82 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task FieldManagementTogglesMovesAndSortsWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'f' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'd' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'x' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'f' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Home ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Right ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Down ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( 's' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 10, terminal.Frames.Count );
+
+		Assert.True(
+			terminal.Frames[ 1 ].Lines.Any(
+				line => line.Text.StartsWith( ">*S", StringComparison.Ordinal )
+					&& line.Text.Contains( "%CPU", StringComparison.Ordinal )
+			)
+		);
+		Assert.True(
+			terminal.Frames[ 2 ].Lines.Any(
+				line => line.Text.StartsWith( "> S", StringComparison.Ordinal )
+					&& line.Text.Contains( "%CPU", StringComparison.Ordinal )
+			)
+		);
+
+		Assert.Null(
+			terminal.Frames[ 4 ].Lines[ 6 ].Spans
+		);
+
+		TopRenderFrame reordered = terminal.Frames[ 11 ];
+		string header = reordered.Lines[ 5 ].Text;
+		Assert.True(
+			header.StartsWith( "USER", StringComparison.Ordinal )
+		);
+		Assert.False(
+			header.Contains( "%CPU", StringComparison.Ordinal )
+		);
+		Assert.True(
+			header.IndexOf( "PID", StringComparison.Ordinal )
+				< header.IndexOf( "PR", StringComparison.Ordinal )
+		);
+		Assert.Contains(
+			"202",
+			reordered.Lines[ 6 ].Text,
+			StringComparison.Ordinal
+		);
+
+		TopRenderSpan span = Assert.Single(
+			terminal.Frames[ 9 ].Lines[ 6 ].Spans!
+		);
+		Assert.Equal( 9, span.Start );
+		Assert.Equal( 7, span.Length );
+		Assert.Equal(
+			TopLineStyle.HighlightBold,
+			span.Style
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task LocateAndLocateNextRepositionWithoutResampling() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock );

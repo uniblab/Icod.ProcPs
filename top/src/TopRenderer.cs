@@ -46,6 +46,7 @@ internal static class TopRenderer {
 		" R              reverse/normal sort direction",
 		" B/b/x/y        emphasis and highlighting",
 		" J / j          justify numeric / character columns",
+		" f              manage task fields",
 		" c              toggle command name / command line",
 		" H              toggle thread display",
 		" i              toggle idle-task suppression",
@@ -74,6 +75,12 @@ internal static class TopRenderer {
 			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
 		}
 
+		if ( state.ShowFieldManager ) {
+			return RenderFieldManager(
+				state,
+				dimensions
+			);
+		}
 		if ( state.ShowHelp ) {
 			return RenderHelp( state, dimensions );
 		}
@@ -284,49 +291,30 @@ internal static class TopRenderer {
 		return result;
 	}
 
-	internal static IReadOnlyList<string> ListFields() => [
-		"PID      process or task identifier",
-		"USER     effective user name or numeric identifier",
-		"PR       portable priority derived from the observed nice value",
-		"NI       observed nice value",
-		"VIRT     virtual memory size",
-		"RES      resident memory size",
-		"SHR      shared resident memory (shown as unavailable until observed)",
-		"S        task state",
-		"%CPU     interval CPU utilization",
-		"%MEM     resident memory percentage",
-		"TIME+    cumulative observed CPU time",
-		"COMMAND  command name or command line"
-	];
+	internal static IReadOnlyList<string> ListFields() {
+		var result = new List<string>( TopFieldCatalog.Definitions.Count );
+		foreach ( TopFieldDefinition definition in TopFieldCatalog.Definitions ) {
+			result.Add(
+				$"{definition.Name,-9}{definition.Description}"
+			);
+		}
+		return result;
+	}
 
-	internal static bool TryParseSortField( string text, out TopSortField field ) {
+	internal static bool TryParseSortField(
+		string text,
+		out TopFieldId field
+	) {
 		ArgumentNullException.ThrowIfNull( text );
-		string normalized = text.Trim().ToUpperInvariant();
-		field = normalized switch {
-			"%CPU" or "CPU" or "P" => TopSortField.Cpu,
-			"%MEM" or "MEM" or "M" => TopSortField.Memory,
-			"PID" or "N" => TopSortField.Pid,
-			"TIME" or "TIME+" or "T" => TopSortField.Time,
-			"VIRT" => TopSortField.VirtualMemory,
-			"RES" => TopSortField.ResidentMemory,
-			"USER" => TopSortField.User,
-			"COMMAND" or "CMD" => TopSortField.Command,
-			"NI" or "NICE" => TopSortField.Nice,
-			"S" or "STATE" => TopSortField.State,
-			_ => default
-		};
-		return normalized is "%CPU" or "CPU" or "P"
-			or "%MEM" or "MEM" or "M"
-			or "PID" or "N"
-			or "TIME" or "TIME+" or "T"
-			or "VIRT" or "RES" or "USER"
-			or "COMMAND" or "CMD" or "NI" or "NICE"
-			or "S" or "STATE";
+		return TopFieldCatalog.TryParse(
+			text,
+			out field
+		);
 	}
 
 	internal static bool TryParseSortOverride(
 		string text,
-		out TopSortField field,
+		out TopFieldId field,
 		out bool? highToLow
 	) {
 		ArgumentNullException.ThrowIfNull( text );
@@ -393,6 +381,128 @@ internal static class TopRenderer {
 		}
 		state.VerticalOffset = 0;
 		state.HorizontalOffset = 0;
+		return new TopRenderFrame(
+			lines,
+			dimensions.Columns,
+			dimensions.Rows,
+			state.BoldEnabled
+		);
+	}
+
+	private static TopRenderFrame RenderFieldManager(
+		TopRuntimeState state,
+		TopTerminalDimensions dimensions
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
+		if ( 0 == state.FieldOrder.Count ) {
+			throw new InvalidOperationException(
+				"The top field order cannot be empty."
+			);
+		}
+
+		state.FieldCursor = Math.Clamp(
+			state.FieldCursor,
+			0,
+			state.FieldOrder.Count - 1
+		);
+		TopFieldDefinition sortDefinition = TopFieldCatalog.Get(
+			state.SortField
+		);
+		var lines = new List<TopRenderLine>( dimensions.Rows ) {
+			new(
+				LimitRunes(
+					$"Fields Management for 1:Def - sort field: {sortDefinition.Name}",
+					dimensions.Columns
+				),
+				TopLineStyle.Header
+			),
+			new(
+				LimitRunes(
+					"Markers: > selected, * displayed, S sort, M moving",
+					dimensions.Columns
+				),
+				TopLineStyle.Dim
+			),
+			new(
+				LimitRunes(
+					"Up/Down/Pg/Home/End move; d/Space display; s sort; Right move; Left/Enter place; q/Esc return",
+					dimensions.Columns
+				),
+				TopLineStyle.Dim
+			)
+		};
+
+		int listRows = Math.Max(
+			1,
+			dimensions.Rows - 3
+		);
+		int maxOffset = Math.Max(
+			0,
+			state.FieldOrder.Count - listRows
+		);
+		int offset = Math.Clamp(
+			state.FieldCursor - listRows + 1,
+			0,
+			maxOffset
+		);
+		int end = Math.Min(
+			state.FieldOrder.Count,
+			offset + listRows
+		);
+		for ( int index = offset; index < end; index++ ) {
+			TopFieldId field = state.FieldOrder[ index ];
+			TopFieldDefinition definition = TopFieldCatalog.Get(
+				field
+			);
+
+			string selectedMarker = " ";
+			if ( index == state.FieldCursor ) {
+				selectedMarker = ">";
+			}
+			string visibleMarker = " ";
+			if ( state.VisibleFields.Contains( field ) ) {
+				visibleMarker = "*";
+			}
+			string sortMarker = " ";
+			if ( field == state.SortField ) {
+				sortMarker = "S";
+			}
+			string moveMarker = " ";
+			if (
+				state.FieldMoveActive
+				&& index == state.FieldCursor
+			) {
+				moveMarker = "M";
+			}
+			string markers = string.Concat(
+				selectedMarker,
+				visibleMarker,
+				sortMarker,
+				moveMarker
+			);
+			string lineText = $"{markers} {definition.Name,-8} {definition.Description}";
+			TopLineStyle lineStyle = TopLineStyle.Default;
+			if ( index == state.FieldCursor ) {
+				lineStyle = TopLineStyle.HighlightReverse;
+			}
+			lines.Add(
+				new TopRenderLine(
+					LimitRunes(
+						lineText,
+						dimensions.Columns
+					),
+					lineStyle
+				)
+			);
+		}
+		while ( lines.Count < dimensions.Rows ) {
+			lines.Add(
+				new TopRenderLine( string.Empty )
+			);
+		}
 		return new TopRenderFrame(
 			lines,
 			dimensions.Columns,
@@ -537,22 +647,31 @@ internal static class TopRenderer {
 	) {
 		ArgumentNullException.ThrowIfNull( state );
 
+		var fields = new List<string>();
+		foreach ( TopFieldId field in state.FieldOrder ) {
+			if ( !state.VisibleFields.Contains( field ) ) {
+				continue;
+			}
+			TopFieldDefinition definition = TopFieldCatalog.Get(
+				field
+			);
+			bool leftJustified;
+			if ( definition.Numeric ) {
+				leftJustified = state.NumericLeftJustified;
+			} else {
+				leftJustified = !state.CharacterRightJustified;
+			}
+			fields.Add(
+				AlignField(
+					definition.Name,
+					definition.Width,
+					leftJustified
+				)
+			);
+		}
 		return string.Join(
 			" ",
-			[
-				AlignField( "PID", 7, state.NumericLeftJustified ),
-				AlignField( "USER", 8, !state.CharacterRightJustified ),
-				AlignField( "PR", 3, state.NumericLeftJustified ),
-				AlignField( "NI", 3, state.NumericLeftJustified ),
-				AlignField( "VIRT", 8, state.NumericLeftJustified ),
-				AlignField( "RES", 8, state.NumericLeftJustified ),
-				AlignField( "SHR", 8, state.NumericLeftJustified ),
-				AlignField( "S", 1, !state.CharacterRightJustified ),
-				AlignField( "%CPU", 5, state.NumericLeftJustified ),
-				AlignField( "%MEM", 4, state.NumericLeftJustified ),
-				AlignField( "TIME+", 9, state.NumericLeftJustified ),
-				AlignField( "COMMAND", 7, !state.CharacterRightJustified )
-			]
+			fields
 		);
 	}
 
@@ -564,150 +683,55 @@ internal static class TopRenderer {
 		ArgumentNullException.ThrowIfNull( row );
 		ArgumentNullException.ThrowIfNull( state );
 
-		ProcProcessSnapshot process = row.Process;
-		double cpu = state.IrixMode
-			? row.CpuPercentIrix
-			: row.CpuPercentIrix / Math.Max( 1, processorCount );
-		string command = FormatCommand( process, state.ShowCommandLine );
-		if ( state.Forest && 0 < row.ForestDepth ) {
-			command = new string( ' ', row.ForestDepth * 2 ) + "\\_ " + command;
-		}
-		string priority = process.NiceValue.HasValue
-			? ( 20 + process.NiceValue.Value ).ToString( CultureInfo.InvariantCulture )
-			: "?";
-		string nice = process.NiceValue.HasValue
-			? process.NiceValue.Value.ToString( CultureInfo.InvariantCulture )
-			: "?";
-
-		string virtualMemory = FormatTaskMemory(
-			process.VirtualMemoryBytes,
-			state.TaskScale
-		);
-		if (
-			state.SuppressZeros
-			&& process.VirtualMemoryBytes.HasValue
-			&& 0UL == process.VirtualMemoryBytes.Value
-		) {
-			virtualMemory = string.Empty;
-		}
-
-		string residentMemory = FormatTaskMemory(
-			process.ResidentMemoryBytes,
-			state.TaskScale
-		);
-		if (
-			state.SuppressZeros
-			&& process.ResidentMemoryBytes.HasValue
-			&& 0UL == process.ResidentMemoryBytes.Value
-		) {
-			residentMemory = string.Empty;
-		}
-
-		string cpuText = cpu.ToString(
-			"0.0",
-			CultureInfo.InvariantCulture
-		);
-		if ( state.SuppressZeros && 0.0 == cpu ) {
-			cpuText = string.Empty;
-		}
-
-		string memoryPercent = row.MemoryPercent.ToString(
-			"0.0",
-			CultureInfo.InvariantCulture
-		);
-		if ( state.SuppressZeros && 0.0 == row.MemoryPercent ) {
-			memoryPercent = string.Empty;
-		}
-
-		string cpuTime = FormatCpuTime( row.CpuSeconds );
-		if (
-			state.SuppressZeros
-			&& row.CpuSeconds.HasValue
-			&& 0.0 == row.CpuSeconds.Value
-		) {
-			cpuTime = string.Empty;
-		}
-
-		string[] fields = [
-			AlignField(
-				process.ProcessId.ToString( CultureInfo.InvariantCulture ),
-				7,
-				state.NumericLeftJustified
-			),
-			AlignField(
-				TruncateUser( row.User ),
-				8,
-				!state.CharacterRightJustified
-			),
-			AlignField(
-				priority,
-				3,
-				state.NumericLeftJustified
-			),
-			AlignField(
-				nice,
-				3,
-				state.NumericLeftJustified
-			),
-			AlignField(
-				virtualMemory,
-				8,
-				state.NumericLeftJustified
-			),
-			AlignField(
-				residentMemory,
-				8,
-				state.NumericLeftJustified
-			),
-			AlignField(
-				"-",
-				8,
-				state.NumericLeftJustified
-			),
-			AlignField(
-				StateCode( process ),
-				1,
-				!state.CharacterRightJustified
-			),
-			AlignField(
-				cpuText,
-				5,
-				state.NumericLeftJustified
-			),
-			AlignField(
-				memoryPercent,
-				4,
-				state.NumericLeftJustified
-			),
-			AlignField(
-				cpuTime,
-				9,
-				state.NumericLeftJustified
-			),
-			FormatCommandField(
-				command,
-				state.CharacterRightJustified
-			)
-		];
-
-		int sortIndex = SortFieldIndex( state.SortField );
 		var builder = new StringBuilder();
 		int runePosition = 0;
-		int sortFieldStart = 0;
+		int sortFieldStart = -1;
 		int sortFieldLength = 0;
-		for ( int index = 0; index < fields.Length; index++ ) {
-			if ( 0 < index ) {
+		bool first = true;
+		foreach ( TopFieldId field in state.FieldOrder ) {
+			if ( !state.VisibleFields.Contains( field ) ) {
+				continue;
+			}
+
+			TopFieldDefinition definition = TopFieldCatalog.Get(
+				field
+			);
+			string fieldText = definition.Formatter(
+				row,
+				state,
+				processorCount
+			);
+			if ( TopFieldId.Command == field ) {
+				fieldText = FormatCommandField(
+					fieldText,
+					state.CharacterRightJustified
+				);
+			} else {
+				bool leftJustified;
+				if ( definition.Numeric ) {
+					leftJustified = state.NumericLeftJustified;
+				} else {
+					leftJustified = !state.CharacterRightJustified;
+				}
+				fieldText = AlignField(
+					fieldText,
+					definition.Width,
+					leftJustified
+				);
+			}
+
+			if ( !first ) {
 				builder.Append( ' ' );
 				runePosition++;
 			}
+			first = false;
 
-			string field = fields[ index ];
-			int fieldLength = CountRunes( field );
-			if ( sortIndex == index ) {
+			int fieldLength = CountRunes( fieldText );
+			if ( field == state.SortField ) {
 				sortFieldStart = runePosition;
 				sortFieldLength = fieldLength;
 			}
-			builder.Append( field );
+			builder.Append( fieldText );
 			runePosition += fieldLength;
 		}
 
@@ -862,24 +886,16 @@ internal static class TopRenderer {
 	}
 
 	private static Comparison<TopTaskRow> SortComparison(
-		TopSortField field,
+		TopFieldId field,
 		bool highToLow
 	) {
-		Comparison<TopTaskRow> comparison = field switch {
-			TopSortField.Memory => ( left, right ) => Descending( left.MemoryPercent, right.MemoryPercent, left, right ),
-			TopSortField.Pid => ( left, right ) => Descending( left.Process.ProcessId, right.Process.ProcessId, left, right ),
-			TopSortField.Time => ( left, right ) => Descending( left.CpuSeconds ?? 0.0, right.CpuSeconds ?? 0.0, left, right ),
-			TopSortField.VirtualMemory => ( left, right ) => Descending( ObservedOrZero( left.Process.VirtualMemoryBytes ), ObservedOrZero( right.Process.VirtualMemoryBytes ), left, right ),
-			TopSortField.ResidentMemory => ( left, right ) => Descending( ObservedOrZero( left.Process.ResidentMemoryBytes ), ObservedOrZero( right.Process.ResidentMemoryBytes ), left, right ),
-			TopSortField.User => ( left, right ) => Descending( left.User, right.User, left, right ),
-			TopSortField.Command => ( left, right ) => Descending( FormatCommand( left.Process, false ), FormatCommand( right.Process, false ), left, right ),
-			TopSortField.Nice => ( left, right ) => Descending( ObservedNice( left.Process ), ObservedNice( right.Process ), left, right ),
-			TopSortField.State => ( left, right ) => Descending( StateCode( left.Process ), StateCode( right.Process ), left, right ),
-			_ => ( left, right ) => Descending( left.CpuPercentIrix, right.CpuPercentIrix, left, right )
-		};
-		return highToLow
+		Comparison<TopTaskRow> comparison = TopFieldCatalog.Get(
+			field
+		).HighToLowComparison;
+		return ( highToLow )
 			? comparison
-			: ( left, right ) => comparison( right, left );
+			: ( left, right ) => comparison( right, left )
+		;
 	}
 
 	private static int Descending<T>( T left, T right, TopTaskRow leftRow, TopTaskRow rightRow )
@@ -887,6 +903,81 @@ internal static class TopRenderer {
 		int result = right.CompareTo( left );
 		return TieBreak( result, leftRow, rightRow );
 	}
+
+	internal static int CompareFieldDescending<T>(
+		T left,
+		T right,
+		TopTaskRow leftRow,
+		TopTaskRow rightRow
+	)
+		where T : IComparable<T> {
+		ArgumentNullException.ThrowIfNull( leftRow );
+		ArgumentNullException.ThrowIfNull( rightRow );
+		return Descending(
+			left,
+			right,
+			leftRow,
+			rightRow
+		);
+	}
+
+	internal static ulong FieldObservedOrZero(
+		ProcObservedValue<ulong> value
+	) => ObservedOrZero( value );
+
+	internal static int FieldObservedPriority(
+		ProcProcessSnapshot process
+	) {
+		ArgumentNullException.ThrowIfNull( process );
+		if ( !process.NiceValue.HasValue ) {
+			return int.MaxValue;
+		}
+		return 20 + process.NiceValue.Value;
+	}
+
+	internal static int FieldObservedNice(
+		ProcProcessSnapshot process
+	) {
+		ArgumentNullException.ThrowIfNull( process );
+		return ObservedNice( process );
+	}
+
+	internal static string FieldStateCode(
+		ProcProcessSnapshot process
+	) {
+		ArgumentNullException.ThrowIfNull( process );
+		return StateCode( process );
+	}
+
+	internal static string FieldCommand(
+		ProcProcessSnapshot process,
+		bool commandLine
+	) {
+		ArgumentNullException.ThrowIfNull( process );
+		return FormatCommand(
+			process,
+			commandLine
+		);
+	}
+
+	internal static string FieldTruncateUser(
+		string user
+	) {
+		ArgumentNullException.ThrowIfNull( user );
+		return TruncateUser( user );
+	}
+
+	internal static string FieldCpuTime(
+		double? seconds
+	) => FormatCpuTime( seconds );
+
+	internal static string FieldTaskMemory(
+		ProcObservedValue<ulong> bytes,
+		TopMemoryScale scale
+	) => FormatTaskMemory(
+		bytes,
+		scale
+	);
 
 	private static int TieBreak( int comparison, TopTaskRow left, TopTaskRow right ) =>
 		0 != comparison ? comparison : left.Process.ProcessId.CompareTo( right.Process.ProcessId );
@@ -926,6 +1017,12 @@ internal static class TopRenderer {
 		ArgumentNullException.ThrowIfNull( state );
 
 		if ( !state.HighlightSortColumn ) {
+			return null;
+		}
+		if (
+			0 > formatted.SortFieldStart
+			|| 0 >= formatted.SortFieldLength
+		) {
 			return null;
 		}
 
@@ -991,24 +1088,6 @@ internal static class TopRenderer {
 			: TopLineStyle.HighlightBold
 		;
 	}
-
-	private static int SortFieldIndex(
-		TopSortField field
-	) => field switch {
-		TopSortField.Pid => 0,
-		TopSortField.User => 1,
-		TopSortField.Nice => 3,
-		TopSortField.VirtualMemory => 4,
-		TopSortField.ResidentMemory => 5,
-		TopSortField.State => 7,
-		TopSortField.Cpu => 8,
-		TopSortField.Memory => 9,
-		TopSortField.Time => 10,
-		TopSortField.Command => 11,
-		_ => throw new ArgumentOutOfRangeException(
-			nameof( field )
-		)
-	};
 
 	private static int CountRunes(
 		string text

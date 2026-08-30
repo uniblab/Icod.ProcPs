@@ -135,9 +135,17 @@ profile:
 - `j` toggles character columns between left justification (the default) and
   right justification. The trailing COMMAND value remains unpadded in the
   default mode and gains only the minimum header width when right-justified.
+- `f` opens the single-window Fields Management screen. `*` marks displayed
+  fields, `S` marks the active sort field, and `>` marks the current selection.
+  Arrow keys, Page Up, Page Down, Home, and End navigate. `d` or Space toggles
+  field visibility, `s` designates the sort field, Right begins repositioning,
+  and Left or Enter commits the new position. `q` or Escape returns to the
+  process display. Visibility and order changes reset horizontal scrolling but
+  preserve the task display's vertical position. Alternate-window `a`/`w`
+  field-group cycling remains deferred with alternate-display mode.
 - `x` toggles highlighting of the active sort field. The highlight is clipped
   to the visible portion of that field when the task display is horizontally
-  scrolled.
+  scrolled. A hidden sort field has no task-column highlight.
 - `y` toggles highlighting of tasks whose observed state is running. The
   built-in monochrome profile starts with running-row highlighting enabled and
   uses bold emphasis until `b` changes it.
@@ -214,7 +222,6 @@ tranches rather than represented incompletely:
 
 - personal/system `toprc` persistence beyond the built-in-default behavior;
 - alternate-display multi-window/field-group mode;
-- the full interactive field-management screen;
 - configurable color schemes and color-management screens;
 - per-logical-CPU activity rows until the Shared metrics contract exposes them;
 - cumulative dead-child CPU time (`-S`); and
