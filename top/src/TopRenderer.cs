@@ -29,13 +29,20 @@ using Icod.ProcPs.Shared;
 internal static class TopRenderer {
 	private const int SummaryRows = 5;
 	private const int TableHeaderRows = 1;
+
+	private readonly record struct TopFormattedTaskLine(
+		string Text,
+		int SortFieldStart,
+		int SortFieldLength
+	);
+
 	private static readonly string[] HelpLines = [
 		"top help -- core interactive commands",
 		" q              quit",
 		" Enter/Space    refresh now",
 		" P/M/N/T        sort by CPU, memory, PID, or time",
 		" R              reverse/normal sort direction",
-		" B / b / y      bold, emphasis mode, running rows",
+		" B / b / x / y  bold, emphasis, sort column, running rows",
 		" c              toggle command name / command line",
 		" H              toggle thread display",
 		" i              toggle idle-task suppression",
@@ -93,12 +100,28 @@ internal static class TopRenderer {
 			index < tasks.Count && lines.Count < dimensions.Rows - footerRows;
 			index++ ) {
 			TopTaskRow task = tasks[ index ];
-			string line = FormatTaskLine( task, state, sample.ProcessorCount );
+			TopFormattedTaskLine formatted = FormatTaskLine(
+				task,
+				state,
+				sample.ProcessorCount
+			);
+			string visibleLine = SliceForDisplay(
+				formatted.Text,
+				state.HorizontalOffset,
+				dimensions.Columns
+			);
+			TopLineStyle lineStyle = TaskLineStyle(
+				task,
+				state
+			);
 			lines.Add( new TopRenderLine(
-				SliceForDisplay( line, state.HorizontalOffset, dimensions.Columns ),
-				TaskLineStyle(
-					task,
-					state
+				visibleLine,
+				lineStyle,
+				SortColumnSpans(
+					visibleLine,
+					formatted,
+					state,
+					lineStyle
 				)
 			) );
 		}
@@ -143,7 +166,11 @@ internal static class TopRenderer {
 		lines.Add( LimitRunes( BuildHeader(), width ) );
 		foreach ( TopTaskRow task in SelectAndOrderTasks( sample, state ) ) {
 			lines.Add( LimitRunes(
-				FormatTaskLine( task, state, sample.ProcessorCount ),
+				FormatTaskLine(
+					task,
+					state,
+					sample.ProcessorCount
+				).Text,
 				width
 			) );
 		}
@@ -401,11 +428,14 @@ internal static class TopRenderer {
 	private static string BuildHeader() =>
 		"    PID USER       PR  NI     VIRT      RES      SHR S  %CPU %MEM     TIME+ COMMAND";
 
-	private static string FormatTaskLine(
+	private static TopFormattedTaskLine FormatTaskLine(
 		TopTaskRow row,
 		TopRuntimeState state,
 		int processorCount
 	) {
+		ArgumentNullException.ThrowIfNull( row );
+		ArgumentNullException.ThrowIfNull( state );
+
 		ProcProcessSnapshot process = row.Process;
 		double cpu = state.IrixMode
 			? row.CpuPercentIrix
@@ -420,21 +450,90 @@ internal static class TopRenderer {
 		string nice = process.NiceValue.HasValue
 			? process.NiceValue.Value.ToString( CultureInfo.InvariantCulture )
 			: "?";
-		return string.Format(
-			CultureInfo.InvariantCulture,
-			"{0,7} {1,-8} {2,3} {3,3} {4,8} {5,8} {6,8} {7,1} {8,5:0.0} {9,4:0.0} {10,9} {11}",
-			process.ProcessId,
-			TruncateUser( row.User ),
-			priority,
-			nice,
-			FormatTaskMemory( process.VirtualMemoryBytes, state.TaskScale ),
-			FormatTaskMemory( process.ResidentMemoryBytes, state.TaskScale ),
-			"-",
-			StateCode( process ),
-			cpu,
-			row.MemoryPercent,
-			FormatCpuTime( row.CpuSeconds ),
+		string[] fields = [
+			string.Format(
+				CultureInfo.InvariantCulture,
+				"{0,7}",
+				process.ProcessId
+			),
+			string.Format(
+				CultureInfo.InvariantCulture,
+				"{0,-8}",
+				TruncateUser( row.User )
+			),
+			string.Format(
+				CultureInfo.InvariantCulture,
+				"{0,3}",
+				priority
+			),
+			string.Format(
+				CultureInfo.InvariantCulture,
+				"{0,3}",
+				nice
+			),
+			string.Format(
+				CultureInfo.InvariantCulture,
+				"{0,8}",
+				FormatTaskMemory( process.VirtualMemoryBytes, state.TaskScale )
+			),
+			string.Format(
+				CultureInfo.InvariantCulture,
+				"{0,8}",
+				FormatTaskMemory( process.ResidentMemoryBytes, state.TaskScale )
+			),
+			string.Format(
+				CultureInfo.InvariantCulture,
+				"{0,8}",
+				"-"
+			),
+			string.Format(
+				CultureInfo.InvariantCulture,
+				"{0,1}",
+				StateCode( process )
+			),
+			string.Format(
+				CultureInfo.InvariantCulture,
+				"{0,5:0.0}",
+				cpu
+			),
+			string.Format(
+				CultureInfo.InvariantCulture,
+				"{0,4:0.0}",
+				row.MemoryPercent
+			),
+			string.Format(
+				CultureInfo.InvariantCulture,
+				"{0,9}",
+				FormatCpuTime( row.CpuSeconds )
+			),
 			command
+		];
+
+		int sortIndex = SortFieldIndex( state.SortField );
+		var builder = new StringBuilder();
+		int runePosition = 0;
+		int sortFieldStart = 0;
+		int sortFieldLength = 0;
+		for ( int index = 0; index < fields.Length; index++ ) {
+			if ( 0 < index ) {
+				builder.Append( ' ' );
+				runePosition++;
+			}
+
+			string field = fields[ index ];
+			int fieldLength = CountRunes( field );
+			if ( sortIndex == index ) {
+				sortFieldStart = runePosition;
+				sortFieldLength = fieldLength;
+			}
+			builder.Append( field );
+			runePosition += fieldLength;
+		}
+
+		return new TopFormattedTaskLine(
+			builder.ToString(),
+			sortFieldStart,
+			sortFieldLength
 		);
 	}
 
@@ -589,6 +688,132 @@ internal static class TopRenderer {
 			return TopLineStyle.HighlightBold;
 		}
 		return TopLineStyle.HighlightReverse;
+	}
+
+	private static IReadOnlyList<TopRenderSpan>? SortColumnSpans(
+		string visibleLine,
+		TopFormattedTaskLine formatted,
+		TopRuntimeState state,
+		TopLineStyle lineStyle
+	) {
+		ArgumentNullException.ThrowIfNull( visibleLine );
+		ArgumentNullException.ThrowIfNull( state );
+
+		if ( !state.HighlightSortColumn ) {
+			return null;
+		}
+
+		int visibleLength = CountRunes( visibleLine );
+		int visibleStart = state.HorizontalOffset;
+		int fieldStart = formatted.SortFieldStart;
+		int fieldEnd = fieldStart + formatted.SortFieldLength;
+		int visibleEnd = visibleStart + visibleLength;
+		if (
+			fieldEnd <= visibleStart
+			|| visibleEnd <= fieldStart
+		) {
+			return null;
+		}
+
+		int relativeStart = Math.Max(
+			0,
+			fieldStart - visibleStart
+		);
+		int relativeEnd = Math.Min(
+			visibleLength,
+			fieldEnd - visibleStart
+		);
+		int start = StringIndexAtRuneOffset(
+			visibleLine,
+			relativeStart
+		);
+		int end = StringIndexAtRuneOffset(
+			visibleLine,
+			relativeEnd
+		);
+		if ( end <= start ) {
+			return null;
+		}
+
+		return [
+			new TopRenderSpan(
+				start,
+				end - start,
+				SortColumnStyle(
+					state,
+					lineStyle
+				)
+			)
+		];
+	}
+
+	private static TopLineStyle SortColumnStyle(
+		TopRuntimeState state,
+		TopLineStyle lineStyle
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		TopLineStyle preferred = ( state.HighlightBold )
+			? TopLineStyle.HighlightBold
+			: TopLineStyle.HighlightReverse
+		;
+		if ( lineStyle != preferred ) {
+			return preferred;
+		}
+		return ( state.HighlightBold )
+			? TopLineStyle.HighlightReverse
+			: TopLineStyle.HighlightBold
+		;
+	}
+
+	private static int SortFieldIndex(
+		TopSortField field
+	) => field switch {
+		TopSortField.Pid => 0,
+		TopSortField.User => 1,
+		TopSortField.Nice => 3,
+		TopSortField.VirtualMemory => 4,
+		TopSortField.ResidentMemory => 5,
+		TopSortField.State => 7,
+		TopSortField.Cpu => 8,
+		TopSortField.Memory => 9,
+		TopSortField.Time => 10,
+		TopSortField.Command => 11,
+		_ => throw new ArgumentOutOfRangeException(
+			nameof( field )
+		)
+	};
+
+	private static int CountRunes(
+		string text
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+
+		int result = 0;
+		foreach ( Rune rune in text.EnumerateRunes() ) {
+			_ = rune;
+			result++;
+		}
+		return result;
+	}
+
+	private static int StringIndexAtRuneOffset(
+		string text,
+		int runeOffset
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+		ArgumentOutOfRangeException.ThrowIfNegative( runeOffset );
+
+		int stringIndex = 0;
+		int runeIndex = 0;
+		foreach ( Rune rune in text.EnumerateRunes() ) {
+			if ( runeOffset <= runeIndex ) {
+				break;
+			}
+			stringIndex += rune.Utf16SequenceLength;
+			runeIndex++;
+		}
+		return stringIndex;
 	}
 
 	private static string StateCode( ProcProcessSnapshot process ) {

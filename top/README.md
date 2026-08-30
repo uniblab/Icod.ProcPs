@@ -120,7 +120,11 @@ profile:
 - `R` toggles the active sort direction between high-to-low and low-to-high.
 - `B` globally enables or disables use of bold rendition in the summary and
   task areas.
-- `b` selects bold versus reverse-video emphasis for highlighted task rows.
+- `b` selects bold versus reverse-video emphasis for highlighted task rows
+  and sort fields.
+- `x` toggles highlighting of the active sort field. The highlight is clipped
+  to the visible portion of that field when the task display is horizontally
+  scrolled.
 - `y` toggles highlighting of tasks whose observed state is running. The
   built-in monochrome profile starts with running-row highlighting enabled and
   uses bold emphasis until `b` changes it.

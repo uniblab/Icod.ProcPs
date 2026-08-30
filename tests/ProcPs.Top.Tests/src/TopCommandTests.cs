@@ -443,6 +443,73 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task SortColumnHighlightTracksFieldScrollAndEmphasis() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'x' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'M' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Right ) );
+		terminal.Events.Enqueue( CharacterEvent( 'b' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 5, terminal.Frames.Count );
+		Assert.Null(
+			terminal.Frames[ 0 ].Lines[ 6 ].Spans
+		);
+
+		TopRenderSpan cpuSpan = Assert.Single(
+			terminal.Frames[ 1 ].Lines[ 6 ].Spans!
+		);
+		Assert.Equal( 54, cpuSpan.Start );
+		Assert.Equal( 5, cpuSpan.Length );
+		Assert.Equal(
+			TopLineStyle.HighlightBold,
+			cpuSpan.Style
+		);
+
+		TopRenderSpan memorySpan = Assert.Single(
+			terminal.Frames[ 2 ].Lines[ 6 ].Spans!
+		);
+		Assert.Equal( 60, memorySpan.Start );
+		Assert.Equal( 4, memorySpan.Length );
+		Assert.Equal(
+			TopLineStyle.HighlightBold,
+			memorySpan.Style
+		);
+
+		TopRenderSpan scrolledMemorySpan = Assert.Single(
+			terminal.Frames[ 3 ].Lines[ 6 ].Spans!
+		);
+		Assert.Equal( 52, scrolledMemorySpan.Start );
+		Assert.Equal( 4, scrolledMemorySpan.Length );
+		Assert.Equal(
+			TopLineStyle.HighlightBold,
+			scrolledMemorySpan.Style
+		);
+
+		TopRenderSpan reverseMemorySpan = Assert.Single(
+			terminal.Frames[ 4 ].Lines[ 6 ].Spans!
+		);
+		Assert.Equal( 52, reverseMemorySpan.Start );
+		Assert.Equal( 4, reverseMemorySpan.Length );
+		Assert.Equal(
+			TopLineStyle.HighlightReverse,
+			reverseMemorySpan.Style
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task ImmediateRefreshInputResamplesWithoutWaitingForTimeout() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock );

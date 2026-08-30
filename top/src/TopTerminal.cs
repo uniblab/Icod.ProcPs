@@ -85,10 +85,18 @@ internal enum TopLineStyle {
 	HighlightReverse
 }
 
+/// <summary>Represents one styled span within a rendered top line.</summary>
+internal readonly record struct TopRenderSpan(
+	int Start,
+	int Length,
+	TopLineStyle Style
+);
+
 /// <summary>Represents one rendered top line.</summary>
 internal readonly record struct TopRenderLine(
 	string Text,
-	TopLineStyle Style = TopLineStyle.Default
+	TopLineStyle Style = TopLineStyle.Default,
+	IReadOnlyList<TopRenderSpan>? Spans = null
 );
 
 /// <summary>Represents a complete top display frame.</summary>
@@ -284,7 +292,7 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 				continue;
 			}
 			window.Move( row, 0 );
-			window.Write( line.Text, StyleFor( line.Style, frame.BoldEnabled ) );
+			WriteLine( window, line, frame.BoldEnabled );
 		}
 		window.Move( 0, 0 );
 		await this.session.RefreshAsync( cancellationToken ).ConfigureAwait( false );
@@ -339,6 +347,64 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 			CursesKey.Tab => new TopInputEvent( TopInputKey.Tab, null ),
 			_ => new TopInputEvent( TopInputKey.Other, null )
 		};
+	}
+
+	private static void WriteLine(
+		CursesWindow window,
+		TopRenderLine line,
+		bool boldEnabled
+	) {
+		ArgumentNullException.ThrowIfNull( window );
+
+		CursesStyle baseStyle = StyleFor(
+			line.Style,
+			boldEnabled
+		);
+		if ( line.Spans is null || 0 == line.Spans.Count ) {
+			window.Write(
+				line.Text,
+				baseStyle
+			);
+			return;
+		}
+
+		int position = 0;
+		foreach ( TopRenderSpan span in line.Spans ) {
+			if (
+				0 > span.Start
+				|| 0 >= span.Length
+				|| span.Start < position
+				|| line.Text.Length < span.Start
+				|| line.Text.Length - span.Start < span.Length
+			) {
+				throw new InvalidOperationException(
+					"A top render line contained an invalid or overlapping styled span."
+				);
+			}
+			if ( position < span.Start ) {
+				window.Write(
+					line.Text[ position..span.Start ],
+					baseStyle
+				);
+			}
+			window.Write(
+				line.Text.Substring(
+					span.Start,
+					span.Length
+				),
+				StyleFor(
+					span.Style,
+					boldEnabled
+				)
+			);
+			position = span.Start + span.Length;
+		}
+		if ( position < line.Text.Length ) {
+			window.Write(
+				line.Text[ position.. ],
+				baseStyle
+			);
+		}
 	}
 
 	private static CursesStyle StyleFor(
