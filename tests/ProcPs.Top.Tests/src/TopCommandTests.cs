@@ -789,7 +789,7 @@ public sealed class TopCommandTests {
 
 		Assert.Equal( 0, result.ExitCode );
 		Assert.Equal( 1, processes.CaptureCount );
-		Assert.Equal( 10, terminal.Frames.Count );
+		Assert.Equal( 12, terminal.Frames.Count );
 
 		Assert.True(
 			terminal.Frames[ 1 ].Lines.Any(
@@ -827,7 +827,7 @@ public sealed class TopCommandTests {
 		);
 
 		TopRenderSpan span = Assert.Single(
-			terminal.Frames[ 9 ].Lines[ 6 ].Spans!
+			reordered.Lines[ 6 ].Spans!
 		);
 		Assert.Equal( 9, span.Start );
 		Assert.Equal( 7, span.Length );
