@@ -46,7 +46,9 @@ internal static class TopRenderer {
 		" R              reverse/normal sort direction",
 		" A              toggle alternate-display mode",
 		" a / w          next / previous window",
-		" g              choose window 1 through 4",
+		" g / G          choose / rename current window",
+		" - / _          show/hide current / all task windows",
+		" +              reset and show all windows",
 		" B/b/x/y        emphasis and highlighting",
 		" J / j          justify numeric / character columns",
 		" f              manage task fields",
@@ -202,6 +204,9 @@ internal static class TopRenderer {
 			? 0
 			: 1
 		;
+		int visibleWindowCount = CountVisibleTaskWindows(
+			state
+		);
 		var lines = new List<TopRenderLine>(
 			dimensions.Rows
 		);
@@ -219,11 +224,11 @@ internal static class TopRenderer {
 		}
 
 		int windowAreaRows = dimensions.Rows - SummaryRows - footerRows;
-		if ( TopRuntimeState.WindowCount > windowAreaRows ) {
+		if ( visibleWindowCount > windowAreaRows ) {
 			lines.Add(
 				new TopRenderLine(
 					LimitRunes(
-						$"alternate display requires at least {SummaryRows + TopRuntimeState.WindowCount} terminal rows",
+						$"alternate display requires at least {SummaryRows + visibleWindowCount} terminal rows",
 						dimensions.Columns
 					),
 					TopLineStyle.Message
@@ -242,11 +247,16 @@ internal static class TopRenderer {
 			);
 		}
 
-		int totalTaskRows = windowAreaRows - TopRuntimeState.WindowCount;
-		int baseTaskRows = totalTaskRows / TopRuntimeState.WindowCount;
-		int extraTaskRows = totalTaskRows % TopRuntimeState.WindowCount;
+		int remainingTaskRows = Math.Max(
+			0,
+			windowAreaRows - visibleWindowCount
+		);
+		int remainingVisibleWindows = visibleWindowCount;
 
 		for ( int windowIndex = 0; windowIndex < TopRuntimeState.WindowCount; windowIndex++ ) {
+			if ( !state.Windows[ windowIndex ].TaskDisplayVisible ) {
+				continue;
+			}
 			state.ActivateWindow(
 				windowIndex
 			);
@@ -254,16 +264,13 @@ internal static class TopRenderer {
 				sample,
 				state
 			);
-			int taskRows = baseTaskRows;
-			if ( windowIndex < extraTaskRows ) {
-				taskRows++;
-			}
-			if ( 0 < state.MaximumTasks ) {
-				taskRows = Math.Min(
-					taskRows,
-					state.MaximumTasks
-				);
-			}
+			int taskRows = AllocateNextAlternateTaskRows(
+				state.MaximumTasks,
+				remainingTaskRows,
+				remainingVisibleWindows
+			);
+			remainingTaskRows -= taskRows;
+			remainingVisibleWindows--;
 			int maxOffset = ( 0 < taskRows )
 				? Math.Max(
 					0,
@@ -539,24 +546,80 @@ internal static class TopRenderer {
 			);
 		}
 
+		state.SynchronizeCurrentWindow();
+		if ( !state.TaskDisplayVisible ) {
+			return 0;
+		}
+
 		int windowAreaRows = Math.Max(
 			0,
 			dimensions.Rows - SummaryRows - footerRows
 		);
-		int totalTaskRows = Math.Max(
-			0,
-			windowAreaRows - TopRuntimeState.WindowCount
+		int visibleWindowCount = CountVisibleTaskWindows(
+			state
 		);
-		int result = totalTaskRows / TopRuntimeState.WindowCount;
-		int extraTaskRows = totalTaskRows % TopRuntimeState.WindowCount;
-		if ( state.CurrentWindowIndex < extraTaskRows ) {
-			result++;
-		}
-		if ( 0 < state.MaximumTasks ) {
-			result = Math.Min(
-				result,
-				state.MaximumTasks
+		int remainingTaskRows = Math.Max(
+			0,
+			windowAreaRows - visibleWindowCount
+		);
+		int remainingVisibleWindows = visibleWindowCount;
+		for ( int index = 0; index < TopRuntimeState.WindowCount; index++ ) {
+			TopWindowState window = state.Windows[
+				index
+			];
+			if ( !window.TaskDisplayVisible ) {
+				continue;
+			}
+			int taskRows = AllocateNextAlternateTaskRows(
+				window.MaximumTasks,
+				remainingTaskRows,
+				remainingVisibleWindows
 			);
+			if ( index == state.CurrentWindowIndex ) {
+				return taskRows;
+			}
+			remainingTaskRows -= taskRows;
+			remainingVisibleWindows--;
+		}
+		return 0;
+	}
+
+	private static int CountVisibleTaskWindows(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		int result = 0;
+		foreach ( TopWindowState window in state.Windows ) {
+			if ( window.TaskDisplayVisible ) {
+				result++;
+			}
+		}
+		return result;
+	}
+
+	private static int AllocateNextAlternateTaskRows(
+		int maximumTasks,
+		int remainingTaskRows,
+		int remainingVisibleWindows
+	) {
+		ArgumentOutOfRangeException.ThrowIfNegative( maximumTasks );
+		ArgumentOutOfRangeException.ThrowIfNegative( remainingTaskRows );
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( remainingVisibleWindows );
+
+		if ( 1 == remainingVisibleWindows ) {
+			return remainingTaskRows;
+		}
+		if ( 0 < maximumTasks ) {
+			return Math.Min(
+				maximumTasks,
+				remainingTaskRows
+			);
+		}
+
+		int result = remainingTaskRows / remainingVisibleWindows;
+		if ( 0 < remainingTaskRows % remainingVisibleWindows ) {
+			result++;
 		}
 		return result;
 	}

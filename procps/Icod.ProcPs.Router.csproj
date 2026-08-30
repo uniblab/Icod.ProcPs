@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.15 adds four independent top field groups/windows (Def, Job, Mem, Usr), alternate-display rendering, A/a/w/g window navigation, per-window field/filter/sort persistence, and removes alpha.14's unnecessary unsafe LibraryImport requirement.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.15 completes the four-window top alternate-display tranche with A/a/w/g navigation, G naming, -/_ visibility toggles, =/+ window reset semantics, procps-style pane sizing, per-window persistence, and the alpha.14 interop correction.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

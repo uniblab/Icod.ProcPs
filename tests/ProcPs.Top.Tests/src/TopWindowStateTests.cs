@@ -71,6 +71,10 @@ public sealed class TopWindowStateTests {
 		);
 		source.ActivateWindow( 2 );
 		source.MaximumTasks = 7;
+		source.TaskDisplayVisible = false;
+		source.RenameCurrentWindow(
+			"Ram"
+		);
 
 		string serialized = TopConfigurationCodec.Serialize(
 			source
@@ -83,8 +87,9 @@ public sealed class TopWindowStateTests {
 
 		Assert.True( restored.AlternateDisplayMode );
 		Assert.Equal( 2, restored.CurrentWindowIndex );
-		Assert.Equal( "3:Mem", restored.CurrentWindowLabel );
+		Assert.Equal( "3:Ram", restored.CurrentWindowLabel );
 		Assert.Equal( 7, restored.MaximumTasks );
+		Assert.False( restored.TaskDisplayVisible );
 
 		restored.ActivateWindow( 0 );
 		Assert.Equal( TopFieldId.Pid, restored.SortField );
@@ -92,5 +97,31 @@ public sealed class TopWindowStateTests {
 		restored.ActivateWindow( 1 );
 		Assert.Equal( TopFieldId.Memory, restored.SortField );
 		Assert.DoesNotContain( TopFieldId.Pid, restored.VisibleFields );
+	}
+
+	[Fact]
+	public void VisibilityTogglesPreserveIndependentWindowChoices() {
+		TopRuntimeState state = new();
+		state.TaskDisplayVisible = false;
+		state.SynchronizeCurrentWindow();
+		state.ActivateWindow( 1 );
+
+		Assert.True( state.TaskDisplayVisible );
+
+		state.ToggleAllTaskDisplays();
+
+		Assert.False( state.TaskDisplayVisible );
+
+		state.ActivateWindow( 0 );
+		Assert.True( state.TaskDisplayVisible );
+
+		state.ShowAllTaskDisplays();
+
+		for ( int index = 0; index < TopRuntimeState.WindowCount; index++ ) {
+			state.ActivateWindow(
+				index
+			);
+			Assert.True( state.TaskDisplayVisible );
+		}
 	}
 }

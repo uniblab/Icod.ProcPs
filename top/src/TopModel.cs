@@ -57,7 +57,8 @@ internal sealed class TopWindowState {
 		this.Name = name;
 	}
 
-	internal string Name { get; }
+	internal string Name { get; private set; }
+	internal bool TaskDisplayVisible { get; set; } = true;
 	internal TopFieldId SortField { get; set; } = TopFieldId.Cpu;
 	internal bool SortHighToLow { get; set; } = true;
 	internal bool HighlightBold { get; set; } = true;
@@ -88,11 +89,19 @@ internal sealed class TopWindowState {
 		return result;
 	}
 
+	internal void Rename(
+		string name
+	) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( name );
+		this.Name = name;
+	}
+
 	internal void CaptureFrom(
 		TopRuntimeState state
 	) {
 		ArgumentNullException.ThrowIfNull( state );
 
+		this.TaskDisplayVisible = state.TaskDisplayVisible;
 		this.SortField = state.SortField;
 		this.SortHighToLow = state.SortHighToLow;
 		this.HighlightBold = state.HighlightBold;
@@ -129,6 +138,7 @@ internal sealed class TopWindowState {
 	) {
 		ArgumentNullException.ThrowIfNull( state );
 
+		state.TaskDisplayVisible = this.TaskDisplayVisible;
 		state.SortField = this.SortField;
 		state.SortHighToLow = this.SortHighToLow;
 		state.HighlightBold = this.HighlightBold;
@@ -165,6 +175,7 @@ internal sealed class TopWindowState {
 	) {
 		ArgumentNullException.ThrowIfNull( source );
 
+		this.TaskDisplayVisible = source.TaskDisplayVisible;
 		this.SortField = source.SortField;
 		this.SortHighToLow = source.SortHighToLow;
 		this.HighlightBold = source.HighlightBold;
@@ -230,6 +241,7 @@ internal sealed class TopRuntimeState {
 	internal bool SecureMode { get; set; }
 	internal bool SingleCpuSummary { get; set; } = true;
 	internal bool AlternateDisplayMode { get; set; }
+	internal bool TaskDisplayVisible { get; set; } = true;
 	internal int CurrentWindowIndex { get; private set; }
 	internal int VerticalOffset { get; set; }
 	internal int HorizontalOffset { get; set; }
@@ -245,7 +257,7 @@ internal sealed class TopRuntimeState {
 	internal List<TopFieldId> FieldOrder { get; } = TopFieldCatalog.CreateDefaultOrder();
 	internal HashSet<TopFieldId> VisibleFields { get; } = TopFieldCatalog.CreateDefaultVisible();
 	internal IReadOnlyList<TopWindowState> Windows => this.windows;
-	internal string CurrentWindowLabel => $"{this.CurrentWindowIndex + 1}:{GetWindowName( this.CurrentWindowIndex )}";
+	internal string CurrentWindowLabel => $"{this.CurrentWindowIndex + 1}:{this.windows[ this.CurrentWindowIndex ].Name}";
 
 	internal static string GetWindowName(
 		int index
@@ -262,6 +274,41 @@ internal sealed class TopRuntimeState {
 		this.windows[
 			this.CurrentWindowIndex
 		].CaptureFrom(
+			this
+		);
+	}
+
+	internal void RenameCurrentWindow(
+		string name
+	) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( name );
+		this.windows[
+			this.CurrentWindowIndex
+		].Rename(
+			name
+		);
+	}
+
+	internal void ToggleAllTaskDisplays() {
+		this.SynchronizeCurrentWindow();
+		foreach ( TopWindowState window in this.windows ) {
+			window.TaskDisplayVisible = !window.TaskDisplayVisible;
+		}
+		this.windows[
+			this.CurrentWindowIndex
+		].ApplyTo(
+			this
+		);
+	}
+
+	internal void ShowAllTaskDisplays() {
+		this.SynchronizeCurrentWindow();
+		foreach ( TopWindowState window in this.windows ) {
+			window.TaskDisplayVisible = true;
+		}
+		this.windows[
+			this.CurrentWindowIndex
+		].ApplyTo(
 			this
 		);
 	}
@@ -338,6 +385,7 @@ internal enum TopPromptKind {
 	Delay,
 	MaximumTasks,
 	Window,
+	WindowName,
 	Locate,
 	OtherFilterCaseSensitive,
 	OtherFilterIgnoreCase,

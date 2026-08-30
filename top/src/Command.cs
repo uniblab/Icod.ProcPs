@@ -136,12 +136,13 @@ Options:
 
 Interactive keys:
  q quit; 0 zero suppress; n/# max tasks; P/M/N/T sort; R reverse/normal sort;
- A alternate display; a/w next/previous window; g choose window; B bold enable;
+ A alternate display; a/w next/previous window; g/G choose/rename window;
+ -/_ show/hide current/all windows; =/+ reset current/all windows; B bold enable;
  b emphasis mode; J numeric justify; j character justify; f manage fields;
  x sort column; y running rows; c command line; H threads; i idle tasks;
  V forest; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
  O/o other filter; L locate; & locate next; k signal; r renice; W write config;
- = reset limits; arrows/PgUp/PgDn/Home/End scroll; h/? help.
+ arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
 
 	/// <summary>Runs <c>top</c> synchronously.</summary>
@@ -686,9 +687,29 @@ Interactive keys:
 				state.SynchronizeCurrentWindow();
 				state.AlternateDisplayMode = !state.AlternateDisplayMode;
 				state.Message = ( state.AlternateDisplayMode )
-					? "alternate display: all four windows visible"
+					? "alternate display mode enabled"
 					: $"full-screen display: {state.CurrentWindowLabel}"
 				;
+				return TopCommandAction.Rerender;
+			case '-':
+				if ( !state.AlternateDisplayMode ) {
+					state.Message = "window visibility is available only in alternate-display mode";
+					return TopCommandAction.Rerender;
+				}
+				state.TaskDisplayVisible = !state.TaskDisplayVisible;
+				state.SynchronizeCurrentWindow();
+				state.Message = ( state.TaskDisplayVisible )
+					? $"{state.CurrentWindowLabel} task display shown"
+					: $"{state.CurrentWindowLabel} task display hidden"
+				;
+				return TopCommandAction.Rerender;
+			case '_':
+				if ( !state.AlternateDisplayMode ) {
+					state.Message = "window visibility is available only in alternate-display mode";
+					return TopCommandAction.Rerender;
+				}
+				state.ToggleAllTaskDisplays();
+				state.Message = "all task-window visibility toggled";
 				return TopCommandAction.Rerender;
 			case 'a':
 				ActivateRelativeWindow(
@@ -706,6 +727,12 @@ Interactive keys:
 				state.Prompt = new TopPromptState(
 					TopPromptKind.Window,
 					"Choose window (1-4): "
+				);
+				return TopCommandAction.Rerender;
+			case 'G':
+				state.Prompt = new TopPromptState(
+					TopPromptKind.WindowName,
+					$"Name {state.CurrentWindowLabel} (1-3 UTF-8 bytes): "
 				);
 				return TopCommandAction.Rerender;
 			case 'B':
@@ -871,14 +898,17 @@ Interactive keys:
 				return TopCommandAction.Rerender;
 			case '=':
 				state.ProcessIds.Clear();
-				state.UserFilter = null;
-				state.OtherFilters.Clear();
-				state.HideIdle = false;
-				state.MaximumTasks = 0;
-				state.SearchText = null;
-				state.VerticalOffset = 0;
-				state.HorizontalOffset = 0;
-				state.Message = "display limits, filters, and scrolling reset";
+				ResetCurrentWindowDisplayLimits(
+					state
+				);
+				state.Message = $"display limits reset for {state.CurrentWindowLabel}";
+				return TopCommandAction.Rerender;
+			case '+':
+				state.ProcessIds.Clear();
+				ResetAllWindowDisplayLimits(
+					state
+				);
+				state.Message = "display limits reset for all windows";
 				return TopCommandAction.Rerender;
 			case 'h':
 			case '?':
@@ -1027,6 +1057,42 @@ Interactive keys:
 			default:
 				return TopCommandAction.None;
 		}
+	}
+
+	private static void ResetCurrentWindowDisplayLimits(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		state.TaskDisplayVisible = true;
+		state.UserFilter = null;
+		state.OtherFilters.Clear();
+		state.HideIdle = false;
+		state.MaximumTasks = 0;
+		state.SearchText = null;
+		state.VerticalOffset = 0;
+		state.HorizontalOffset = 0;
+		state.SynchronizeCurrentWindow();
+	}
+
+	private static void ResetAllWindowDisplayLimits(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		int currentWindowIndex = state.CurrentWindowIndex;
+		for ( int index = 0; index < TopRuntimeState.WindowCount; index++ ) {
+			state.ActivateWindow(
+				index
+			);
+			ResetCurrentWindowDisplayLimits(
+				state
+			);
+		}
+		state.ShowAllTaskDisplays();
+		state.ActivateWindow(
+			currentWindowIndex
+		);
 	}
 
 	private static void ActivateRelativeWindow(
@@ -1188,6 +1254,22 @@ Interactive keys:
 					selectedWindow - 1
 				);
 				state.Message = $"current window: {state.CurrentWindowLabel}";
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.WindowName:
+				state.Prompt = null;
+				string windowName = prompt.Buffer.Trim();
+				int windowNameBytes = Utf8.GetByteCount(
+					windowName
+				);
+				if ( windowNameBytes is < 1 or > 3 ) {
+					state.Message = "window name must occupy 1 through 3 UTF-8 bytes";
+					return TopCommandAction.Rerender;
+				}
+				state.RenameCurrentWindow(
+					windowName
+				);
+				state.Message = $"window renamed: {state.CurrentWindowLabel}";
 				return TopCommandAction.Rerender;
 
 			case TopPromptKind.Locate:

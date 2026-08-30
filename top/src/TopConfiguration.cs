@@ -363,7 +363,7 @@ internal sealed class SystemTopConfigurationStore {
 	}
 }
 
-/// <summary>Serializes the persistent single-window top configuration contract.</summary>
+/// <summary>Serializes the persistent four-window top configuration contract.</summary>
 internal static class TopConfigurationCodec {
 	private const string FormatName = "Icod.ProcPs.Top";
 	private const int CurrentVersion = 1;
@@ -615,6 +615,8 @@ internal static class TopConfigurationCodec {
 			}
 		}
 		return new TopConfigurationWindowDocument {
+			Name = window.Name,
+			TaskDisplayVisible = window.TaskDisplayVisible,
 			SortField = window.SortField,
 			SortHighToLow = window.SortHighToLow,
 			HighlightBold = window.HighlightBold,
@@ -675,9 +677,14 @@ internal static class TopConfigurationCodec {
 			);
 		}
 
+		string name = ResolveWindowName(
+			document.Name,
+			index
+		);
 		var result = new TopWindowState(
-			TopRuntimeState.GetWindowName( index )
+			name
 		) {
+			TaskDisplayVisible = document.TaskDisplayVisible,
 			SortField = document.SortField,
 			SortHighToLow = document.SortHighToLow,
 			HighlightBold = document.HighlightBold,
@@ -738,6 +745,33 @@ internal static class TopConfigurationCodec {
 			}
 		}
 		return result;
+	}
+
+	private static string ResolveWindowName(
+		string? configured,
+		int index
+	) {
+		if ( index is < 0 or >= TopRuntimeState.WindowCount ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( index )
+			);
+		}
+		if ( configured is null ) {
+			return TopRuntimeState.GetWindowName(
+				index
+			);
+		}
+
+		string name = configured.Trim();
+		int byteCount = Encoding.UTF8.GetByteCount(
+			name
+		);
+		if ( byteCount is < 1 or > 3 ) {
+			throw new FormatException(
+				$"window {index + 1} name must occupy 1 through 3 UTF-8 bytes"
+			);
+		}
+		return name;
 	}
 
 	private static List<TopFieldId> BuildFieldOrder(
@@ -845,6 +879,8 @@ internal sealed class TopConfigurationDocument {
 }
 
 internal sealed class TopConfigurationWindowDocument {
+	public string? Name { get; set; }
+	public bool TaskDisplayVisible { get; set; } = true;
 	public TopFieldId SortField { get; set; } = TopFieldId.Cpu;
 	public bool SortHighToLow { get; set; } = true;
 	public bool HighlightBold { get; set; } = true;
