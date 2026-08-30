@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.8 adds procps-compatible top zero suppression: interactive 0 blanks true zero values in VIRT, RES, %CPU, %MEM, and TIME+ while preserving exempt, unavailable, and merely rounded-to-zero fields.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.9 adds procps-compatible top n/# maximum-task display limits, page scrolling within the limited task window, and = reset behavior for idle/max-task display limits.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

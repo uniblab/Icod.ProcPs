@@ -120,6 +120,10 @@ profile:
   fields. `VIRT`, `RES`, `%CPU`, `%MEM`, and `TIME+` participate; `PR`,
   `NI`, identity/state fields, unavailable values, and nonzero values that
   merely round to a displayed zero remain visible.
+- `n` or `#` prompts for the maximum number of task rows to display. `0`
+  restores the unlimited setting; the terminal still caps the result to the
+  task rows physically available on screen. This is distinct from the
+  command-line `-n` / `--iterations` option.
 - `P`, `M`, `N`, and `T` sort by CPU, memory, PID, and cumulative CPU time.
 - `R` toggles the active sort direction between high-to-low and low-to-high.
 - `B` globally enables or disables use of bold rendition in the summary and
@@ -152,7 +156,7 @@ profile:
   changes through `Icod.Processes`.
 - Arrow keys, Page Up, Page Down, Home, and End scroll the task display; Left and
   Right scroll horizontally.
-- `=` clears PID/user restrictions and scrolling.
+- `=` clears idle/max-task display limits, PID/user restrictions, and scrolling.
 - `h` or `?` displays a compact help screen.
 
 In secure mode the `d`/`s`, `k`, and `r` commands are disabled.

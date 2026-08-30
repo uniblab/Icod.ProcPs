@@ -41,6 +41,7 @@ internal static class TopRenderer {
 		" q              quit",
 		" Enter/Space    refresh now",
 		" 0              toggle zero suppression",
+		" n or #         set maximum displayed tasks",
 		" P/M/N/T        sort by CPU, memory, PID, or time",
 		" R              reverse/normal sort direction",
 		" B/b/x/y        emphasis and highlighting",
@@ -57,7 +58,7 @@ internal static class TopRenderer {
 		" r              change a process nice value",
 		" arrows/PgUp    scroll task display",
 		" Home/End       jump to first/last task",
-		" =              clear PID/user filters and scrolling",
+		" =              clear display limits, filters, scrolling",
 		" h or ?         close this help"
 	];
 
@@ -82,6 +83,12 @@ internal static class TopRenderer {
 			0,
 			dimensions.Rows - SummaryRows - TableHeaderRows - footerRows
 		);
+		if ( 0 < state.MaximumTasks ) {
+			availableTaskRows = Math.Min(
+				availableTaskRows,
+				state.MaximumTasks
+			);
+		}
 		int maxOffset = Math.Max( 0, tasks.Count - availableTaskRows );
 		state.VerticalOffset = Math.Clamp( state.VerticalOffset, 0, maxOffset );
 		state.HorizontalOffset = Math.Max( 0, state.HorizontalOffset );
@@ -98,8 +105,12 @@ internal static class TopRenderer {
 			TopLineStyle.Header
 		) );
 
+		int taskEndIndex = Math.Min(
+			tasks.Count,
+			state.VerticalOffset + availableTaskRows
+		);
 		for ( int index = state.VerticalOffset;
-			index < tasks.Count && lines.Count < dimensions.Rows - footerRows;
+			index < taskEndIndex;
 			index++ ) {
 			TopTaskRow task = tasks[ index ];
 			TopFormattedTaskLine formatted = FormatTaskLine(

@@ -135,11 +135,12 @@ Options:
  -h, --help                    display this help and exit
 
 Interactive keys:
- q quit; 0 zero suppress; P/M/N/T sort; R reverse/normal sort; B bold enable;
- b emphasis mode; J numeric justify; j character justify; x sort column;
- y running rows; c command line; H threads; i idle tasks; V forest;
- I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
- k signal; r renice; arrows/PgUp/PgDn/Home/End scroll; h/? help.
+ q quit; 0 zero suppress; n/# max tasks; P/M/N/T sort; R reverse/normal sort;
+ B bold enable; b emphasis mode; J numeric justify; j character justify;
+ x sort column; y running rows; c command line; H threads; i idle tasks;
+ V forest; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
+ k signal; r renice; = reset limits; arrows/PgUp/PgDn/Home/End scroll;
+ h/? help.
 """;
 
 	/// <summary>Runs <c>top</c> synchronously.</summary>
@@ -544,6 +545,17 @@ Interactive keys:
 		if ( TopInputKey.EndOfInput == input.Key ) {
 			return TopCommandAction.Exit;
 		}
+		int pageSize = Math.Max(
+			1,
+			dimensions.Rows - 7
+		);
+		if ( 0 < state.MaximumTasks ) {
+			pageSize = Math.Min(
+				pageSize,
+				state.MaximumTasks
+			);
+		}
+
 		if ( TopInputKey.Up == input.Key ) {
 			state.VerticalOffset = Math.Max( 0, state.VerticalOffset - 1 );
 			return TopCommandAction.Rerender;
@@ -553,11 +565,11 @@ Interactive keys:
 			return TopCommandAction.Rerender;
 		}
 		if ( TopInputKey.PageUp == input.Key ) {
-			state.VerticalOffset = Math.Max( 0, state.VerticalOffset - Math.Max( 1, dimensions.Rows - 7 ) );
+			state.VerticalOffset = Math.Max( 0, state.VerticalOffset - pageSize );
 			return TopCommandAction.Rerender;
 		}
 		if ( TopInputKey.PageDown == input.Key ) {
-			state.VerticalOffset += Math.Max( 1, dimensions.Rows - 7 );
+			state.VerticalOffset += pageSize;
 			return TopCommandAction.Rerender;
 		}
 		if ( TopInputKey.Home == input.Key ) {
@@ -667,6 +679,13 @@ Interactive keys:
 				state.SingleCpuSummary = !state.SingleCpuSummary;
 				state.Message = "Per-CPU activity rows are not yet exposed by the shared metrics contract; aggregate CPU remains shown.";
 				return TopCommandAction.Rerender;
+			case 'n':
+			case '#':
+				state.Prompt = new TopPromptState(
+					TopPromptKind.MaximumTasks,
+					"Maximum tasks (0 for unlimited): "
+				);
+				return TopCommandAction.Rerender;
 			case 'd':
 			case 's':
 				if ( state.SecureMode ) {
@@ -707,9 +726,11 @@ Interactive keys:
 			case '=':
 				state.ProcessIds.Clear();
 				state.UserFilter = null;
+				state.HideIdle = false;
+				state.MaximumTasks = 0;
 				state.VerticalOffset = 0;
 				state.HorizontalOffset = 0;
-				state.Message = "filters and scrolling reset";
+				state.Message = "display limits, filters, and scrolling reset";
 				return TopCommandAction.Rerender;
 			case 'h':
 			case '?':
@@ -762,6 +783,26 @@ Interactive keys:
 				state.Prompt = null;
 				state.Message = $"delay set to {delay.TotalSeconds:0.###} seconds";
 				return TopCommandAction.Resample;
+
+			case TopPromptKind.MaximumTasks:
+				state.Prompt = null;
+				if (
+					!int.TryParse(
+						text,
+						NumberStyles.None,
+						CultureInfo.InvariantCulture,
+						out int maximumTasks
+					)
+				) {
+					state.Message = "maximum tasks must be zero or a positive integer";
+					return TopCommandAction.Rerender;
+				}
+				state.MaximumTasks = maximumTasks;
+				state.VerticalOffset = 0;
+				state.Message = 0 == maximumTasks
+					? "maximum tasks: unlimited"
+					: $"maximum tasks set to {maximumTasks}";
+				return TopCommandAction.Rerender;
 
 			case TopPromptKind.KillProcessId:
 				if ( !TryParsePositiveProcessId( text, out int killPid ) ) {

@@ -76,6 +76,7 @@ internal sealed class TopRuntimeState {
 	internal bool NumericLeftJustified { get; set; }
 	internal bool CharacterRightJustified { get; set; }
 	internal bool SuppressZeros { get; set; }
+	internal int MaximumTasks { get; set; }
 	internal TopMemoryScale SummaryScale { get; set; } = TopMemoryScale.Mebibytes;
 	internal TopMemoryScale TaskScale { get; set; } = TopMemoryScale.Kibibytes;
 	internal bool ShowCommandLine { get; set; }
@@ -97,6 +98,7 @@ internal sealed class TopRuntimeState {
 /// <summary>Identifies one interactive top prompt.</summary>
 internal enum TopPromptKind {
 	Delay,
+	MaximumTasks,
 	KillProcessId,
 	KillSignal,
 	ReniceProcessId,
