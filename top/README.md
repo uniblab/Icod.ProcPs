@@ -28,16 +28,15 @@ Batch mode does not open a terminal and is suitable for redirection or pipelines
 ## OPTIONS
 
 `-A`, `--apply-defaults`
-: Use the built-in defaults. This implementation does not yet read personal
-  `toprc` configuration, so this option must be the only command-line option and
-  selects the normal built-in state.
+: Use the built-in defaults and ignore personal Icod top configuration. As with
+  procps `top`, this option must be the only command-line option.
 
 `-b`, `--batch`
 : Run without interactive terminal input. Output is written to standard output.
 
 `-c`, `--cmdline-toggle`
-: Start with the COMMAND column showing the observed command line instead of the
-  short command name.
+: Reverse the remembered COMMAND presentation state after personal configuration
+  has been loaded.
 
 `-d SECONDS`, `--delay SECONDS`
 : Set the refresh interval. Fractional and zero-second delays are accepted;
@@ -56,8 +55,8 @@ Batch mode does not open a terminal and is suitable for redirection or pipelines
   the limitation rather than synthesizing threads.
 
 `-i`, `--idle-toggle`
-: Suppress tasks with no measured CPU activity in the most recent interval,
-  except tasks currently reported runnable.
+: Reverse the remembered idle-task suppression state after personal
+  configuration has been loaded.
 
 `-n NUMBER`, `--iterations NUMBER`
 : Exit after the requested number of refreshes.
@@ -100,9 +99,9 @@ Batch mode does not open a terminal and is suitable for redirection or pipelines
   the batch default is 512.
 
 `-1`, `--single-cpu-toggle`
-: Toggle the aggregate CPU presentation label. The current shared metrics model
-  exposes aggregate activity but not one activity counter set per logical CPU,
-  so separate per-CPU rows are deliberately not synthesized.
+: Reverse the remembered aggregate CPU presentation state. The current shared
+  metrics model exposes aggregate activity but not one activity counter set per
+  logical CPU, so separate per-CPU rows are deliberately not synthesized.
 
 `-V`, `--version`
 : Display procps-ng compatibility version information and exit.
@@ -178,12 +177,33 @@ profile:
   `Icod.Processes`.
 - `r` prompts for PID and nice value and performs reuse-protected priority
   changes through `Icod.Processes`.
+- `W` atomically writes the supported persistent single-window state to the
+  personal Icod top configuration file without resampling processes.
 - Arrow keys, Page Up, Page Down, Home, and End scroll the task display; Left and
   Right scroll horizontally.
 - `=` clears idle/max-task display limits, PID/user/Other Filter restrictions, locate state, and scrolling.
 - `h` or `?` displays a compact help screen.
 
 In secure mode the `d`/`s`, `k`, and `r` commands are disabled.
+
+## CONFIGURATION
+
+Personal configuration is loaded before command-line overrides. The preferred
+file is `procps/icod-toprc.json` beneath an absolute `XDG_CONFIG_HOME`; otherwise
+`$HOME/.config/procps/icod-toprc.json` is used. When neither path is usable,
+Windows-style environments may fall back to an absolute `APPDATA` directory.
+`$HOME/.icod-toprc.json` is accepted as a legacy Icod read fallback.
+
+The distinct `icod-toprc.json` name is deliberate. Native procps `top` uses a
+versioned multi-window format in `procps/toprc`; this single-window tranche does
+not overwrite or claim wire compatibility with that file. `W` always writes the
+preferred Icod path, while `-A` skips personal configuration loading.
+
+Persisted state includes delay, sort field/direction, emphasis and justification
+toggles, zero suppression, maximum tasks, memory scales, command/thread/idle/
+forest/Irix/CPU-summary states, field order/visibility, and active Other Filters.
+PID monitoring, user filtering, locate text, scrolling, prompts, field-manager
+cursor state, and secure mode remain transient.
 
 ## CPU ACCOUNTING
 
@@ -229,7 +249,8 @@ This tranche establishes the production monitor engine and terminal lifecycle.
 The following large procps `top` subsystems are intentionally left for later
 tranches rather than represented incompletely:
 
-- personal/system `toprc` persistence beyond the built-in-default behavior;
+- native procps `toprc` wire-format interoperability plus system-wide
+  `topdefaultrc` defaults and `/etc/toprc` secure-mode restrictions;
 - alternate-display multi-window/field-group mode;
 - configurable color schemes and color-management screens;
 - per-logical-CPU activity rows until the Shared metrics contract exposes them;

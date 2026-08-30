@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.12 adds procps-compatible top O/o Other Filtering with include/exclude criteria, substring equality, relational string comparisons, multiple active filters, and reset integration.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.13 adds safe personal top configuration persistence with startup loading, command-line overrides, interactive W writes, field/order/filter persistence, and -A default bypass semantics.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

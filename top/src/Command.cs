@@ -115,12 +115,12 @@ Usage:
 Options:
  -A, --apply-defaults          use built-in defaults (no personal top configuration)
  -b, --batch                   run in non-interactive batch mode
- -c, --cmdline-toggle          start by displaying command lines
+ -c, --cmdline-toggle          reverse the remembered command name/line state
  -d, --delay SECONDS           set the refresh delay; fractional seconds are accepted
  -E, --scale-summary-mem SCALE set summary memory scale: k, m, g, t, p, or e
  -e, --scale-task-mem SCALE    set task memory scale: k, m, g, t, p, or e
  -H, --threads-show            show individual lightweight tasks where supported
- -i, --idle-toggle             suppress tasks idle during the most recent interval
+ -i, --idle-toggle             reverse the remembered idle-task state
  -n, --iterations NUMBER       exit after NUMBER refreshes
  -O, --list-fields             list fields implemented by this top and exit
  -o, --sort-override FIELD     sort by PID, USER, PR, NI, VIRT, RES, SHR, S, %CPU, %MEM, TIME+, or COMMAND
@@ -130,7 +130,7 @@ Options:
  -U, --filter-any-user USER    filter by any observed real/effective user ID
  -u, --filter-only-euser USER  filter by effective user ID
  -w, --width [COLUMNS]         batch output width; without COLUMNS use 512
- -1, --single-cpu-toggle       toggle the aggregate CPU presentation label
+ -1, --single-cpu-toggle       reverse the remembered aggregate CPU state
  -V, --version                 display version information and exit
  -h, --help                    display this help and exit
 
@@ -140,8 +140,8 @@ Interactive keys:
  f manage fields; x sort column; y running rows; c command line; H threads;
  i idle tasks;
  V forest; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
- O/o other filter; L locate; & locate next; k signal; r renice; = reset limits;
- arrows/PgUp/PgDn/Home/End scroll; h/? help.
+ O/o other filter; L locate; & locate next; k signal; r renice; W write config;
+ = reset limits; arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
 
 	/// <summary>Runs <c>top</c> synchronously.</summary>
@@ -216,7 +216,38 @@ Interactive keys:
 		IProcAccountDisplayResolver accounts = accountResolver ?? SystemProcAccountDisplayResolver.Instance;
 		Func<string, string?> environment = environmentVariableProvider ?? Environment.GetEnvironmentVariable;
 		int currentProcessId = currentProcessIdProvider?.Invoke() ?? Environment.ProcessId;
-		ParsedArguments parsed = Parse( args, accounts, environment, currentProcessId );
+		var configurationStore = new SystemTopConfigurationStore(
+			environment
+		);
+		TopRuntimeState startupState = new();
+		if ( ShouldLoadConfiguration( args ) ) {
+			try {
+				await configurationStore.LoadAsync(
+					startupState,
+					cancellationToken
+				).ConfigureAwait( false );
+			} catch ( OperationCanceledException ) {
+				return Canceled;
+			} catch ( Exception exception ) when (
+				exception is IOException
+					or UnauthorizedAccessException
+					or FormatException
+			) {
+				await WriteLineAsync(
+					errorOutput,
+					$"top: {exception.Message}",
+					CancellationToken.None
+				).ConfigureAwait( false );
+				return Failure;
+			}
+		}
+		ParsedArguments parsed = Parse(
+			args,
+			accounts,
+			environment,
+			currentProcessId,
+			startupState
+		);
 		if ( parsed.Error is not null ) {
 			await WriteLineAsync( errorOutput, $"top: {parsed.Error}", cancellationToken ).ConfigureAwait( false );
 			await WriteTextAsync( errorOutput, NormalizeLineEndings( Usage ), cancellationToken ).ConfigureAwait( false );
@@ -269,6 +300,7 @@ Interactive keys:
 					accounts,
 					terminalFactory,
 					processControl,
+					configurationStore,
 					monotonicClock,
 					errorOutput,
 					cancellationToken
@@ -341,6 +373,7 @@ Interactive keys:
 		IProcAccountDisplayResolver accountResolver,
 		ITopTerminalSessionFactory terminalFactory,
 		ITopProcessControl processControl,
+		SystemTopConfigurationStore configurationStore,
 		IMonotonicClock clock,
 		Stream errorOutput,
 		CancellationToken cancellationToken
@@ -351,6 +384,7 @@ Interactive keys:
 		ArgumentNullException.ThrowIfNull( accountResolver );
 		ArgumentNullException.ThrowIfNull( terminalFactory );
 		ArgumentNullException.ThrowIfNull( processControl );
+		ArgumentNullException.ThrowIfNull( configurationStore );
 		ArgumentNullException.ThrowIfNull( clock );
 		ArgumentNullException.ThrowIfNull( errorOutput );
 
@@ -450,6 +484,7 @@ Interactive keys:
 						processProvider,
 						accountResolver,
 						processControl,
+						configurationStore,
 						dimensions,
 						token
 					).ConfigureAwait( false );
@@ -519,6 +554,7 @@ Interactive keys:
 		IProcProcessProvider processProvider,
 		IProcAccountDisplayResolver accountResolver,
 		ITopProcessControl processControl,
+		SystemTopConfigurationStore configurationStore,
 		TopTerminalDimensions dimensions,
 		CancellationToken cancellationToken
 	) {
@@ -527,6 +563,7 @@ Interactive keys:
 		ArgumentNullException.ThrowIfNull( processProvider );
 		ArgumentNullException.ThrowIfNull( accountResolver );
 		ArgumentNullException.ThrowIfNull( processControl );
+		ArgumentNullException.ThrowIfNull( configurationStore );
 
 		if ( state.ShowFieldManager ) {
 			return HandleFieldManagerInput(
@@ -789,6 +826,20 @@ Interactive keys:
 					TopPromptKind.AnyUser,
 					"Any observed user (blank clears): "
 				);
+				return TopCommandAction.Rerender;
+			case 'W':
+				try {
+					string path = await configurationStore.SaveAsync(
+						state,
+						cancellationToken
+					).ConfigureAwait( false );
+					state.Message = $"configuration written to {path}";
+				} catch ( Exception exception ) when (
+					exception is IOException
+						or UnauthorizedAccessException
+				) {
+					state.Message = $"configuration write failed: {exception.Message}";
+				}
 				return TopCommandAction.Rerender;
 			case '=':
 				state.ProcessIds.Clear();
@@ -1221,17 +1272,39 @@ Interactive keys:
 		return observed.HasValue ? observed.Value : null;
 	}
 
+	private static bool ShouldLoadConfiguration(
+		IReadOnlyList<string> args
+	) {
+		ArgumentNullException.ThrowIfNull( args );
+
+		foreach ( string argument in args ) {
+			if ( argument is "-A" or "--apply-defaults" ) {
+				return false;
+			}
+			if (
+				argument is "-h" or "--help"
+					or "-V" or "--version"
+					or "-O" or "--list-fields"
+			) {
+				return false;
+			}
+		}
+		return true;
+	}
+
 	private static ParsedArguments Parse(
 		IReadOnlyList<string> args,
 		IProcAccountDisplayResolver accountResolver,
 		Func<string, string?> environmentVariableProvider,
-		int currentProcessId
+		int currentProcessId,
+		TopRuntimeState startupState
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		ArgumentNullException.ThrowIfNull( accountResolver );
 		ArgumentNullException.ThrowIfNull( environmentVariableProvider );
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( currentProcessId );
-		var result = new ParsedArguments();
+		ArgumentNullException.ThrowIfNull( startupState );
+		var result = new ParsedArguments( startupState );
 		string? columns = environmentVariableProvider( "COLUMNS" );
 		if ( int.TryParse( columns, NumberStyles.None, CultureInfo.InvariantCulture, out int environmentWidth )
 			&& 0 < environmentWidth ) {
@@ -1263,7 +1336,7 @@ Interactive keys:
 				continue;
 			}
 			if ( argument is "-c" or "--cmdline-toggle" ) {
-				result.State.ShowCommandLine = true;
+				result.State.ShowCommandLine = !result.State.ShowCommandLine;
 				continue;
 			}
 			if ( argument is "-H" or "--threads-show" ) {
@@ -1271,7 +1344,7 @@ Interactive keys:
 				continue;
 			}
 			if ( argument is "-i" or "--idle-toggle" ) {
-				result.State.HideIdle = true;
+				result.State.HideIdle = !result.State.HideIdle;
 				continue;
 			}
 			if ( argument is "-O" or "--list-fields" ) {
@@ -1287,7 +1360,7 @@ Interactive keys:
 				continue;
 			}
 			if ( argument is "-1" or "--single-cpu-toggle" ) {
-				result.State.SingleCpuSummary = false;
+				result.State.SingleCpuSummary = !result.State.SingleCpuSummary;
 				continue;
 			}
 
@@ -1599,6 +1672,11 @@ Interactive keys:
 	}
 
 	private sealed class ParsedArguments {
+		internal ParsedArguments( TopRuntimeState state ) {
+			ArgumentNullException.ThrowIfNull( state );
+			this.State = state;
+		}
+
 		internal bool ApplyDefaults { get; set; }
 		internal bool Batch { get; set; }
 		internal bool Help { get; set; }
@@ -1606,7 +1684,7 @@ Interactive keys:
 		internal bool ListFields { get; set; }
 		internal int? Iterations { get; set; }
 		internal int BatchWidth { get; set; } = DefaultBatchWidth;
-		internal TopRuntimeState State { get; } = new();
+		internal TopRuntimeState State { get; }
 		internal string? Error { get; private set; }
 
 		internal void Fail( string error ) {

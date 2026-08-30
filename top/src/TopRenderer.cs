@@ -59,6 +59,7 @@ internal static class TopRenderer {
 		" L / &          locate string / locate next",
 		" k              signal a process",
 		" r              change a process nice value",
+		" W              write personal configuration",
 		" arrows/PgUp    scroll task display",
 		" Home/End       jump to first/last task",
 		" =              clear display limits, filters, scrolling",

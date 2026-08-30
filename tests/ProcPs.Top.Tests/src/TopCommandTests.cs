@@ -1243,6 +1243,128 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task PersonalConfigurationLoadsBeforeCommandLineToggle() {
+		string root = CreateConfigurationDirectory();
+		try {
+			string configurationPath = Path.Combine(
+				root,
+				"procps",
+				"icod-toprc.json"
+			);
+			Directory.CreateDirectory(
+				Path.GetDirectoryName( configurationPath )!
+			);
+			TopRuntimeState configured = new() {
+				ShowCommandLine = true
+			};
+			await File.WriteAllTextAsync(
+				configurationPath,
+				TopConfigurationCodec.Serialize( configured )
+			);
+
+			FakeClock clock = new();
+			CommandResult result = await RunCoreAsync(
+				[ "-b", "-n", "1", "-c" ],
+				new FakeTerminal( clock ),
+				clock,
+				environmentVariableProvider: name =>
+					"XDG_CONFIG_HOME" == name ? root : null
+			);
+
+			Assert.Equal( 0, result.ExitCode );
+			Assert.Contains( "alpha", result.Stdout, StringComparison.Ordinal );
+			Assert.DoesNotContain( "--worker", result.Stdout, StringComparison.Ordinal );
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
+	public async Task WriteConfigurationDoesNotResampleProcesses() {
+		string root = CreateConfigurationDirectory();
+		try {
+			FakeClock clock = new();
+			FakeTerminal terminal = new( clock );
+			terminal.Events.Enqueue( CharacterEvent( 'M' ) );
+			terminal.Events.Enqueue( CharacterEvent( 'W' ) );
+			terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+			FakeProcessProvider processes = new( CreateProcesses() );
+
+			CommandResult result = await RunCoreAsync(
+				Array.Empty<string>(),
+				terminal,
+				clock,
+				processes,
+				environmentVariableProvider: name =>
+					"XDG_CONFIG_HOME" == name ? root : null
+			);
+
+			Assert.Equal( 0, result.ExitCode );
+			Assert.Equal( 1, processes.CaptureCount );
+			Assert.Equal( 3, terminal.Frames.Count );
+			string configurationPath = Path.Combine(
+				root,
+				"procps",
+				"icod-toprc.json"
+			);
+			Assert.True( File.Exists( configurationPath ) );
+			TopRuntimeState restored = new();
+			TopConfigurationCodec.Apply(
+				await File.ReadAllTextAsync( configurationPath ),
+				restored
+			);
+			Assert.Equal( TopFieldId.Memory, restored.SortField );
+			Assert.True( terminal.Disposed );
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
+	public async Task ApplyDefaultsSkipsInvalidPersonalConfiguration() {
+		string root = CreateConfigurationDirectory();
+		try {
+			string configurationPath = Path.Combine(
+				root,
+				"procps",
+				"icod-toprc.json"
+			);
+			Directory.CreateDirectory(
+				Path.GetDirectoryName( configurationPath )!
+			);
+			await File.WriteAllTextAsync(
+				configurationPath,
+				"{ invalid"
+			);
+			FakeClock clock = new();
+			FakeTerminal terminal = new( clock );
+			terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+
+			CommandResult result = await RunCoreAsync(
+				[ "-A" ],
+				terminal,
+				clock,
+				environmentVariableProvider: name =>
+					"XDG_CONFIG_HOME" == name ? root : null
+			);
+
+			Assert.Equal( 0, result.ExitCode );
+			Assert.True( terminal.Disposed );
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
 	public async Task NonInteractiveTerminalFailsBeforeSamplingAndIsDisposed() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock, isInteractive: false );
@@ -1290,7 +1412,8 @@ public sealed class TopCommandTests {
 		FakeAccountResolver? accountResolver = null,
 		FakeProcessorProvider? processorProvider = null,
 		ITopProcessControl? processControl = null,
-		CancellationToken cancellationToken = default
+		CancellationToken cancellationToken = default,
+		Func<string, string?>? environmentVariableProvider = null
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		ArgumentNullException.ThrowIfNull( terminal );
@@ -1308,7 +1431,7 @@ public sealed class TopCommandTests {
 			processorProvider ?? new FakeProcessorProvider( 4 ),
 			clock,
 			() => ObservationTime,
-			_ => null,
+			environmentVariableProvider ?? ( _ => null ),
 			() => 9999,
 			terminal,
 			processControl ?? new FakeProcessControl(),
@@ -1399,6 +1522,15 @@ public sealed class TopCommandTests {
 		ProcObservationSource.LinuxProcfs,
 		ProcObservationFidelity.Exact
 	);
+
+	private static string CreateConfigurationDirectory() {
+		string path = Path.Combine(
+			Path.GetTempPath(),
+			$"icod-procps-top-{Guid.NewGuid():N}"
+		);
+		Directory.CreateDirectory( path );
+		return path;
+	}
 
 	private static ScheduledTerminalEvent CharacterEvent( char value ) => new(
 		TopTerminalEventKind.Input,
