@@ -110,16 +110,29 @@ Child text is converted to a fixed visible cell image using the DCurses Unicode
 width policy. BEL (`\a`) requests an audible terminal alert and is not rendered;
 this is independent of `--beep`, which alerts for a non-zero child status.
 Tabs advance to eight-column stops. Carriage return rewinds the current row.
-C0/C1 controls other than BEL, tab, CR, and LF are discarded. ANSI CSI sequences
-are stripped; SGR sequences are translated to semantic DCurses styles only when
-`--color` is enabled. Comparison options operate on visible text and ignore
-style-only changes and off-screen output.
+C0/C1 controls other than ESC, BEL, tab, CR, and LF are discarded. With
+`--color`, ESC processing follows the procps-ng 4.0.6 numeric SGR consumer:
+standard and bright colors, indexed
+`38;5;n` / `48;5;n` colors through 255, bold, dim, underline, reverse, and their
+supported reset forms are translated to semantic DCurses styles. The upstream
+24-bit `38;2;r;g;b` / `48;2;r;g;b` form is explicitly not implemented, and an
+unsupported SGR attribute stops interpretation of the remaining attributes in
+that sequence. DCurses 0.1 has no italic or blink semantic attributes, so those
+recognized SGR requests are consumed without adding a rendition flag.
+
+Without color interpretation, the ESC byte itself is discarded while following
+bytes remain ordinary visible output; for example `ESC[31mred` displays as
+`[31mred`. This deliberately matches procps rather than stripping an entire CSI
+sequence. Comparison options therefore continue to operate on the text that is
+actually visible and ignore style-only changes and off-screen output.
 
 As in procps-ng, ordinary mode stops consuming display semantics after the
 visible body is exhausted, so BEL characters in the discarded tail do not
 alert. `--follow` keeps consuming output while scrolling and therefore continues
 to honor BEL characters beyond the first screenful. BEL characters skipped by
-`--no-wrap` after a line has been truncated are likewise not consumed.
+`--no-wrap` after a line has been truncated are likewise not consumed. The
+discarded remainder is not ANSI-interpreted either, and the following line
+starts with default rendition state.
 
 Resize events reset comparison baselines so geometry changes cannot trigger a
 false `--chgexit`. `--no-rerun` redraws the most recent captured output at the

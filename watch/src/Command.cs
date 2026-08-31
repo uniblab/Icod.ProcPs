@@ -1344,37 +1344,31 @@ internal sealed class WatchScreen {
 		int index = 0;
 
 		while ( index < output.Length && row < bodyHeight ) {
-			if ( '\u001b' == output[ index ]
-				&& index + 1 < output.Length
-				&& '[' == output[ index + 1 ] ) {
-				int end = FindCsiEnd( output, index + 2 );
-				if ( 0 <= end ) {
-					if ( preserveColor && 'm' == output[ end ] ) {
-						style = ApplySgr(
-							style,
-							output.AsSpan( index + 2, end - index - 2 )
-						);
-					}
-					index = end + 1;
-					continue;
-				}
-			}
-
 			char character = output[ index ];
 			if ( '\n' == character ) {
+				if ( skipUntilNewline ) {
+					style = CursesStyle.Default;
+				}
 				row++;
 				column = 0;
 				skipUntilNewline = false;
 				index++;
 				continue;
 			}
-			if ( '\r' == character ) {
-				column = 0;
-				skipUntilNewline = false;
+			if ( skipUntilNewline ) {
 				index++;
 				continue;
 			}
-			if ( skipUntilNewline ) {
+			if ( preserveColor && '\u001b' == character ) {
+				index = ConsumeAnsiEscape(
+					output,
+					index,
+					ref style
+				);
+				continue;
+			}
+			if ( '\r' == character ) {
+				column = 0;
 				index++;
 				continue;
 			}
@@ -1511,32 +1505,11 @@ internal sealed class WatchScreen {
 		bool skipUntilNewline = false;
 		int index = 0;
 		while ( index < output.Length ) {
-			if (
-				'\u001b' == output[ index ]
-				&& index + 1 < output.Length
-				&& '[' == output[ index + 1 ]
-			) {
-				int end = FindCsiEnd(
-					output,
-					index + 2
-				);
-				if ( 0 <= end ) {
-					if ( preserveColor && 'm' == output[ end ] ) {
-						style = ApplySgr(
-							style,
-							output.AsSpan(
-								index + 2,
-								end - index - 2
-							)
-						);
-					}
-					index = end + 1;
-					continue;
-				}
-			}
-
 			char character = output[ index ];
 			if ( '\n' == character ) {
+				if ( skipUntilNewline ) {
+					style = CursesStyle.Default;
+				}
 				ClearFollowLineFrom(
 					cells,
 					dimensions.Columns,
@@ -1554,13 +1527,20 @@ internal sealed class WatchScreen {
 				index++;
 				continue;
 			}
-			if ( '\r' == character ) {
-				column = 0;
-				skipUntilNewline = false;
+			if ( skipUntilNewline ) {
 				index++;
 				continue;
 			}
-			if ( skipUntilNewline ) {
+			if ( preserveColor && '\u001b' == character ) {
+				index = ConsumeAnsiEscape(
+					output,
+					index,
+					ref style
+				);
+				continue;
+			}
+			if ( '\r' == character ) {
+				column = 0;
 				index++;
 				continue;
 			}
@@ -1795,21 +1775,68 @@ internal sealed class WatchScreen {
 		}
 	}
 
-	private static int FindCsiEnd(
+	private static int ConsumeAnsiEscape(
 		string text,
-		int start
+		int escapeIndex,
+		ref CursesStyle style
 	) {
 		ArgumentNullException.ThrowIfNull( text );
-		for ( int index = start; index < text.Length; index++ ) {
-			char candidate = text[ index ];
-			if ( '@' <= candidate && '~' >= candidate ) {
+		if (
+			0 > escapeIndex
+			|| text.Length <= escapeIndex
+			|| '\u001b' != text[ escapeIndex ]
+		) {
+			throw new ArgumentOutOfRangeException( nameof( escapeIndex ) );
+		}
+
+		int index = escapeIndex + 1;
+		if ( text.Length <= index ) {
+			return index;
+		}
+
+		char candidate = text[ index ];
+		if ( '(' == candidate ) {
+			index++;
+			if ( text.Length <= index ) {
 				return index;
 			}
-			if ( candidate > 0x7F ) {
-				return -1;
+			index++;
+			if ( text.Length <= index ) {
+				return index;
+			}
+			candidate = text[ index ];
+		}
+		if ( '[' != candidate ) {
+			return index;
+		}
+
+		int parameterStart = index + 1;
+		index = parameterStart;
+		const int MaximumAnsiBufferLength = 100;
+		for (
+			int count = 0;
+			index < text.Length && count < MaximumAnsiBufferLength;
+			count++, index++
+		) {
+			candidate = text[ index ];
+			if ( 'm' == candidate ) {
+				style = ApplySgr(
+					style,
+					text.AsSpan(
+						parameterStart,
+						index - parameterStart
+					)
+				);
+				return index + 1;
+			}
+			if (
+				( '0' > candidate || '9' < candidate )
+				&& ';' != candidate
+			) {
+				return index + 1;
 			}
 		}
-		return -1;
+		return index;
 	}
 
 	private static void AppendZeroWidthElement(
@@ -2040,11 +2067,22 @@ internal sealed class WatchScreen {
 				case 2:
 					style = style.WithAttributes( attributes | CursesTextAttributes.Dim );
 					continue;
+				case 3:
+				case 5:
+				case 23:
+				case 25:
+					// DCurses 0.1 has no semantic italic or blink attributes.
+					continue;
 				case 4:
 					style = style.WithAttributes( attributes | CursesTextAttributes.Underline );
 					continue;
 				case 7:
 					style = style.WithAttributes( attributes | CursesTextAttributes.Reverse );
+					continue;
+				case 21:
+					style = style.WithAttributes(
+						attributes & ~CursesTextAttributes.Bold
+					);
 					continue;
 				case 22:
 					style = style.WithAttributes(
@@ -2082,13 +2120,13 @@ internal sealed class WatchScreen {
 				continue;
 			}
 			if ( code is not 38 and not 48 ) {
-				continue;
+				return style;
 			}
 
 			bool foreground = 38 == code;
 			if ( index + 2 < parameters.Count && 5 == parameters[ index + 1 ] ) {
 				int colorIndex = parameters[ index + 2 ];
-				if ( 0 <= colorIndex ) {
+				if ( colorIndex is >= 0 and <= 255 ) {
 					style = foreground
 						? style.WithForeground( CursesColor.Indexed( colorIndex ) )
 						: style.WithBackground( CursesColor.Indexed( colorIndex ) );
@@ -2096,24 +2134,7 @@ internal sealed class WatchScreen {
 				index += 2;
 				continue;
 			}
-			if ( index + 4 < parameters.Count && 2 == parameters[ index + 1 ] ) {
-				int red = parameters[ index + 2 ];
-				int green = parameters[ index + 3 ];
-				int blue = parameters[ index + 4 ];
-				if ( red is >= 0 and <= 255
-					&& green is >= 0 and <= 255
-					&& blue is >= 0 and <= 255 ) {
-					CursesColor color = CursesColor.Rgb(
-						(byte)red,
-						(byte)green,
-						(byte)blue
-					);
-					style = foreground
-						? style.WithForeground( color )
-						: style.WithBackground( color );
-				}
-				index += 4;
-			}
+			return style;
 		}
 		return style;
 	}

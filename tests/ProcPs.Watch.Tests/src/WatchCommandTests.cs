@@ -257,6 +257,96 @@ public sealed class WatchCommandTests {
 
 		Assert.Equal( 0, plainResult.ExitCode );
 		Assert.True( plain.Frames[ 0 ].Screen.GetCell( 0, 0 ).Style.IsDefault );
+		Assert.StartsWith(
+			"[31mred[0m",
+			VisibleRow(
+				plain.Frames[ 0 ].Screen,
+				0
+			),
+			StringComparison.Ordinal
+		);
+	}
+
+	[Fact]
+	public void IndexedSgrAndBoldResetMatchProcpsColorProfile() {
+		WatchScreen screen = WatchScreen.Create(
+			"\u001b[1;21;38;5;200;48;5;17mX",
+			new WatchTerminalDimensions( 10, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: true
+		);
+
+		CursesStyle style = screen.GetCell( 0, 0 ).Style;
+		Assert.Equal( CursesTextAttributes.None, style.Attributes );
+		Assert.Equal( CursesColorKind.Indexed, style.Foreground.Kind );
+		Assert.Equal( 200, style.Foreground.Index );
+		Assert.Equal( CursesColorKind.Indexed, style.Background.Kind );
+		Assert.Equal( 17, style.Background.Index );
+	}
+
+	[Fact]
+	public void UnsupportedSgrStopsRemainingAttributesAndRgbIsNotInterpreted() {
+		WatchScreen unsupported = WatchScreen.Create(
+			"\u001b[1;6;31mX",
+			new WatchTerminalDimensions( 10, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: true
+		);
+		CursesStyle unsupportedStyle = unsupported.GetCell( 0, 0 ).Style;
+		Assert.True(
+			0 != (
+				unsupportedStyle.Attributes
+				& CursesTextAttributes.Bold
+			)
+		);
+		Assert.True( unsupportedStyle.Foreground.IsDefault );
+
+		WatchScreen rgb = WatchScreen.Create(
+			"\u001b[38;2;1;2;3mX",
+			new WatchTerminalDimensions( 10, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: true
+		);
+		Assert.True( rgb.GetCell( 0, 0 ).Style.IsDefault );
+	}
+
+	[Fact]
+	public void PrivateAnsiSequenceConsumesOnlyProcpsPrefix() {
+		WatchScreen screen = WatchScreen.Create(
+			"\u001b[?25lX",
+			new WatchTerminalDimensions( 10, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: true
+		);
+
+		Assert.StartsWith(
+			"25lX",
+			VisibleRow(
+				screen,
+				0
+			),
+			StringComparison.Ordinal
+		);
+	}
+
+	[Fact]
+	public void NoWrapDiscardedTailResetsAnsiBeforeNextLine() {
+		WatchScreen screen = WatchScreen.Create(
+			"\u001b[31mAB\u001b[32mignored\nX",
+			new WatchTerminalDimensions( 1, 2 ),
+			noTitle: true,
+			noWrap: true,
+			preserveColor: true
+		);
+
+		CursesStyle firstStyle = screen.GetCell( 0, 0 ).Style;
+		Assert.Equal( 1, firstStyle.Foreground.Index );
+		Assert.Equal( "X", screen.GetCell( 1, 0 ).Content );
+		Assert.True( screen.GetCell( 1, 0 ).Style.IsDefault );
 	}
 
 	[Fact]

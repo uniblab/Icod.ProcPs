@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.33 hardens procps watch child-output fidelity: BEL characters consumed by the visible output parser now request audible alerts independently of --beep, ordinary mode ignores BELs beyond its consumed screenful, and follow mode continues alerting while scrolling.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.34 hardens procps watch ANSI fidelity: color-disabled ESC bytes leave following sequence text visible, color mode follows the numeric SGR consumer boundary, unsupported attributes stop the remaining list, indexed colors are limited to the procps 256-color form, and no-wrap discarded tails reset rendition state.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>
