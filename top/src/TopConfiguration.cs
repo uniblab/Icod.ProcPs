@@ -661,6 +661,8 @@ internal static class TopConfigurationCodec {
 		state.HideIdle = document.HideIdle;
 		state.Forest = document.Forest;
 		state.IrixMode = document.IrixMode;
+		state.LoadAverageVisible = document.LoadAverageVisible;
+		state.ScrollCoordinatesVisible = document.ScrollCoordinatesVisible;
 		state.SingleCpuSummary = document.SingleCpuSummary;
 		state.CpuSummaryVisible = document.CpuSummaryVisible;
 		state.CpuSummaryGraphMode = document.CpuSummaryGraphMode;
@@ -776,6 +778,8 @@ internal static class TopConfigurationCodec {
 			HideIdle = state.HideIdle,
 			Forest = state.Forest,
 			IrixMode = state.IrixMode,
+			LoadAverageVisible = state.LoadAverageVisible,
+			ScrollCoordinatesVisible = state.ScrollCoordinatesVisible,
 			SingleCpuSummary = state.SingleCpuSummary,
 			CpuSummaryVisible = state.CpuSummaryVisible,
 			CpuSummaryGraphMode = state.CpuSummaryGraphMode,
@@ -817,6 +821,8 @@ internal static class TopConfigurationCodec {
 			ShowCommandLine = window.ShowCommandLine,
 			HideIdle = window.HideIdle,
 			Forest = window.Forest,
+			LoadAverageVisible = window.LoadAverageVisible,
+			ScrollCoordinatesVisible = window.ScrollCoordinatesVisible,
 			SingleCpuSummary = window.SingleCpuSummary,
 			CpuSummaryVisible = window.CpuSummaryVisible,
 			CpuSummaryGraphMode = window.CpuSummaryGraphMode,
@@ -901,6 +907,8 @@ internal static class TopConfigurationCodec {
 			ShowCommandLine = document.ShowCommandLine,
 			HideIdle = document.HideIdle,
 			Forest = document.Forest,
+			LoadAverageVisible = document.LoadAverageVisible,
+			ScrollCoordinatesVisible = document.ScrollCoordinatesVisible,
 			SingleCpuSummary = document.SingleCpuSummary,
 			CpuSummaryVisible = document.CpuSummaryVisible,
 			CpuSummaryGraphMode = document.CpuSummaryGraphMode,
@@ -1127,6 +1135,8 @@ internal sealed class TopConfigurationDocument {
 	public bool HideIdle { get; set; }
 	public bool Forest { get; set; }
 	public bool IrixMode { get; set; } = true;
+	public bool LoadAverageVisible { get; set; } = true;
+	public bool ScrollCoordinatesVisible { get; set; }
 	public bool SingleCpuSummary { get; set; } = true;
 	public bool CpuSummaryVisible { get; set; } = true;
 	public TopSummaryGraphMode CpuSummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
@@ -1156,6 +1166,8 @@ internal sealed class TopConfigurationWindowDocument {
 	public bool ShowCommandLine { get; set; }
 	public bool HideIdle { get; set; }
 	public bool Forest { get; set; }
+	public bool LoadAverageVisible { get; set; } = true;
+	public bool ScrollCoordinatesVisible { get; set; }
 	public bool SingleCpuSummary { get; set; } = true;
 	public bool CpuSummaryVisible { get; set; } = true;
 	public TopSummaryGraphMode CpuSummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;

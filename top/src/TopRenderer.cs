@@ -50,7 +50,10 @@ internal static class TopRenderer {
 		" +              reset and show all windows",
 		" B/b/x/y        emphasis and highlighting",
 		" z / Z          toggle colors / map window colors",
+		" l              toggle load-average / uptime line",
 		" t / m          cycle CPU / memory summary presentation",
+		" C              toggle scroll-coordinate message",
+		" < / >          move visible sort field left / right",
 		" J / j          justify numeric / character columns",
 		" f              manage task fields",
 		" c              toggle command name / command line",
@@ -107,9 +110,14 @@ internal static class TopRenderer {
 		}
 
 		List<TopTaskRow> tasks = SelectAndOrderTasks( sample, state );
-		int footerRows = state.Prompt is null && string.IsNullOrEmpty( state.Message )
+		int footerRows = (
+			state.Prompt is null
+			&& string.IsNullOrEmpty( state.Message )
+			&& !ShouldShowScrollCoordinates( state )
+		)
 			? 0
-			: 1;
+			: 1
+		;
 		int availableTaskRows = AvailableTaskRows(
 			state,
 			dimensions,
@@ -199,9 +207,21 @@ internal static class TopRenderer {
 						state.Colors.Messages
 					)
 				) );
+			} else if ( !string.IsNullOrEmpty( state.Message ) ) {
+				lines.Add( new TopRenderLine(
+					LimitRunes( state.Message, dimensions.Columns ),
+					TopLineStyle.Message,
+					ForegroundColor: ForegroundColor(
+						state,
+						state.Colors.Messages
+					)
+				) );
 			} else {
 				lines.Add( new TopRenderLine(
-					LimitRunes( state.Message ?? string.Empty, dimensions.Columns ),
+					LimitRunes(
+						BuildScrollCoordinatesMessage( sample, state ),
+						dimensions.Columns
+					),
 					TopLineStyle.Message,
 					ForegroundColor: ForegroundColor(
 						state,
@@ -231,6 +251,7 @@ internal static class TopRenderer {
 		int footerRows = (
 			state.Prompt is null
 			&& string.IsNullOrEmpty( state.Message )
+			&& !ShouldShowScrollCoordinates( state )
 		)
 			? 0
 			: 1
@@ -446,11 +467,25 @@ internal static class TopRenderer {
 						)
 					)
 				);
+			} else if ( !string.IsNullOrEmpty( state.Message ) ) {
+				lines.Add(
+					new TopRenderLine(
+						LimitRunes(
+							state.Message,
+							dimensions.Columns
+						),
+						TopLineStyle.Message,
+						ForegroundColor: ForegroundColor(
+							state,
+							state.Colors.Messages
+						)
+					)
+				);
 			} else {
 				lines.Add(
 					new TopRenderLine(
 						LimitRunes(
-							state.Message ?? string.Empty,
+							BuildScrollCoordinatesMessage( sample, state ),
 							dimensions.Columns
 						),
 						TopLineStyle.Message,
@@ -604,6 +639,7 @@ internal static class TopRenderer {
 		int footerRows = (
 			state.Prompt is null
 			&& string.IsNullOrEmpty( state.Message )
+			&& !ShouldShowScrollCoordinates( state )
 		)
 			? 0
 			: 1
@@ -1078,6 +1114,85 @@ internal static class TopRenderer {
 		);
 	}
 
+	private static bool ShouldShowScrollCoordinates(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		return state.ScrollCoordinatesVisible
+			&& (
+				!state.AlternateDisplayMode
+				|| state.TaskDisplayVisible
+			);
+	}
+
+	private static string BuildScrollCoordinatesMessage(
+		TopSample sample,
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( sample );
+		ArgumentNullException.ThrowIfNull( state );
+
+		List<TopTaskRow> tasks = SelectAndOrderTasks(
+			sample,
+			state
+		);
+		int taskPosition = ( 0 == tasks.Count )
+			? 0
+			: Math.Min(
+				tasks.Count,
+				state.VerticalOffset + 1
+			)
+		;
+
+		var visibleFields = new List<TopFieldDefinition>();
+		foreach ( TopFieldId field in state.FieldOrder ) {
+			if ( state.VisibleFields.Contains( field ) ) {
+				visibleFields.Add(
+					TopFieldCatalog.Get( field )
+				);
+			}
+		}
+
+		int fieldPosition = 0;
+		int displacement = 0;
+		if ( 0 < visibleFields.Count ) {
+			int remaining = Math.Max(
+				0,
+				state.HorizontalOffset
+			);
+			for ( int index = 0; index < visibleFields.Count; index++ ) {
+				int width = Math.Max(
+					1,
+					visibleFields[ index ].Width
+				);
+				bool last = index == visibleFields.Count - 1;
+				if ( last || remaining < width + 1 ) {
+					fieldPosition = index + 1;
+					displacement = remaining;
+					break;
+				}
+				remaining -= width + 1;
+			}
+		}
+
+		string result = string.Format(
+			CultureInfo.InvariantCulture,
+			"scroll coordinates: y = {0}/{1} (tasks), x = {2}/{3} (fields)",
+			taskPosition,
+			tasks.Count,
+			fieldPosition,
+			visibleFields.Count
+		);
+		if ( 0 < displacement ) {
+			result += string.Format(
+				CultureInfo.InvariantCulture,
+				" + {0}",
+				displacement
+			);
+		}
+		return result;
+	}
+
 	private static IReadOnlyList<string> BuildSummaryLines(
 		TopSample sample,
 		TopRuntimeState state,
@@ -1089,9 +1204,12 @@ internal static class TopRenderer {
 
 		var result = new List<string>(
 			GetSummaryRowCount( state )
-		) {
-			BuildTopLine( sample )
-		};
+		);
+		if ( state.LoadAverageVisible ) {
+			result.Add(
+				BuildTopLine( sample )
+			);
+		}
 		if ( state.CpuSummaryVisible ) {
 			string taskLabel = ( state.ShowThreads )
 				? "Threads"
@@ -1148,7 +1266,10 @@ internal static class TopRenderer {
 	) {
 		ArgumentNullException.ThrowIfNull( state );
 
-		int result = 1;
+		int result = ( state.LoadAverageVisible )
+			? 1
+			: 0
+		;
 		if ( state.CpuSummaryVisible ) {
 			result += 2;
 		}

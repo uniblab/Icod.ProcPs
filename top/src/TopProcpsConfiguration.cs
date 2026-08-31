@@ -434,6 +434,14 @@ internal static partial class TopProcpsConfigurationCodec {
 				winFlags
 				& ShowForestFlag
 			),
+			LoadAverageVisible = 0 != (
+				winFlags
+				& ViewLoadAverage
+			),
+			ScrollCoordinatesVisible = 0 != (
+				winFlags
+				& ViewScroll
+			),
 			SingleCpuSummary = 0 != (
 				winFlags
 				& ViewCpuSummary

@@ -129,6 +129,9 @@ profile:
   command-line `-n` / `--iterations` option.
 - `P`, `M`, `N`, and `T` sort by CPU, memory, PID, and cumulative CPU time.
 - `R` toggles the active sort direction between high-to-low and low-to-high.
+- `<` and `>` move the visible sort field left or right across the neighboring
+  visible field without changing which field controls sorting. Hidden fields
+  remain hidden and keep their relative placement.
 - `B` globally enables or disables use of bold rendition in the summary and
   task areas.
 - `b` selects bold versus reverse-video emphasis for highlighted task rows
@@ -140,6 +143,7 @@ profile:
   Up/Down cycle the full native procps `-1..255` range. `a` / `w` switch
   windows, while `B`, `b`, and `z` remain available in the manager. Enter
   keeps the edits; `q` or Escape restores the state that existed on entry.
+- `l` toggles the load-average/uptime summary line for the current window.
 - `t` cycles the task/CPU summary through detailed percentages, a compact bar
   graph, a compact block graph, and hidden. `m` applies the same four-way cycle
   to the memory/swap summary. When a native configuration hides a summary while
@@ -213,7 +217,8 @@ profile:
 - `W` atomically writes the supported persistent four-window state to the
   personal Icod top configuration file without resampling processes.
 - Arrow keys, Page Up, Page Down, Home, and End scroll the task display; Left and
-  Right scroll horizontally.
+  Right scroll horizontally. `C` toggles procps-style scroll coordinates in the
+  otherwise-unused message line; prompts and explicit messages take precedence.
 - `=` clears current-window idle/max-task limits, PID/user/Other Filter
   restrictions, locate state, and scrolling while forcing that task display
   visible. `+` applies the window-local reset to all four field groups.
@@ -275,7 +280,8 @@ The Icod JSON persists delay, alternate-display/current-window selection,
 global bold enable, memory scales, thread/Irix/zero-suppression state, and each
 window's name, task-display visibility, sort field/direction, emphasis and
 justification toggles, maximum tasks, command/idle/forest/CPU-summary state,
-color state, CPU/memory summary visibility and graph selectors, field
+load/uptime and scroll-coordinate visibility, color state, CPU/memory summary
+visibility and graph selectors, field
 order/visibility, and active Other Filters. The alpha.13/14 single-window
 JSON remains readable and initializes `1:Def` when no window array is present;
 the first alpha.15 four-window JSON remains readable because omitted names and
@@ -323,16 +329,25 @@ on the current host.
 
 ## CURRENT SCOPE
 
-This tranche establishes the production monitor engine and terminal lifecycle.
-The current renderer now consumes the persisted procps CPU/memory summary
-selectors directly: detailed, bar, block, and hidden presentations round-trip
-through native and Icod configuration and are selectable with `t` / `m`.
+The production monitor now covers the core summary, task, scrolling, field,
+color, four-window, filtering, search, process-control, and configuration
+interactions supported by the current observation model. Per-window native
+`View_LOADAV` and `View_SCROLL` state round-trips through Icod/native
+configuration and is controlled by `l` / `C`; `<` / `>` provide direct sort
+field movement in addition to Fields Management.
 
-The following procps `top` areas remain intentionally incomplete because their
-source facts are not yet available through the shared observation contracts:
+Additional procps conveniences that do not require new kernel facts remain on
+the completion queue: forest parent focus/collapse (`F` / `v`), fixed-width
+expansion (`X` / `Fixed_widest`), Inspect (`Y`), and the applicable 4.0.6
+bottom-window/message-log views.
 
-- per-logical-CPU activity rows until the Shared metrics contract exposes them;
-- cumulative dead-child CPU time (`-S`); and
+The following areas remain blocked by facts that are not yet available through
+the shared observation contracts:
+
+- separate per-logical-CPU, NUMA, combined-CPU, adjacent-CPU, and P/E-core
+  summary views (`1` / `2` / `3` / `4` / `5` / `!`) beyond the current
+  aggregate-state toggle;
+- cumulative dead-child CPU time (`-S` / interactive `S`); and
 - fields whose source facts are not yet present in the neutral process model,
   including exact SHR accounting.
 

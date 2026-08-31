@@ -34,6 +34,7 @@ internal static partial class TopProcpsConfigurationCodec {
 	private const int ViewStates = 0x002000;
 	private const int ViewLoadAverage = 0x004000;
 	private const int ViewCpuSummary = 0x008000;
+	private const int ViewScroll = 0x080000;
 
 	internal static string Decode(
 		ReadOnlySpan<byte> bytes
@@ -254,7 +255,10 @@ internal static partial class TopProcpsConfigurationCodec {
 	) {
 		ArgumentNullException.ThrowIfNull( window );
 
-		int result = ViewLoadAverage;
+		int result = 0;
+		if ( window.LoadAverageVisible ) {
+			result |= ViewLoadAverage;
+		}
 		if ( window.CpuSummaryVisible ) {
 			result |= ViewStates;
 		}
@@ -299,6 +303,9 @@ internal static partial class TopProcpsConfigurationCodec {
 		}
 		if ( window.SingleCpuSummary ) {
 			result |= ViewCpuSummary;
+		}
+		if ( window.ScrollCoordinatesVisible ) {
+			result |= ViewScroll;
 		}
 		return result;
 	}

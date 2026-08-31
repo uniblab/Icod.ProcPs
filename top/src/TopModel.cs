@@ -80,6 +80,8 @@ internal sealed class TopWindowState {
 	internal bool ShowCommandLine { get; set; }
 	internal bool HideIdle { get; set; }
 	internal bool Forest { get; set; }
+	internal bool LoadAverageVisible { get; set; } = true;
+	internal bool ScrollCoordinatesVisible { get; set; }
 	internal bool SingleCpuSummary { get; set; } = true;
 	internal bool CpuSummaryVisible { get; set; } = true;
 	internal TopSummaryGraphMode CpuSummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
@@ -129,6 +131,8 @@ internal sealed class TopWindowState {
 		this.ShowCommandLine = state.ShowCommandLine;
 		this.HideIdle = state.HideIdle;
 		this.Forest = state.Forest;
+		this.LoadAverageVisible = state.LoadAverageVisible;
+		this.ScrollCoordinatesVisible = state.ScrollCoordinatesVisible;
 		this.SingleCpuSummary = state.SingleCpuSummary;
 		this.CpuSummaryVisible = state.CpuSummaryVisible;
 		this.CpuSummaryGraphMode = state.CpuSummaryGraphMode;
@@ -172,6 +176,8 @@ internal sealed class TopWindowState {
 		state.ShowCommandLine = this.ShowCommandLine;
 		state.HideIdle = this.HideIdle;
 		state.Forest = this.Forest;
+		state.LoadAverageVisible = this.LoadAverageVisible;
+		state.ScrollCoordinatesVisible = this.ScrollCoordinatesVisible;
 		state.SingleCpuSummary = this.SingleCpuSummary;
 		state.CpuSummaryVisible = this.CpuSummaryVisible;
 		state.CpuSummaryGraphMode = this.CpuSummaryGraphMode;
@@ -215,6 +221,8 @@ internal sealed class TopWindowState {
 		this.ShowCommandLine = source.ShowCommandLine;
 		this.HideIdle = source.HideIdle;
 		this.Forest = source.Forest;
+		this.LoadAverageVisible = source.LoadAverageVisible;
+		this.ScrollCoordinatesVisible = source.ScrollCoordinatesVisible;
 		this.SingleCpuSummary = source.SingleCpuSummary;
 		this.CpuSummaryVisible = source.CpuSummaryVisible;
 		this.CpuSummaryGraphMode = source.CpuSummaryGraphMode;
@@ -272,6 +280,8 @@ internal sealed class TopRuntimeState {
 	internal bool Forest { get; set; }
 	internal bool IrixMode { get; set; } = true;
 	internal bool SecureMode { get; set; }
+	internal bool LoadAverageVisible { get; set; } = true;
+	internal bool ScrollCoordinatesVisible { get; set; }
 	internal bool SingleCpuSummary { get; set; } = true;
 	internal bool CpuSummaryVisible { get; set; } = true;
 	internal TopSummaryGraphMode CpuSummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
@@ -325,6 +335,45 @@ internal sealed class TopRuntimeState {
 		].Rename(
 			name
 		);
+	}
+
+	internal bool MoveSortField(
+		int direction
+	) {
+		if ( direction is not -1 and not 1 ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( direction )
+			);
+		}
+		if ( !this.VisibleFields.Contains( this.SortField ) ) {
+			return false;
+		}
+
+		int sourceIndex = this.FieldOrder.IndexOf(
+			this.SortField
+		);
+		if ( 0 > sourceIndex ) {
+			return false;
+		}
+		int targetIndex = sourceIndex + direction;
+		while (
+			targetIndex is >= 0 and < this.FieldOrder.Count
+			&& !this.VisibleFields.Contains(
+				this.FieldOrder[ targetIndex ]
+			)
+		) {
+			targetIndex += direction;
+		}
+		if ( targetIndex is < 0 || targetIndex >= this.FieldOrder.Count ) {
+			return false;
+		}
+
+		TopFieldId target = this.FieldOrder[ targetIndex ];
+		this.FieldOrder[ targetIndex ] = this.SortField;
+		this.FieldOrder[ sourceIndex ] = target;
+		this.HorizontalOffset = 0;
+		this.SynchronizeCurrentWindow();
+		return true;
 	}
 
 	internal void ToggleAllTaskDisplays() {
