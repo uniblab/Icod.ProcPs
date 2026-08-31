@@ -89,14 +89,16 @@ internal enum TopLineStyle {
 internal readonly record struct TopRenderSpan(
 	int Start,
 	int Length,
-	TopLineStyle Style
+	TopLineStyle Style,
+	int? ForegroundColor = null
 );
 
 /// <summary>Represents one rendered top line.</summary>
 internal readonly record struct TopRenderLine(
 	string Text,
 	TopLineStyle Style = TopLineStyle.Default,
-	IReadOnlyList<TopRenderSpan>? Spans = null
+	IReadOnlyList<TopRenderSpan>? Spans = null,
+	int? ForegroundColor = null
 );
 
 /// <summary>Represents a complete top display frame.</summary>
@@ -358,7 +360,8 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 
 		CursesStyle baseStyle = StyleFor(
 			line.Style,
-			boldEnabled
+			boldEnabled,
+			line.ForegroundColor
 		);
 		if ( line.Spans is null || 0 == line.Spans.Count ) {
 			window.Write(
@@ -394,7 +397,8 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 				),
 				StyleFor(
 					span.Style,
-					boldEnabled
+					boldEnabled,
+					span.ForegroundColor
 				)
 			);
 			position = span.Start + span.Length;
@@ -409,7 +413,8 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 
 	private static CursesStyle StyleFor(
 		TopLineStyle style,
-		bool boldEnabled
+		bool boldEnabled,
+		int? foregroundColor
 	) {
 		CursesStyle result = style switch {
 			TopLineStyle.Summary => SummaryStyle,
@@ -421,11 +426,34 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 			TopLineStyle.HighlightReverse => HighlightReverseStyle,
 			_ => CursesStyle.Default
 		};
-		if ( boldEnabled ) {
-			return result;
+		if ( !boldEnabled ) {
+			result = result.WithAttributes(
+				result.Attributes & ~CursesTextAttributes.Bold
+			);
 		}
-		return result.WithAttributes(
-			result.Attributes & ~CursesTextAttributes.Bold
+		if ( foregroundColor.HasValue ) {
+			result = result.WithForeground(
+				ColorFor(
+					foregroundColor.Value
+				)
+			);
+		}
+		return result;
+	}
+
+	private static CursesColor ColorFor(
+		int color
+	) {
+		if ( -1 == color ) {
+			return CursesColor.Default;
+		}
+		if ( color is < 0 or > 255 ) {
+			throw new InvalidOperationException(
+				$"A top render color must be -1 through 255, not {color}."
+			);
+		}
+		return CursesColor.Indexed(
+			color
 		);
 	}
 }

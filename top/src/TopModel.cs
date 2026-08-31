@@ -257,6 +257,7 @@ internal sealed class TopRuntimeState {
 	internal int HorizontalOffset { get; set; }
 	internal string? Message { get; set; }
 	internal bool ShowHelp { get; set; }
+	internal TopColorManagerState? ColorManager { get; set; }
 	internal bool ShowFieldManager { get; set; }
 	internal int FieldCursor { get; set; }
 	internal bool FieldMoveActive { get; set; }

@@ -50,6 +50,7 @@ internal static class TopRenderer {
 		" - / _          show/hide current / all task windows",
 		" +              reset and show all windows",
 		" B/b/x/y        emphasis and highlighting",
+		" z / Z          toggle colors / map window colors",
 		" J / j          justify numeric / character columns",
 		" f              manage task fields",
 		" c              toggle command name / command line",
@@ -82,6 +83,12 @@ internal static class TopRenderer {
 			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
 		}
 
+		if ( state.ColorManager is not null ) {
+			return RenderColorManager(
+				state,
+				dimensions
+			);
+		}
 		if ( state.ShowFieldManager ) {
 			return RenderFieldManager(
 				state,
@@ -118,12 +125,20 @@ internal static class TopRenderer {
 		foreach ( string line in BuildSummaryLines( sample, state ) ) {
 			lines.Add( new TopRenderLine(
 				SliceForDisplay( line, state.HorizontalOffset, dimensions.Columns ),
-				TopLineStyle.Summary
+				TopLineStyle.Summary,
+				ForegroundColor: ForegroundColor(
+					state,
+					state.Colors.Summary
+				)
 			) );
 		}
 		lines.Add( new TopRenderLine(
 			SliceForDisplay( BuildHeader( state ), state.HorizontalOffset, dimensions.Columns ),
-			TopLineStyle.Header
+			TopLineStyle.Header,
+			ForegroundColor: ForegroundColor(
+				state,
+				state.Colors.Header
+			)
 		) );
 
 		int taskEndIndex = Math.Min(
@@ -156,6 +171,10 @@ internal static class TopRenderer {
 					formatted,
 					state,
 					lineStyle
+				),
+				TaskForegroundColor(
+					state,
+					lineStyle
 				)
 			) );
 		}
@@ -170,12 +189,20 @@ internal static class TopRenderer {
 						$"{state.Prompt.Label}{state.Prompt.Buffer}",
 						dimensions.Columns
 					),
-					TopLineStyle.Prompt
+					TopLineStyle.Prompt,
+					ForegroundColor: ForegroundColor(
+						state,
+						state.Colors.Messages
+					)
 				) );
 			} else {
 				lines.Add( new TopRenderLine(
 					LimitRunes( state.Message ?? string.Empty, dimensions.Columns ),
-					TopLineStyle.Message
+					TopLineStyle.Message,
+					ForegroundColor: ForegroundColor(
+						state,
+						state.Colors.Messages
+					)
 				) );
 			}
 		}
@@ -218,7 +245,11 @@ internal static class TopRenderer {
 						state.HorizontalOffset,
 						dimensions.Columns
 					),
-					TopLineStyle.Summary
+					TopLineStyle.Summary,
+					ForegroundColor: ForegroundColor(
+						state,
+						state.Colors.Summary
+					)
 				)
 			);
 		}
@@ -231,7 +262,11 @@ internal static class TopRenderer {
 						$"alternate display requires at least {SummaryRows + visibleWindowCount} terminal rows",
 						dimensions.Columns
 					),
-					TopLineStyle.Message
+					TopLineStyle.Message,
+					ForegroundColor: ForegroundColor(
+						state,
+						state.Colors.Messages
+					)
 				)
 			);
 			while ( lines.Count < dimensions.Rows ) {
@@ -311,7 +346,11 @@ internal static class TopRenderer {
 						windowHeader,
 						dimensions.Columns
 					),
-					TopLineStyle.Header
+					TopLineStyle.Header,
+					ForegroundColor: ForegroundColor(
+						state,
+						state.Colors.Header
+					)
 				)
 			);
 
@@ -358,7 +397,11 @@ internal static class TopRenderer {
 					new TopRenderLine(
 						visibleLine,
 						lineStyle,
-						spans
+						spans,
+						TaskForegroundColor(
+							state,
+							lineStyle
+						)
 					)
 				);
 			}
@@ -385,7 +428,11 @@ internal static class TopRenderer {
 							$"{state.Prompt.Label}{state.Prompt.Buffer}",
 							dimensions.Columns
 						),
-						TopLineStyle.Prompt
+						TopLineStyle.Prompt,
+						ForegroundColor: ForegroundColor(
+							state,
+							state.Colors.Messages
+						)
 					)
 				);
 			} else {
@@ -395,7 +442,11 @@ internal static class TopRenderer {
 							state.Message ?? string.Empty,
 							dimensions.Columns
 						),
-						TopLineStyle.Message
+						TopLineStyle.Message,
+						ForegroundColor: ForegroundColor(
+							state,
+							state.Colors.Messages
+						)
 					)
 				);
 			}
@@ -696,6 +747,170 @@ internal static class TopRenderer {
 			_ => default
 		};
 		return char.ToLowerInvariant( text[ 0 ] ) is 'k' or 'm' or 'g' or 't' or 'p' or 'e';
+	}
+
+	internal static TopRenderFrame RenderColorManager(
+		TopRuntimeState state,
+		TopTerminalDimensions dimensions
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( dimensions )
+			);
+		}
+		TopColorManagerState manager = state.ColorManager
+			?? throw new InvalidOperationException(
+				"The color mapping screen was requested without an active color manager."
+			);
+
+		state.VerticalOffset = 0;
+		state.HorizontalOffset = 0;
+		var lines = new List<TopRenderLine>(
+			dimensions.Rows
+		);
+		lines.Add(
+			new TopRenderLine(
+				LimitRunes(
+					$"Help for color mapping - Current Window = {state.CurrentWindowLabel}",
+					dimensions.Columns
+				),
+				TopLineStyle.Header,
+				ForegroundColor: ForegroundColor(
+					state,
+					state.Colors.Header
+				)
+			)
+		);
+		lines.Add(
+			new TopRenderLine(
+				LimitRunes(
+					$"B:Bold {ToggleStateLabel( state.BoldEnabled )}  b:Highlight {ToggleStateLabel( state.HighlightBold )}  z:Colors {ToggleStateLabel( state.ColorsEnabled )}",
+					dimensions.Columns
+				),
+				TopLineStyle.Dim
+			)
+		);
+
+		(TopColorTarget Target, char Key, string Label)[] targets = [
+			( TopColorTarget.Summary, 'S', "summary data" ),
+			( TopColorTarget.Messages, 'M', "messages/prompts" ),
+			( TopColorTarget.Header, 'H', "column headers" ),
+			( TopColorTarget.Tasks, 'T', "task rows" ),
+			( TopColorTarget.TaskAccent, 'X', "highlighted tasks/columns" )
+		];
+		foreach ( var target in targets ) {
+			int color = TopColorManagerState.GetColor(
+				state.Colors,
+				target.Target
+			);
+			char marker = ( manager.Target == target.Target )
+				? '>'
+				: ' '
+			;
+			TopLineStyle style = ( manager.Target == target.Target )
+				? TopLineStyle.HighlightReverse
+				: TopLineStyle.Default
+			;
+			lines.Add(
+				new TopRenderLine(
+					LimitRunes(
+						$"{marker} {target.Key} {target.Label,-27} {ColorValueLabel( color )}",
+						dimensions.Columns
+					),
+					style,
+					ForegroundColor: ForegroundColor(
+						state,
+						color
+					)
+				)
+			);
+		}
+
+		lines.Add(
+			new TopRenderLine(
+				LimitRunes(
+					"S/M/H/T/X target; 0-7/@ color; Up/Down cycle -1..255",
+					dimensions.Columns
+				),
+				TopLineStyle.Dim
+			)
+		);
+		lines.Add(
+			new TopRenderLine(
+				LimitRunes(
+					"a/w window; B/b/z toggles; Enter apply; q/Esc cancel",
+					dimensions.Columns
+				),
+				TopLineStyle.Dim
+			)
+		);
+		while ( lines.Count < dimensions.Rows ) {
+			lines.Add(
+				new TopRenderLine( string.Empty )
+			);
+		}
+		if ( dimensions.Rows < lines.Count ) {
+			lines.RemoveRange(
+				dimensions.Rows,
+				lines.Count - dimensions.Rows
+			);
+		}
+		return new TopRenderFrame(
+			lines,
+			dimensions.Columns,
+			dimensions.Rows,
+			state.BoldEnabled
+		);
+	}
+
+	private static string ToggleStateLabel(
+		bool enabled
+	) {
+		return ( enabled )
+			? "On"
+			: "Off"
+		;
+	}
+
+	private static string ColorValueLabel(
+		int color
+	) {
+		if ( -1 == color ) {
+			return "@ (terminal default)";
+		}
+		return color.ToString(
+			CultureInfo.InvariantCulture
+		);
+	}
+
+	private static int? ForegroundColor(
+		TopRuntimeState state,
+		int color
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		return ( state.ColorsEnabled )
+			? color
+			: null
+		;
+	}
+
+	private static int? TaskForegroundColor(
+		TopRuntimeState state,
+		TopLineStyle lineStyle
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		if ( !state.ColorsEnabled ) {
+			return null;
+		}
+		return (
+			lineStyle is TopLineStyle.HighlightBold
+				or TopLineStyle.HighlightReverse
+		)
+			? state.Colors.TaskAccent
+			: state.Colors.Tasks
+		;
 	}
 
 	private static TopRenderFrame RenderHelp(
@@ -1499,6 +1714,10 @@ internal static class TopRenderer {
 				SortColumnStyle(
 					state,
 					lineStyle
+				),
+				ForegroundColor(
+					state,
+					state.Colors.TaskAccent
 				)
 			)
 		];

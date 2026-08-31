@@ -139,7 +139,8 @@ Interactive keys:
  A alternate display; a/w next/previous window; g/G choose/rename window;
  -/_ show/hide current/all windows; =/+ reset current/all windows; B bold enable;
  b emphasis mode; J numeric justify; j character justify; f manage fields;
- x sort column; y running rows; c command line; H threads; i idle tasks;
+ x sort column; y running rows; z colors; Z map colors; c command line; H threads;
+ i idle tasks;
  V forest; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
  O/o other filter; L locate; & locate next; k signal; r renice; W write config;
  arrows/PgUp/PgDn/Home/End scroll; h/? help.
@@ -571,6 +572,12 @@ Interactive keys:
 		ArgumentNullException.ThrowIfNull( processControl );
 		ArgumentNullException.ThrowIfNull( configurationStore );
 
+		if ( state.ColorManager is not null ) {
+			return HandleColorManagerInput(
+				input,
+				state
+			);
+		}
 		if ( state.ShowFieldManager ) {
 			return HandleFieldManagerInput(
 				input,
@@ -740,6 +747,14 @@ Interactive keys:
 				return TopCommandAction.Rerender;
 			case 'b':
 				state.HighlightBold = !state.HighlightBold;
+				return TopCommandAction.Rerender;
+			case 'z':
+				state.ColorsEnabled = !state.ColorsEnabled;
+				return TopCommandAction.Rerender;
+			case 'Z':
+				state.ColorManager = new TopColorManagerState(
+					state
+				);
 				return TopCommandAction.Rerender;
 			case 'J':
 				state.NumericLeftJustified = !state.NumericLeftJustified;
@@ -913,6 +928,41 @@ Interactive keys:
 			case 'h':
 			case '?':
 				state.ShowHelp = true;
+				return TopCommandAction.Rerender;
+			default:
+				return TopCommandAction.None;
+		}
+	}
+
+	private static TopCommandAction HandleColorManagerInput(
+		TopInputEvent input,
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		TopColorManagerState manager = state.ColorManager
+			?? throw new InvalidOperationException(
+				"Color mapping input was requested without an active color manager."
+			);
+		if ( TopInputKey.EndOfInput == input.Key ) {
+			manager.Restore(
+				state
+			);
+			state.ColorManager = null;
+			return TopCommandAction.Exit;
+		}
+
+		TopColorManagerInputResult result = manager.HandleInput(
+			input,
+			state
+		);
+		switch ( result ) {
+			case TopColorManagerInputResult.Commit:
+			case TopColorManagerInputResult.Cancel:
+				state.ColorManager = null;
+				state.Message = null;
+				return TopCommandAction.Rerender;
+			case TopColorManagerInputResult.Changed:
 				return TopCommandAction.Rerender;
 			default:
 				return TopCommandAction.None;
