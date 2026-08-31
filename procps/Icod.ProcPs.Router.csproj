@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.31 completes procps watch --follow presentation: successive child output continues at the retained cursor, visible history scrolls without unbounded transcript growth, resize preserves retained cells, and --no-rerun can repaint follow state without launching another child.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.32 hardens procps watch compatibility: the two-row title now follows the 4.0.6 interval, locale timestamp, truncation, and right-aligned low-header model, while attached -d/--differences arguments enable permanent highlighting exactly as upstream getopt handling does.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

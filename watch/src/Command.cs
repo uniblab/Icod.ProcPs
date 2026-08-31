@@ -693,17 +693,29 @@ public static class Command {
 		List<string> headerLines = [];
 		if ( !parsed.NoTitle ) {
 			string intervalText = parsed.Interval.TotalSeconds.ToString(
-				"0.###",
-				CultureInfo.InvariantCulture
+				"0.0",
+				CultureInfo.CurrentCulture
 			);
 			string commandText = string.Join( " ", parsed.Command );
-			string left = $"Every {intervalText}s: {commandText}";
-			string right = $"{hostName}: {now:HH:mm:ss}";
-			headerLines.Add(
-				ComposeHeaderRow( left, right, screen.Width )
+			string leftPrefix = $"Every {intervalText}s: ";
+			string right = string.Concat(
+				hostName,
+				": ",
+				now.ToString(
+					"G",
+					CultureInfo.CurrentCulture
+				)
 			);
 			headerLines.Add(
-				$"Elapsed: {elapsed.TotalSeconds.ToString( "0.###", CultureInfo.InvariantCulture )}s  Exit: {status}"
+				ComposeHeaderRow(
+					leftPrefix,
+					commandText,
+					right,
+					screen.Width
+				)
+			);
+			headerLines.Add(
+				ComposeLowHeader( elapsed, status, screen.Width )
 			);
 		}
 
@@ -715,33 +727,100 @@ public static class Command {
 	}
 
 	private static string ComposeHeaderRow(
-		string left,
+		string leftPrefix,
+		string command,
 		string right,
 		int width
 	) {
-		ArgumentNullException.ThrowIfNull( left );
+		ArgumentNullException.ThrowIfNull( leftPrefix );
+		ArgumentNullException.ThrowIfNull( command );
 		ArgumentNullException.ThrowIfNull( right );
 		if ( 1 > width ) {
 			throw new ArgumentOutOfRangeException( nameof( width ) );
 		}
 
-		string clippedLeft = WatchTextLayout.ClipToWidth( left, width );
-		int leftWidth = WatchTextLayout.GetWidth( clippedLeft );
 		int rightWidth = WatchTextLayout.GetWidth( right );
-		if ( leftWidth >= width ) {
-			return clippedLeft;
-		}
-		if ( rightWidth + 1 >= width ) {
-			return clippedLeft;
+		if ( width < rightWidth ) {
+			return string.Empty;
 		}
 
-		int availableLeft = width - rightWidth - 1;
-		clippedLeft = WatchTextLayout.ClipToWidth( left, availableLeft );
-		leftWidth = WatchTextLayout.GetWidth( clippedLeft );
+		int prefixWidth = WatchTextLayout.GetWidth( leftPrefix );
+		int availableForCommand = width - prefixWidth - rightWidth;
+		string left = string.Empty;
+		if ( 0 <= availableForCommand ) {
+			int commandWidth = WatchTextLayout.GetWidth( command );
+			if ( commandWidth < availableForCommand ) {
+				left = string.Concat(
+					leftPrefix,
+					command
+				);
+			} else {
+				const string Ellipsis = "…";
+				int ellipsisWidth = WatchTextLayout.GetWidth( Ellipsis );
+				if ( ellipsisWidth < availableForCommand ) {
+					int commandLimit = Math.Max(
+						0,
+						availableForCommand - ellipsisWidth - 1
+					);
+					left = string.Concat(
+						leftPrefix,
+						WatchTextLayout.ClipToWidth(
+							command,
+							commandLimit
+						),
+						Ellipsis
+					);
+				} else {
+					left = leftPrefix;
+				}
+			}
+		}
+
+		int leftWidth = WatchTextLayout.GetWidth( left );
 		return string.Concat(
-			clippedLeft,
+			left,
 			new string( ' ', width - leftWidth - rightWidth ),
 			right
+		);
+	}
+
+	private static string ComposeLowHeader(
+		TimeSpan elapsed,
+		int status,
+		int width
+	) {
+		if ( 1 > width ) {
+			throw new ArgumentOutOfRangeException( nameof( width ) );
+		}
+
+		string text;
+		if ( TimeSpan.FromDays( 1 ) < elapsed ) {
+			text = $"in >1 day ({status})";
+		} else if ( TimeSpan.FromMilliseconds( 1 ) > elapsed ) {
+			text = $"in <0.001s ({status})";
+		} else {
+			text = string.Concat(
+				"in ",
+				elapsed.TotalSeconds.ToString(
+					"0.000",
+					CultureInfo.CurrentCulture
+				),
+				"s (",
+				status.ToString( CultureInfo.InvariantCulture ),
+				")"
+			);
+		}
+
+		int textWidth = WatchTextLayout.GetWidth( text );
+		if ( width < textWidth ) {
+			return string.Empty;
+		}
+		return string.Concat(
+			new string(
+				' ',
+				width - textWidth
+			),
+			text
 		);
 	}
 
@@ -809,28 +888,12 @@ public static class Command {
 				continue;
 			}
 			if ( argument.StartsWith( "--differences=", StringComparison.Ordinal ) ) {
-				string mode = argument[ "--differences=".Length.. ];
-				if ( !string.Equals(
-					mode,
-					"permanent",
-					StringComparison.OrdinalIgnoreCase
-				) ) {
-					return ParsedArguments.Failed( "invalid differences mode" );
-				}
 				differences = true;
 				permanentDifferences = true;
 				continue;
 			}
 			if ( argument.StartsWith( "-d", StringComparison.Ordinal )
 				&& 2 < argument.Length ) {
-				string mode = argument[ 2.. ].TrimStart( '=' );
-				if ( !string.Equals(
-					mode,
-					"permanent",
-					StringComparison.OrdinalIgnoreCase
-				) ) {
-					return ParsedArguments.Failed( "invalid differences mode" );
-				}
 				differences = true;
 				permanentDifferences = true;
 				continue;

@@ -35,8 +35,8 @@ child finishes; `--precise` uses monotonic fixed-rate scheduling.
 -b, --beep                   alert if the command exits non-zero
 -c, --color                  interpret ANSI SGR color/style sequences
 -C, --no-color               ignore ANSI SGR color/style sequences
--d, --differences[=permanent]
-                              highlight visible changes between updates
+-d, --differences[=<permanent>]
+                              highlight changes; attached argument makes them permanent
 -e, --errexit                freeze on non-zero exit, then return that status
                               after a fresh key press
 -f, --follow                 retain, append, and scroll repeated command output
@@ -52,6 +52,13 @@ child finishes; `--precise` uses monotonic fixed-rate scheduling.
 -h, --help                   display help
 -v, --version                display version
 ```
+
+As in procps-ng 4.0.6 itself, the optional argument to `--differences` is tested
+for presence rather than content. Consequently `-d1`, `--differences=1`, and
+`--differences=permanent` all enable permanent highlighting. The argument must
+remain attached to `-d` or `--differences`; a separate following operand begins
+the watched command because option processing stops at the first non-option
+operand.
 
 `--follow` conflicts with difference and comparison-driven exit modes.
 In follow mode the body is not cleared between executions. A new child begins
@@ -91,6 +98,13 @@ idempotent procps-ng key loop.
 
 `watch` requires interactive terminal input and output. Redirected standard
 output is therefore rejected by the DCurses session contract.
+
+The title follows the procps-ng 4.0.6 two-row model. Its first row begins with
+`Every N.Ns:`, places the host name and locale-formatted date/time against the
+right edge, and clips the command with an ellipsis when needed. The second row
+right-aligns the previous command duration and portable status as
+`in N.NNNs (status)`; sub-millisecond runs use `in <0.001s`, and runs longer
+than one day use `in >1 day`.
 
 Child text is converted to a fixed visible cell image using the DCurses Unicode
 width policy. Tabs advance to eight-column stops. Carriage return rewinds the

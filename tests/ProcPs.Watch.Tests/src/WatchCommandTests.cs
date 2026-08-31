@@ -21,6 +21,7 @@
 
 namespace Icod.ProcPs.Watch.Tests;
 
+using System.Globalization;
 using System.Text;
 using Icod.DCurses;
 using Icod.Processes;
@@ -173,6 +174,52 @@ public sealed class WatchCommandTests {
 		Assert.NotNull( terminal.Frames[ 1 ].Highlights );
 		Assert.True( terminal.Frames[ 1 ].Highlights![ 3 ] );
 		Assert.Equal( "H", terminal.Frames[ 1 ].Screen.GetCell( 0, 3 ).Content );
+	}
+
+	[Theory]
+	[InlineData( "-d1" )]
+	[InlineData( "--differences=1" )]
+	[InlineData( "--differences=permanent" )]
+	public async Task AttachedDifferencesArgumentEnablesPermanentHighlight(
+		string option
+	) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( option );
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new WatchTerminalDimensions( 30, 4 )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent( WatchTerminalEventKind.Timeout )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent( WatchTerminalEventKind.Timeout )
+		);
+		terminal.Events.Enqueue( Input( 'q' ) );
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "alpha" ),
+			Execution.Success( "alpHa" ),
+			Execution.Success( "alpha" )
+		);
+
+		CommandResult result = await RunAsync(
+			[ "--exec", "--no-title", option, "tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 3, executor.Options.Count );
+		Assert.Equal( 3, terminal.Frames.Count );
+		Assert.NotNull( terminal.Frames[ 1 ].Highlights );
+		Assert.NotNull( terminal.Frames[ 2 ].Highlights );
+		Assert.True( terminal.Frames[ 1 ].Highlights![ 3 ] );
+		Assert.True(
+			terminal.Frames[ 2 ].Highlights![ 3 ],
+			"Permanent highlighting should retain a prior visible difference."
+		);
 	}
 
 	[Fact]
@@ -405,22 +452,44 @@ public sealed class WatchCommandTests {
 			titled,
 			new FakeExecutor(
 				titledClock,
-				Execution.Success( "same" ),
-				Execution.Success( "same" )
+				new Execution( "same", string.Empty, 0, TimeSpan.FromMilliseconds( 125 ) ),
+				new Execution( "same", string.Empty, 0, TimeSpan.FromMilliseconds( 125 ) )
 			),
 			titledClock
 		);
 
 		Assert.Equal( 0, titledResult.ExitCode );
 		Assert.Equal( 2, titled.Frames[ 0 ].HeaderLines.Count );
+		string intervalText = 2d.ToString(
+			"0.0",
+			CultureInfo.CurrentCulture
+		);
 		Assert.Contains(
-			"Every 2s: tool",
+			$"Every {intervalText}s: tool",
 			titled.Frames[ 0 ].HeaderLines[ 0 ],
 			StringComparison.Ordinal
 		);
-		Assert.Contains(
-			"test-host",
+		DateTimeOffset now = new(
+			2026,
+			8,
+			25,
+			12,
+			34,
+			56,
+			TimeSpan.Zero
+		);
+		Assert.EndsWith(
+			$"test-host: {now.ToString( "G", CultureInfo.CurrentCulture )}",
 			titled.Frames[ 0 ].HeaderLines[ 0 ],
+			StringComparison.Ordinal
+		);
+		string elapsedText = 0.125d.ToString(
+			"0.000",
+			CultureInfo.CurrentCulture
+		);
+		Assert.EndsWith(
+			$"in {elapsedText}s (0)",
+			titled.Frames[ 0 ].HeaderLines[ 1 ],
 			StringComparison.Ordinal
 		);
 
@@ -601,7 +670,10 @@ public sealed class WatchCommandTests {
 			);
 			Assert.Equal( 6, lines.Length );
 			Assert.StartsWith(
-				"Every 2s: tool",
+				$"Every {2d.ToString(
+					"0.0",
+					CultureInfo.CurrentCulture
+				)}s: tool",
 				lines[ 0 ],
 				StringComparison.Ordinal
 			);
