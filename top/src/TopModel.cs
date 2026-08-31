@@ -37,6 +37,13 @@ internal enum TopMemoryScale {
 	Exbibytes
 }
 
+/// <summary>Identifies the native procps summary graph selector retained for a summary area.</summary>
+internal enum TopSummaryGraphMode {
+	Detailed,
+	Bar,
+	Block
+}
+
 /// <summary>Describes a command-line or interactive user restriction.</summary>
 internal sealed class TopUserFilter {
 	internal TopUserFilter( uint userId, bool anyUser, bool negate ) {
@@ -74,6 +81,10 @@ internal sealed class TopWindowState {
 	internal bool HideIdle { get; set; }
 	internal bool Forest { get; set; }
 	internal bool SingleCpuSummary { get; set; } = true;
+	internal bool CpuSummaryVisible { get; set; } = true;
+	internal TopSummaryGraphMode CpuSummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
+	internal bool MemorySummaryVisible { get; set; } = true;
+	internal TopSummaryGraphMode MemorySummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
 	internal int VerticalOffset { get; set; }
 	internal int HorizontalOffset { get; set; }
 	internal TopUserFilter? UserFilter { get; set; }
@@ -119,6 +130,10 @@ internal sealed class TopWindowState {
 		this.HideIdle = state.HideIdle;
 		this.Forest = state.Forest;
 		this.SingleCpuSummary = state.SingleCpuSummary;
+		this.CpuSummaryVisible = state.CpuSummaryVisible;
+		this.CpuSummaryGraphMode = state.CpuSummaryGraphMode;
+		this.MemorySummaryVisible = state.MemorySummaryVisible;
+		this.MemorySummaryGraphMode = state.MemorySummaryGraphMode;
 		this.VerticalOffset = state.VerticalOffset;
 		this.HorizontalOffset = state.HorizontalOffset;
 		this.UserFilter = state.UserFilter;
@@ -158,6 +173,10 @@ internal sealed class TopWindowState {
 		state.HideIdle = this.HideIdle;
 		state.Forest = this.Forest;
 		state.SingleCpuSummary = this.SingleCpuSummary;
+		state.CpuSummaryVisible = this.CpuSummaryVisible;
+		state.CpuSummaryGraphMode = this.CpuSummaryGraphMode;
+		state.MemorySummaryVisible = this.MemorySummaryVisible;
+		state.MemorySummaryGraphMode = this.MemorySummaryGraphMode;
 		state.VerticalOffset = this.VerticalOffset;
 		state.HorizontalOffset = this.HorizontalOffset;
 		state.UserFilter = this.UserFilter;
@@ -197,6 +216,10 @@ internal sealed class TopWindowState {
 		this.HideIdle = source.HideIdle;
 		this.Forest = source.Forest;
 		this.SingleCpuSummary = source.SingleCpuSummary;
+		this.CpuSummaryVisible = source.CpuSummaryVisible;
+		this.CpuSummaryGraphMode = source.CpuSummaryGraphMode;
+		this.MemorySummaryVisible = source.MemorySummaryVisible;
+		this.MemorySummaryGraphMode = source.MemorySummaryGraphMode;
 		this.VerticalOffset = source.VerticalOffset;
 		this.HorizontalOffset = source.HorizontalOffset;
 		this.UserFilter = source.UserFilter;
@@ -250,6 +273,10 @@ internal sealed class TopRuntimeState {
 	internal bool IrixMode { get; set; } = true;
 	internal bool SecureMode { get; set; }
 	internal bool SingleCpuSummary { get; set; } = true;
+	internal bool CpuSummaryVisible { get; set; } = true;
+	internal TopSummaryGraphMode CpuSummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
+	internal bool MemorySummaryVisible { get; set; } = true;
+	internal TopSummaryGraphMode MemorySummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
 	internal bool AlternateDisplayMode { get; set; }
 	internal bool TaskDisplayVisible { get; set; } = true;
 	internal int CurrentWindowIndex { get; private set; }

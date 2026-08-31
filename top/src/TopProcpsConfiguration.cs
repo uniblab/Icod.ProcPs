@@ -350,6 +350,16 @@ internal static partial class TopProcpsConfigurationCodec {
 			settings,
 			"maxtasks"
 		);
+		TopSummaryGraphMode cpuSummaryGraphMode = ParseGraphMode(
+			settings,
+			"graph_cpus",
+			windowIndex
+		);
+		TopSummaryGraphMode memorySummaryGraphMode = ParseGraphMode(
+			settings,
+			"graph_mems",
+			windowIndex
+		);
 		IReadOnlyList<int>? legacyFields = null;
 		if ( NativeTransformedVersion > version ) {
 			LegacyWindowConfiguration legacy = ConvertLegacyWindowConfiguration(
@@ -427,7 +437,17 @@ internal static partial class TopProcpsConfigurationCodec {
 			SingleCpuSummary = 0 != (
 				winFlags
 				& ViewCpuSummary
-			)
+			),
+			CpuSummaryVisible = 0 != (
+				winFlags
+				& ViewStates
+			),
+			CpuSummaryGraphMode = cpuSummaryGraphMode,
+			MemorySummaryVisible = 0 != (
+				winFlags
+				& ViewMemory
+			),
+			MemorySummaryGraphMode = memorySummaryGraphMode
 		};
 
 		if ( legacyFields is null ) {
@@ -447,6 +467,36 @@ internal static partial class TopProcpsConfigurationCodec {
 			state,
 			winFlags
 		);
+	}
+
+	private static TopSummaryGraphMode ParseGraphMode(
+		IReadOnlyDictionary<string, string> settings,
+		string name,
+		int windowIndex
+	) {
+		ArgumentNullException.ThrowIfNull( settings );
+		ArgumentException.ThrowIfNullOrWhiteSpace( name );
+		if ( windowIndex is < 0 or >= TopRuntimeState.WindowCount ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( windowIndex )
+			);
+		}
+
+		if ( !settings.TryGetValue( name, out string? text ) ) {
+			return TopSummaryGraphMode.Detailed;
+		}
+		int value = ParseInteger(
+			text,
+			name
+		);
+		return value switch {
+			0 => TopSummaryGraphMode.Detailed,
+			1 => TopSummaryGraphMode.Bar,
+			2 => TopSummaryGraphMode.Block,
+			_ => throw new FormatException(
+				$"procps window {windowIndex + 1} has invalid {name} value {value}"
+			)
+		};
 	}
 
 	private static LegacyWindowConfiguration ConvertLegacyWindowConfiguration(

@@ -133,6 +133,13 @@ profile:
   task areas.
 - `b` selects bold versus reverse-video emphasis for highlighted task rows
   and sort fields.
+- `z` toggles color versus monochrome presentation for the current window.
+- `Z` opens Color Mapping. `S`, `M`, `H`, `T`, and `X` select summary,
+  message/prompt, header, task-row, and highlighted-task colors. `0` through
+  `7` select portable indexed colors, `@` selects the terminal default, and
+  Up/Down cycle the full native procps `-1..255` range. `a` / `w` switch
+  windows, while `B`, `b`, and `z` remain available in the manager. Enter
+  keeps the edits; `q` or Escape restores the state that existed on entry.
 - `J` toggles numeric columns between right justification (the default) and
   left justification.
 - `j` toggles character columns between left justification (the default) and
@@ -252,17 +259,19 @@ ignores the first eyecatcher line, so it can consume an Icod mirror directly.
 If procps later rewrites that mirror, the Icod marker disappears and subsequent
 `W` commands leave the native file alone.
 
-The native mirror contains the state shared by both implementations. Procps
-features not yet represented by Icod, including colors, graph modes, and
-Inspection entries, receive neutral/default values only in an Icod-owned file.
-The native task-memory scale has no EiB encoding, so an Icod EiB task scale is
-mirrored as PiB. The JSON file remains authoritative and lossless.
+The native mirror contains the state shared by both implementations, including
+per-window colors plus the native `graph_cpus` / `graph_mems` selectors and
+their summary-visibility flags. Inspection entries are still outside the Icod
+configuration model. The native task-memory scale has no EiB encoding, so an
+Icod EiB task scale is mirrored as PiB. The JSON file remains authoritative
+and lossless.
 
 The Icod JSON persists delay, alternate-display/current-window selection,
 global bold enable, memory scales, thread/Irix/zero-suppression state, and each
 window's name, task-display visibility, sort field/direction, emphasis and
 justification toggles, maximum tasks, command/idle/forest/CPU-summary state,
-field order/visibility, and active Other Filters. The alpha.13/14 single-window
+color state, CPU/memory summary visibility and graph selectors, field
+order/visibility, and active Other Filters. The alpha.13/14 single-window
 JSON remains readable and initializes `1:Def` when no window array is present;
 the first alpha.15 four-window JSON remains readable because omitted names and
 visibility values retain the canonical names and visible defaults. PID
@@ -313,7 +322,8 @@ This tranche establishes the production monitor engine and terminal lifecycle.
 The following large procps `top` subsystems are intentionally left for later
 tranches rather than represented incompletely:
 
-- configurable color schemes and color-management screens;
+- rendered CPU/memory bar and block graphs plus interactive `t` / `m` cycling;
+  their native visibility and graph-selector state is already persisted;
 - per-logical-CPU activity rows until the Shared metrics contract exposes them;
 - cumulative dead-child CPU time (`-S`); and
 - fields whose source facts are not yet present in the neutral process model,

@@ -160,7 +160,7 @@ internal static partial class TopProcpsConfigurationCodec {
 
 		builder.AppendFormat(
 			CultureInfo.InvariantCulture,
-			"\twinflags={0}, sortindx={1}, maxtasks={2}, graph_cpus=0, graph_mems=0, double_up=0, combine_cpus=0\n",
+			"\twinflags={0}, sortindx={1}, maxtasks={2}, graph_cpus={3}, graph_mems={4}, double_up=0, combine_cpus=0\n",
 			BuildWindowFlags(
 				window,
 				boldEnabled
@@ -168,7 +168,9 @@ internal static partial class TopProcpsConfigurationCodec {
 			NativeField(
 				window.SortField
 			),
-			window.MaximumTasks
+			window.MaximumTasks,
+			NativeGraphMode( window.CpuSummaryGraphMode ),
+			NativeGraphMode( window.MemorySummaryGraphMode )
 		);
 
 		TopColorPalette colors = window.Colors;
@@ -252,9 +254,13 @@ internal static partial class TopProcpsConfigurationCodec {
 	) {
 		ArgumentNullException.ThrowIfNull( window );
 
-		int result = ViewLoadAverage
-			| ViewStates
-			| ViewMemory;
+		int result = ViewLoadAverage;
+		if ( window.CpuSummaryVisible ) {
+			result |= ViewStates;
+		}
+		if ( window.MemorySummaryVisible ) {
+			result |= ViewMemory;
+		}
 		if ( !boldEnabled ) {
 			result |= ViewNoBold;
 		}
@@ -295,6 +301,19 @@ internal static partial class TopProcpsConfigurationCodec {
 			result |= ViewCpuSummary;
 		}
 		return result;
+	}
+
+	private static int NativeGraphMode(
+		TopSummaryGraphMode mode
+	) {
+		return mode switch {
+			TopSummaryGraphMode.Detailed => 0,
+			TopSummaryGraphMode.Bar => 1,
+			TopSummaryGraphMode.Block => 2,
+			_ => throw new InvalidOperationException(
+				$"unsupported top summary graph mode '{mode}'"
+			)
+		};
 	}
 
 	private static int NativeField(

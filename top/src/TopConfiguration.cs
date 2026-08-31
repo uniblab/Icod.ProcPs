@@ -608,6 +608,16 @@ internal static class TopConfigurationCodec {
 				$"unknown configured task memory scale '{document.TaskScale}'"
 			);
 		}
+		if ( !Enum.IsDefined( typeof( TopSummaryGraphMode ), document.CpuSummaryGraphMode ) ) {
+			throw new FormatException(
+				$"unknown configured CPU summary graph mode '{document.CpuSummaryGraphMode}'"
+			);
+		}
+		if ( !Enum.IsDefined( typeof( TopSummaryGraphMode ), document.MemorySummaryGraphMode ) ) {
+			throw new FormatException(
+				$"unknown configured memory summary graph mode '{document.MemorySummaryGraphMode}'"
+			);
+		}
 
 		TimeSpan delay;
 		try {
@@ -652,6 +662,10 @@ internal static class TopConfigurationCodec {
 		state.Forest = document.Forest;
 		state.IrixMode = document.IrixMode;
 		state.SingleCpuSummary = document.SingleCpuSummary;
+		state.CpuSummaryVisible = document.CpuSummaryVisible;
+		state.CpuSummaryGraphMode = document.CpuSummaryGraphMode;
+		state.MemorySummaryVisible = document.MemorySummaryVisible;
+		state.MemorySummaryGraphMode = document.MemorySummaryGraphMode;
 
 		state.FieldOrder.Clear();
 		state.FieldOrder.AddRange( fieldOrder );
@@ -763,6 +777,10 @@ internal static class TopConfigurationCodec {
 			Forest = state.Forest,
 			IrixMode = state.IrixMode,
 			SingleCpuSummary = state.SingleCpuSummary,
+			CpuSummaryVisible = state.CpuSummaryVisible,
+			CpuSummaryGraphMode = state.CpuSummaryGraphMode,
+			MemorySummaryVisible = state.MemorySummaryVisible,
+			MemorySummaryGraphMode = state.MemorySummaryGraphMode,
 			ColorsEnabled = state.ColorsEnabled,
 			Colors = CreateColorDocument( state.Colors ),
 			AlternateDisplayMode = state.AlternateDisplayMode,
@@ -800,6 +818,10 @@ internal static class TopConfigurationCodec {
 			HideIdle = window.HideIdle,
 			Forest = window.Forest,
 			SingleCpuSummary = window.SingleCpuSummary,
+			CpuSummaryVisible = window.CpuSummaryVisible,
+			CpuSummaryGraphMode = window.CpuSummaryGraphMode,
+			MemorySummaryVisible = window.MemorySummaryVisible,
+			MemorySummaryGraphMode = window.MemorySummaryGraphMode,
 			ColorsEnabled = window.ColorsEnabled,
 			Colors = CreateColorDocument( window.Colors ),
 			FieldOrder = [ .. window.FieldOrder ],
@@ -849,6 +871,16 @@ internal static class TopConfigurationCodec {
 				$"window {index + 1} has unknown sort field '{document.SortField}'"
 			);
 		}
+		if ( !Enum.IsDefined( typeof( TopSummaryGraphMode ), document.CpuSummaryGraphMode ) ) {
+			throw new FormatException(
+				$"window {index + 1} has unknown CPU summary graph mode '{document.CpuSummaryGraphMode}'"
+			);
+		}
+		if ( !Enum.IsDefined( typeof( TopSummaryGraphMode ), document.MemorySummaryGraphMode ) ) {
+			throw new FormatException(
+				$"window {index + 1} has unknown memory summary graph mode '{document.MemorySummaryGraphMode}'"
+			);
+		}
 
 		string name = ResolveWindowName(
 			document.Name,
@@ -870,6 +902,10 @@ internal static class TopConfigurationCodec {
 			HideIdle = document.HideIdle,
 			Forest = document.Forest,
 			SingleCpuSummary = document.SingleCpuSummary,
+			CpuSummaryVisible = document.CpuSummaryVisible,
+			CpuSummaryGraphMode = document.CpuSummaryGraphMode,
+			MemorySummaryVisible = document.MemorySummaryVisible,
+			MemorySummaryGraphMode = document.MemorySummaryGraphMode,
 			ColorsEnabled = document.ColorsEnabled,
 			Colors = BuildColorPalette(
 				document.Colors,
@@ -1092,6 +1128,10 @@ internal sealed class TopConfigurationDocument {
 	public bool Forest { get; set; }
 	public bool IrixMode { get; set; } = true;
 	public bool SingleCpuSummary { get; set; } = true;
+	public bool CpuSummaryVisible { get; set; } = true;
+	public TopSummaryGraphMode CpuSummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
+	public bool MemorySummaryVisible { get; set; } = true;
+	public TopSummaryGraphMode MemorySummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
 	public bool ColorsEnabled { get; set; } = true;
 	public TopConfigurationColorDocument? Colors { get; set; }
 	public bool AlternateDisplayMode { get; set; }
@@ -1117,6 +1157,10 @@ internal sealed class TopConfigurationWindowDocument {
 	public bool HideIdle { get; set; }
 	public bool Forest { get; set; }
 	public bool SingleCpuSummary { get; set; } = true;
+	public bool CpuSummaryVisible { get; set; } = true;
+	public TopSummaryGraphMode CpuSummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
+	public bool MemorySummaryVisible { get; set; } = true;
+	public TopSummaryGraphMode MemorySummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
 	public bool ColorsEnabled { get; set; } = true;
 	public TopConfigurationColorDocument? Colors { get; set; }
 	public List<TopFieldId>? FieldOrder { get; set; }
