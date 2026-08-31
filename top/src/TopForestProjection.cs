@@ -133,6 +133,24 @@ internal static class TopForestProjection {
 
 		var result = new List<TopTaskRow>( tasks.Count );
 		var visited = new HashSet<int>();
+		void SuppressDescendants( TopTaskRow row ) {
+			if (
+				!children.TryGetValue(
+					row.Process.ProcessId,
+					out List<TopTaskRow>? list
+				)
+			) {
+				return;
+			}
+
+			foreach ( TopTaskRow child in list ) {
+				if ( !visited.Add( child.Process.ProcessId ) ) {
+					continue;
+				}
+				SuppressDescendants( child );
+			}
+		}
+
 		void Add( TopTaskRow row, int depth ) {
 			if ( !visited.Add( row.Process.ProcessId ) ) {
 				return;
@@ -152,6 +170,7 @@ internal static class TopForestProjection {
 				)
 			);
 			if ( collapsed ) {
+				SuppressDescendants( row );
 				return;
 			}
 			if (
