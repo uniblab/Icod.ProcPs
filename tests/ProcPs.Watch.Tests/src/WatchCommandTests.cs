@@ -692,7 +692,7 @@ public sealed class WatchCommandTests {
 			FakeClock clock = new();
 			FakeTerminal terminal = new(
 				clock,
-				new WatchTerminalDimensions( 40, 5 )
+				new WatchTerminalDimensions( 80, 5 )
 			);
 			terminal.Events.Enqueue(
 				Input(
@@ -755,7 +755,7 @@ public sealed class WatchCommandTests {
 			);
 			for ( int index = 0; index < 5; index++ ) {
 				Assert.Equal(
-					40,
+					80,
 					lines[ index ].Length
 				);
 			}
