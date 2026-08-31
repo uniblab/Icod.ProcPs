@@ -141,8 +141,8 @@ Interactive keys:
  b emphasis mode; J numeric justify; j character justify; f manage fields;
  x sort column; y running rows; z colors; Z map colors; l load/uptime; t CPU summary;
  m memory summary; C scroll coordinates; </> move sort field; c command line;
- H threads; i idle tasks; V forest; F focus parent; v hide/show children; I CPU normalization;
- E/e memory scale; d/s delay; u/U user filter;
+ H threads; i idle tasks; V forest; F focus parent; v hide/show children; X fixed width;
+ I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
  O/o other filter; L locate; & locate next; k signal; r renice; W write config;
  arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
@@ -853,6 +853,13 @@ Interactive keys:
 			case 'e':
 				state.TaskScale = TopRenderer.NextScale( state.TaskScale );
 				return TopCommandAction.Rerender;
+			case 'X':
+				state.Message = null;
+				state.Prompt = new TopPromptState(
+					TopPromptKind.FixedWidthExtra,
+					$"Extra fixed width (-1 auto, 0 default, max {TopFixedWidth.MaximumExtra}): "
+				);
+				return TopCommandAction.Rerender;
 			case '1':
 				state.SingleCpuSummary = !state.SingleCpuSummary;
 				state.Message = "Per-CPU activity rows are not yet exposed by the shared metrics contract; aggregate CPU remains shown.";
@@ -1330,6 +1337,33 @@ Interactive keys:
 				state.Message = 0 == maximumTasks
 					? "maximum tasks: unlimited"
 					: $"maximum tasks set to {maximumTasks}";
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.FixedWidthExtra:
+				state.Prompt = null;
+				if (
+					!int.TryParse(
+						text,
+						NumberStyles.Integer,
+						CultureInfo.InvariantCulture,
+						out int fixedWidthExtra
+					)
+					|| !TopFixedWidth.IsValid( fixedWidthExtra )
+				) {
+					state.Message = $"extra fixed width must be between -1 and {TopFixedWidth.MaximumExtra}";
+					return TopCommandAction.Rerender;
+				}
+				TopFixedWidth.Configure(
+					state,
+					fixedWidthExtra
+				);
+				if ( -1 == fixedWidthExtra ) {
+					state.Message = "extra fixed width: automatic";
+				} else if ( 0 == fixedWidthExtra ) {
+					state.Message = "extra fixed width: defaults";
+				} else {
+					state.Message = $"extra fixed width: +{fixedWidthExtra}";
+				}
 				return TopCommandAction.Rerender;
 
 			case TopPromptKind.Window:

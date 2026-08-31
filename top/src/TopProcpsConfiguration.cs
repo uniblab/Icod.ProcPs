@@ -87,6 +87,10 @@ internal static partial class TopProcpsConfigurationCodec {
 		state.SuppressZeros = parsed.SuppressZeros;
 		state.SummaryScale = parsed.SummaryScale;
 		state.TaskScale = parsed.TaskScale;
+		TopFixedWidth.Configure(
+			state,
+			parsed.FixedWidthExtra
+		);
 		state.IrixMode = parsed.IrixMode;
 		state.RestoreWindows(
 			parsed.Windows,
@@ -177,6 +181,7 @@ internal static partial class TopProcpsConfigurationCodec {
 
 		TopMemoryScale summaryScale = TopMemoryScale.Mebibytes;
 		TopMemoryScale taskScale = TopMemoryScale.Kibibytes;
+		int fixedWidthExtra = 0;
 		bool suppressZeros = false;
 		if (
 			lineIndex < lines.Length
@@ -190,6 +195,13 @@ internal static partial class TopProcpsConfigurationCodec {
 					lineIndex++
 				]
 			);
+			fixedWidthExtra = RequiredInteger(
+				globals,
+				"Fixed_widest"
+			);
+			if ( !TopFixedWidth.IsValid( fixedWidthExtra ) ) {
+				fixedWidthExtra = 0;
+			}
 			summaryScale = ParseMemoryScale(
 				globals,
 				"Summ_mscale",
@@ -217,6 +229,7 @@ internal static partial class TopProcpsConfigurationCodec {
 			SuppressZeros = suppressZeros,
 			SummaryScale = summaryScale,
 			TaskScale = taskScale,
+			FixedWidthExtra = fixedWidthExtra,
 			IrixMode = irixMode,
 			AlternateDisplayMode = alternateDisplayMode
 		};

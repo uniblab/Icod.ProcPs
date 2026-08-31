@@ -101,7 +101,8 @@ internal static partial class TopProcpsConfigurationCodec {
 
 		builder.AppendFormat(
 			CultureInfo.InvariantCulture,
-			"Fixed_widest=0, Summ_mscale={0}, Task_mscale={1}, Zero_suppress={2}, Tics_scaled=0\n",
+			"Fixed_widest={0}, Summ_mscale={1}, Task_mscale={2}, Zero_suppress={3}, Tics_scaled=0\n",
+			state.FixedWidthExtra,
 			(int)state.SummaryScale,
 			NativeTaskScale( state.TaskScale ),
 			BooleanInteger( state.SuppressZeros )

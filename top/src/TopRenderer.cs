@@ -62,6 +62,7 @@ internal static class TopRenderer {
 		" i              toggle idle-task suppression",
 		" V              toggle process forest",
 		" F / v          focus parent / hide-show children",
+		" X              change extra fixed-width columns",
 		" I              toggle Irix/Solaris CPU normalization",
 		" E / e          cycle summary / task memory scale",
 		" d or s         change refresh delay",
@@ -515,6 +516,10 @@ internal static class TopRenderer {
 		ArgumentNullException.ThrowIfNull( sample );
 		ArgumentNullException.ThrowIfNull( state );
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
+		List<TopTaskRow> tasks = SelectAndOrderTasks(
+			sample,
+			state
+		);
 		var lines = new List<string>();
 		lines.AddRange(
 			BuildSummaryLines(
@@ -526,7 +531,7 @@ internal static class TopRenderer {
 			)
 		);
 		lines.Add( LimitRunes( BuildHeader( state ), width ) );
-		foreach ( TopTaskRow task in SelectAndOrderTasks( sample, state ) ) {
+		foreach ( TopTaskRow task in tasks ) {
 			lines.Add( LimitRunes(
 				FormatTaskLine(
 					task,
@@ -1163,9 +1168,9 @@ internal static class TopRenderer {
 				state.HorizontalOffset
 			);
 			for ( int index = 0; index < visibleFields.Count; index++ ) {
-				int width = Math.Max(
-					1,
-					visibleFields[ index ].Width
+				int width = TopFixedWidth.Width(
+					state,
+					visibleFields[ index ]
 				);
 				bool last = index == visibleFields.Count - 1;
 				if ( last || remaining < width + 1 ) {
@@ -1581,7 +1586,10 @@ internal static class TopRenderer {
 			fields.Add(
 				AlignField(
 					definition.Name,
-					definition.Width,
+					TopFixedWidth.Width(
+						state,
+						definition
+					),
 					leftJustified
 				)
 			);
@@ -1671,7 +1679,10 @@ internal static class TopRenderer {
 		}
 		return AlignField(
 			fieldText,
-			definition.Width,
+			TopFixedWidth.Width(
+				state,
+				definition
+			),
 			leftJustified
 		);
 	}
@@ -1823,16 +1834,25 @@ internal static class TopRenderer {
 			state.SortHighToLow
 		);
 		if ( state.Forest ) {
-			return TopForestProjection.Order(
+			List<TopTaskRow> forest = TopForestProjection.Order(
 				tasks,
 				comparison,
 				state
 			);
+			TopFixedWidth.Observe(
+				forest,
+				state
+			);
+			return forest;
 		}
 		foreach ( TopTaskRow row in tasks ) {
 			row.ForestDepth = 0;
 		}
 		tasks.Sort( comparison );
+		TopFixedWidth.Observe(
+			tasks,
+			state
+		);
 		return tasks;
 	}
 
@@ -2078,10 +2098,16 @@ internal static class TopRenderer {
 	}
 
 	internal static string FieldTruncateUser(
-		string user
+		string user,
+		TopRuntimeState state
 	) {
 		ArgumentNullException.ThrowIfNull( user );
-		return TruncateUser( user );
+		ArgumentNullException.ThrowIfNull( state );
+		return TopFixedWidth.Format(
+			user,
+			state,
+			TopFieldId.User
+		);
 	}
 
 	internal static string FieldCpuTime(

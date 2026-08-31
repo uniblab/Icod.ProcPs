@@ -200,6 +200,11 @@ profile:
 - `I` toggles Irix CPU normalization, where 100% represents one processor, and
   total-capacity normalization.
 - `E` and `e` cycle summary and task memory scales.
+- `X` changes the extra width applied to procps fixed-width fields. `0` restores
+  defaults, a positive value adds that many columns, and `-1` enables automatic
+  widening that grows as needed but does not shrink on later refreshes. Of the
+  fields currently exposed by Icod top, USER is the procps `X`-eligible field;
+  truncated values end with `+`.
 - `d` or `s` opens an in-screen line editor for the refresh delay.
 - `u` and `U` open an in-screen user-filter editor; an empty value clears the
   filter and an initial `!` inverts it.
@@ -281,14 +286,16 @@ If procps later rewrites that mirror, the Icod marker disappears and subsequent
 
 The native mirror contains the state shared by both implementations, including
 per-window colors plus the native `graph_cpus` / `graph_mems` selectors and
-their summary-visibility flags. Inspection entries are still outside the Icod
-configuration model. The native task-memory scale has no EiB encoding, so an
+their summary-visibility flags. Global `Fixed_widest` also round-trips and is
+controlled by `X`. Inspection entries are still outside the Icod configuration
+model. The native task-memory scale has no EiB encoding, so an
 Icod EiB task scale is mirrored as PiB. The JSON file remains authoritative
 and lossless.
 
 The Icod JSON persists delay, alternate-display/current-window selection,
-global bold enable, memory scales, thread/Irix/zero-suppression state, and each
-window's name, task-display visibility, sort field/direction, emphasis and
+global bold enable, memory scales, fixed-width expansion, thread/Irix/zero-
+suppression state, and each window's name, task-display visibility, sort
+field/direction, emphasis and
 justification toggles, maximum tasks, command/idle/forest/CPU-summary state,
 load/uptime and scroll-coordinate visibility, color state, CPU/memory summary
 visibility and graph selectors, field
@@ -347,10 +354,11 @@ configuration and is controlled by `l` / `C`; `<` / `>` provide direct sort
 field movement in addition to Fields Management.
 
 Forest parent focus/collapse (`F` / `v`) now operate on the same reuse-aware
-hierarchy used by ordinary forest rendering. Additional procps conveniences
-that do not require new kernel facts remain on the completion queue: fixed-width
-expansion (`X` / `Fixed_widest`), Inspect (`Y`), and the applicable 4.0.6
-bottom-window/message-log views.
+hierarchy used by ordinary forest rendering. `X` / `Fixed_widest` now controls
+the supported fixed-width USER column with explicit or monotonic automatic
+widening. Additional procps conveniences that do not require new kernel facts
+remain on the completion queue: Inspect (`Y`) and the applicable 4.0.6 bottom-
+window/message-log views.
 
 The following areas remain blocked by facts that are not yet available through
 the shared observation contracts:

@@ -291,6 +291,8 @@ internal sealed class TopRuntimeState {
 	internal string? SearchText { get; set; }
 	internal TopMemoryScale SummaryScale { get; set; } = TopMemoryScale.Mebibytes;
 	internal TopMemoryScale TaskScale { get; set; } = TopMemoryScale.Kibibytes;
+	internal int FixedWidthExtra { get; set; }
+	internal Dictionary<TopFieldId, int> AutomaticFixedWidths { get; } = [];
 	internal bool ShowCommandLine { get; set; }
 	internal bool ShowThreads { get; set; }
 	internal bool HideIdle { get; set; }
@@ -559,6 +561,7 @@ internal sealed class TopRuntimeState {
 internal enum TopPromptKind {
 	Delay,
 	MaximumTasks,
+	FixedWidthExtra,
 	Window,
 	WindowName,
 	Locate,

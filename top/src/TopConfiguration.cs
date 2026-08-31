@@ -593,6 +593,11 @@ internal static class TopConfigurationCodec {
 				"the configured maximum task count cannot be negative"
 			);
 		}
+		if ( !TopFixedWidth.IsValid( document.FixedWidthExtra ) ) {
+			throw new FormatException(
+				$"the configured extra fixed width must be between -1 and {TopFixedWidth.MaximumExtra}"
+			);
+		}
 		if ( !IsKnownField( document.SortField ) ) {
 			throw new FormatException(
 				$"unknown configured sort field '{document.SortField}'"
@@ -656,6 +661,10 @@ internal static class TopConfigurationCodec {
 		state.MaximumTasks = document.MaximumTasks;
 		state.SummaryScale = document.SummaryScale;
 		state.TaskScale = document.TaskScale;
+		TopFixedWidth.Configure(
+			state,
+			document.FixedWidthExtra
+		);
 		state.ShowCommandLine = document.ShowCommandLine;
 		state.ShowThreads = document.ShowThreads;
 		state.HideIdle = document.HideIdle;
@@ -773,6 +782,7 @@ internal static class TopConfigurationCodec {
 			MaximumTasks = state.MaximumTasks,
 			SummaryScale = state.SummaryScale,
 			TaskScale = state.TaskScale,
+			FixedWidthExtra = state.FixedWidthExtra,
 			ShowCommandLine = state.ShowCommandLine,
 			ShowThreads = state.ShowThreads,
 			HideIdle = state.HideIdle,
@@ -1130,6 +1140,7 @@ internal sealed class TopConfigurationDocument {
 	public int MaximumTasks { get; set; }
 	public TopMemoryScale SummaryScale { get; set; } = TopMemoryScale.Mebibytes;
 	public TopMemoryScale TaskScale { get; set; } = TopMemoryScale.Kibibytes;
+	public int FixedWidthExtra { get; set; }
 	public bool ShowCommandLine { get; set; }
 	public bool ShowThreads { get; set; }
 	public bool HideIdle { get; set; }

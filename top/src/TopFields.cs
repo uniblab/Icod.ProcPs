@@ -112,7 +112,10 @@ internal static class TopFieldCatalog {
 			numeric: false,
 			defaultVisible: true,
 			formatter: ( row, state, processorCount ) =>
-				TopRenderer.FieldTruncateUser( row.User ),
+				TopRenderer.FieldTruncateUser(
+					row.User,
+					state
+				),
 			highToLowComparison: ( left, right ) =>
 				TopRenderer.CompareFieldDescending(
 					left.User,

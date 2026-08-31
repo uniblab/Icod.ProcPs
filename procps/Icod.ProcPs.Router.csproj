@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.24 completes procps top forest interactions available from the current process model: F maintains focus on the topmost forest parent, v collapses and expands its descendants with collapsed CPU aggregation, reset commands clear tree restrictions, and sort-selection commands leave forest mode.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.25 adds procps top X / Fixed_widest parity for supported fixed-width fields: native and Icod persistence, default/explicit/automatic widths, + truncation markers, monotonic auto widening, and width-aware Other Filters.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>
