@@ -28,6 +28,14 @@ using Icod.Processes;
 using Icod.ProcPs.Shared;
 using Icod.Timing;
 
+/// <summary>Identifies the action requested by one interactive top command.</summary>
+internal enum TopCommandAction {
+	None,
+	Rerender,
+	Resample,
+	Exit
+}
+
 /// <summary>Defines process-control operations consumed by top's interactive commands.</summary>
 internal interface ITopProcessControl {
 	ProcessOperationResult<ProcessSignal> ParseSignal( string text );
@@ -2128,13 +2136,6 @@ Interactive keys:
 		ArgumentNullException.ThrowIfNull( text );
 		byte[] bytes = Utf8.GetBytes( text );
 		await output.WriteAsync( bytes.AsMemory(), cancellationToken ).ConfigureAwait( false );
-	}
-
-	private enum TopCommandAction {
-		None,
-		Rerender,
-		Resample,
-		Exit
 	}
 
 	private sealed class ParsedArguments {
