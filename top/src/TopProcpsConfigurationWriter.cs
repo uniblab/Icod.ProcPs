@@ -171,17 +171,15 @@ internal static partial class TopProcpsConfigurationCodec {
 			window.MaximumTasks
 		);
 
-		(int summary, int messages, int header, int tasks, int taskAccent) = DefaultColors(
-			windowIndex
-		);
+		TopColorPalette colors = window.Colors;
 		builder.AppendFormat(
 			CultureInfo.InvariantCulture,
 			"\tsummclr={0}, msgsclr={1}, headclr={2}, taskclr={3}, task_xy={4}, core_types=0, cores_vs_cpus=0\n",
-			summary,
-			messages,
-			header,
-			tasks,
-			taskAccent
+			colors.Summary,
+			colors.Messages,
+			colors.Header,
+			colors.Tasks,
+			colors.TaskAccent
 		);
 	}
 
@@ -259,6 +257,9 @@ internal static partial class TopProcpsConfigurationCodec {
 			| ViewMemory;
 		if ( !boldEnabled ) {
 			result |= ViewNoBold;
+		}
+		if ( window.ColorsEnabled ) {
+			result |= ShowColorsFlag;
 		}
 		if ( window.TaskDisplayVisible ) {
 			result |= ShowTaskOn;
@@ -496,17 +497,4 @@ internal static partial class TopProcpsConfigurationCodec {
 		return version;
 	}
 
-	private static (int Summary, int Messages, int Header, int Tasks, int TaskAccent) DefaultColors(
-		int windowIndex
-	) {
-		return windowIndex switch {
-			0 => ( 1, 1, 3, -1, 1 ),
-			1 => ( 6, 6, 7, -1, 6 ),
-			2 => ( 5, 5, 4, -1, 5 ),
-			3 => ( 3, 3, 2, -1, 3 ),
-			_ => throw new ArgumentOutOfRangeException(
-				nameof( windowIndex )
-			)
-		};
-	}
 }

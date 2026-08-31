@@ -634,6 +634,11 @@ internal static class TopConfigurationCodec {
 		state.BoldEnabled = document.BoldEnabled;
 		state.HighlightBold = document.HighlightBold;
 		state.HighlightRunning = document.HighlightRunning;
+		state.ColorsEnabled = document.ColorsEnabled;
+		state.Colors = BuildColorPalette(
+			document.Colors,
+			0
+		);
 		state.HighlightSortColumn = document.HighlightSortColumn;
 		state.NumericLeftJustified = document.NumericLeftJustified;
 		state.CharacterRightJustified = document.CharacterRightJustified;
@@ -758,6 +763,8 @@ internal static class TopConfigurationCodec {
 			Forest = state.Forest,
 			IrixMode = state.IrixMode,
 			SingleCpuSummary = state.SingleCpuSummary,
+			ColorsEnabled = state.ColorsEnabled,
+			Colors = CreateColorDocument( state.Colors ),
 			AlternateDisplayMode = state.AlternateDisplayMode,
 			CurrentWindowIndex = state.CurrentWindowIndex,
 			FieldOrder = [ .. state.FieldOrder ],
@@ -793,6 +800,8 @@ internal static class TopConfigurationCodec {
 			HideIdle = window.HideIdle,
 			Forest = window.Forest,
 			SingleCpuSummary = window.SingleCpuSummary,
+			ColorsEnabled = window.ColorsEnabled,
+			Colors = CreateColorDocument( window.Colors ),
 			FieldOrder = [ .. window.FieldOrder ],
 			VisibleFields = visibleFields,
 			OtherFilters = CreateFilterDocuments(
@@ -860,7 +869,12 @@ internal static class TopConfigurationCodec {
 			ShowCommandLine = document.ShowCommandLine,
 			HideIdle = document.HideIdle,
 			Forest = document.Forest,
-			SingleCpuSummary = document.SingleCpuSummary
+			SingleCpuSummary = document.SingleCpuSummary,
+			ColorsEnabled = document.ColorsEnabled,
+			Colors = BuildColorPalette(
+				document.Colors,
+				index
+			)
 		};
 
 		result.FieldOrder.Clear();
@@ -909,6 +923,50 @@ internal static class TopConfigurationCodec {
 			}
 		}
 		return result;
+	}
+
+	private static TopConfigurationColorDocument CreateColorDocument(
+		TopColorPalette colors
+	) {
+		return new TopConfigurationColorDocument {
+			Summary = colors.Summary,
+			Messages = colors.Messages,
+			Header = colors.Header,
+			Tasks = colors.Tasks,
+			TaskAccent = colors.TaskAccent
+		};
+	}
+
+	private static TopColorPalette BuildColorPalette(
+		TopConfigurationColorDocument? document,
+		int windowIndex
+	) {
+		if ( windowIndex is < 0 or >= TopRuntimeState.WindowCount ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( windowIndex )
+			);
+		}
+
+		TopColorPalette fallback = TopColorPalette.ForWindow(
+			windowIndex
+		);
+		if ( document is null ) {
+			return fallback;
+		}
+		try {
+			return new TopColorPalette(
+				document.Summary ?? fallback.Summary,
+				document.Messages ?? fallback.Messages,
+				document.Header ?? fallback.Header,
+				document.Tasks ?? fallback.Tasks,
+				document.TaskAccent ?? fallback.TaskAccent
+			);
+		} catch ( ArgumentOutOfRangeException exception ) {
+			throw new FormatException(
+				$"window {windowIndex + 1} contains a color outside the supported -1 through 255 range",
+				exception
+			);
+		}
 	}
 
 	private static string ResolveWindowName(
@@ -1034,6 +1092,8 @@ internal sealed class TopConfigurationDocument {
 	public bool Forest { get; set; }
 	public bool IrixMode { get; set; } = true;
 	public bool SingleCpuSummary { get; set; } = true;
+	public bool ColorsEnabled { get; set; } = true;
+	public TopConfigurationColorDocument? Colors { get; set; }
 	public bool AlternateDisplayMode { get; set; }
 	public int CurrentWindowIndex { get; set; }
 	public List<TopFieldId>? FieldOrder { get; set; }
@@ -1057,9 +1117,19 @@ internal sealed class TopConfigurationWindowDocument {
 	public bool HideIdle { get; set; }
 	public bool Forest { get; set; }
 	public bool SingleCpuSummary { get; set; } = true;
+	public bool ColorsEnabled { get; set; } = true;
+	public TopConfigurationColorDocument? Colors { get; set; }
 	public List<TopFieldId>? FieldOrder { get; set; }
 	public List<TopFieldId>? VisibleFields { get; set; }
 	public List<TopConfigurationFilterDocument>? OtherFilters { get; set; }
+}
+
+internal sealed class TopConfigurationColorDocument {
+	public int? Summary { get; set; }
+	public int? Messages { get; set; }
+	public int? Header { get; set; }
+	public int? Tasks { get; set; }
+	public int? TaskAccent { get; set; }
 }
 
 internal sealed class TopConfigurationFilterDocument {

@@ -48,6 +48,7 @@ internal static partial class TopProcpsConfigurationCodec {
 	private const int ShowHighlightRowsFlag = 0x000100;
 	private const int ShowHighlightColumnsFlag = 0x000200;
 	private const int ShowHighlightBoldFlag = 0x000400;
+	private const int ShowColorsFlag = 0x000800;
 	private const int ShowJustifyNumericRightFlag = 0x020000;
 	private const int ShowJustifyStringsRightFlag = 0x040000;
 
@@ -377,6 +378,14 @@ internal static partial class TopProcpsConfigurationCodec {
 			),
 			SortField = NativeSortField(
 				sortIndex
+			),
+			ColorsEnabled = 0 != (
+				winFlags
+				& ShowColorsFlag
+			),
+			Colors = ParseColorPalette(
+				settings,
+				windowIndex
 			),
 			SortHighToLow = 0 != (
 				winFlags
@@ -1154,6 +1163,58 @@ internal static partial class TopProcpsConfigurationCodec {
 			text,
 			name
 		);
+	}
+
+	private static TopColorPalette ParseColorPalette(
+		IReadOnlyDictionary<string, string> values,
+		int windowIndex
+	) {
+		ArgumentNullException.ThrowIfNull( values );
+		if ( windowIndex is < 0 or >= TopRuntimeState.WindowCount ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( windowIndex )
+			);
+		}
+
+		TopColorPalette fallback = TopColorPalette.ForWindow(
+			windowIndex
+		);
+		return new TopColorPalette(
+			ParseOptionalColor( values, "summclr", fallback.Summary ),
+			ParseOptionalColor( values, "msgsclr", fallback.Messages ),
+			ParseOptionalColor( values, "headclr", fallback.Header ),
+			ParseOptionalColor( values, "taskclr", fallback.Tasks ),
+			ParseOptionalColor( values, "task_xy", fallback.TaskAccent )
+		);
+	}
+
+	private static int ParseOptionalColor(
+		IReadOnlyDictionary<string, string> values,
+		string name,
+		int fallback
+	) {
+		ArgumentNullException.ThrowIfNull( values );
+		ArgumentException.ThrowIfNullOrWhiteSpace( name );
+
+		if (
+			!values.TryGetValue(
+				name,
+				out string? text
+			)
+			|| text is null
+		) {
+			return fallback;
+		}
+		int value = ParseInteger(
+			text,
+			name
+		);
+		if ( value is < -1 or > 255 ) {
+			throw new FormatException(
+				$"the procps color '{name}' must be -1 through 255"
+			);
+		}
+		return value;
 	}
 
 	private static int ParseInteger(

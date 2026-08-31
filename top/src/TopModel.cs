@@ -64,6 +64,8 @@ internal sealed class TopWindowState {
 	internal bool HighlightBold { get; set; } = true;
 	internal bool HighlightRunning { get; set; } = true;
 	internal bool HighlightSortColumn { get; set; }
+	internal bool ColorsEnabled { get; set; } = true;
+	internal TopColorPalette Colors { get; set; } = TopColorPalette.ForWindow( 0 );
 	internal bool NumericLeftJustified { get; set; }
 	internal bool CharacterRightJustified { get; set; }
 	internal int MaximumTasks { get; set; }
@@ -106,6 +108,8 @@ internal sealed class TopWindowState {
 		this.SortHighToLow = state.SortHighToLow;
 		this.HighlightBold = state.HighlightBold;
 		this.HighlightRunning = state.HighlightRunning;
+		this.ColorsEnabled = state.ColorsEnabled;
+		this.Colors = state.Colors;
 		this.HighlightSortColumn = state.HighlightSortColumn;
 		this.NumericLeftJustified = state.NumericLeftJustified;
 		this.CharacterRightJustified = state.CharacterRightJustified;
@@ -143,6 +147,8 @@ internal sealed class TopWindowState {
 		state.SortHighToLow = this.SortHighToLow;
 		state.HighlightBold = this.HighlightBold;
 		state.HighlightRunning = this.HighlightRunning;
+		state.ColorsEnabled = this.ColorsEnabled;
+		state.Colors = this.Colors;
 		state.HighlightSortColumn = this.HighlightSortColumn;
 		state.NumericLeftJustified = this.NumericLeftJustified;
 		state.CharacterRightJustified = this.CharacterRightJustified;
@@ -180,6 +186,8 @@ internal sealed class TopWindowState {
 		this.SortHighToLow = source.SortHighToLow;
 		this.HighlightBold = source.HighlightBold;
 		this.HighlightRunning = source.HighlightRunning;
+		this.ColorsEnabled = source.ColorsEnabled;
+		this.Colors = source.Colors;
 		this.HighlightSortColumn = source.HighlightSortColumn;
 		this.NumericLeftJustified = source.NumericLeftJustified;
 		this.CharacterRightJustified = source.CharacterRightJustified;
@@ -225,6 +233,8 @@ internal sealed class TopRuntimeState {
 	internal bool BoldEnabled { get; set; } = true;
 	internal bool HighlightBold { get; set; } = true;
 	internal bool HighlightRunning { get; set; } = true;
+	internal bool ColorsEnabled { get; set; } = true;
+	internal TopColorPalette Colors { get; set; } = TopColorPalette.ForWindow( 0 );
 	internal bool HighlightSortColumn { get; set; }
 	internal bool NumericLeftJustified { get; set; }
 	internal bool CharacterRightJustified { get; set; }
@@ -374,7 +384,9 @@ internal sealed class TopRuntimeState {
 		for ( int index = 0; index < WindowCount; index++ ) {
 			result[ index ] = new TopWindowState(
 				WindowNames[ index ]
-			);
+			) {
+				Colors = TopColorPalette.ForWindow( index )
+			};
 		}
 		return result;
 	}
