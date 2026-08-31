@@ -35,7 +35,11 @@ public static class Command {
 	private const int Canceled = 130;
 	private const double MinimumIntervalSeconds = 0.1;
 	private const double MaximumIntervalSeconds = 31.0 * 24.0 * 60.0 * 60.0;
+	private const string ErrorExitPrompt =
+		"command exit with a non-zero status, press a key to exit";
 	private static readonly TimeSpan DefaultInterval = TimeSpan.FromSeconds( 2 );
+	private static readonly TimeSpan MaximumInputWait =
+		TimeSpan.FromSeconds( MaximumIntervalSeconds );
 	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
 		"Icod.ProcPs.Watch",
 		typeof( Command ).Assembly
@@ -412,7 +416,11 @@ public static class Command {
 				lastCompletionTimestamp = monotonicClock.GetTimestamp();
 
 				if ( parsed.ErrorExit && 0 != status ) {
-					return status;
+					return await WaitForErrorExitAcknowledgementAsync(
+						terminal,
+						status,
+						refreshToken
+					).ConfigureAwait( false );
 				}
 				if ( previousScreen is not null ) {
 					if ( parsed.ChangeExit && changed ) {
@@ -455,6 +463,64 @@ public static class Command {
 						or ObjectDisposedException
 				) {
 				}
+			}
+		}
+	}
+
+	private static async Task<int> WaitForErrorExitAcknowledgementAsync(
+		IWatchTerminalSession terminal,
+		int status,
+		CancellationToken cancellationToken
+	) {
+		ArgumentNullException.ThrowIfNull( terminal );
+
+		while ( true ) {
+			WatchTerminalEvent pending = await terminal.ReadEventAsync(
+				TimeSpan.Zero,
+				cancellationToken
+			).ConfigureAwait( false );
+			if ( WatchTerminalEventKind.Timeout == pending.Kind ) {
+				break;
+			}
+			if ( WatchTerminalEventKind.Interrupt == pending.Kind ) {
+				return Canceled;
+			}
+			if (
+				WatchTerminalEventKind.Resize == pending.Kind
+				|| WatchTerminalEventKind.Repaint == pending.Kind
+			) {
+				await terminal.RepaintAsync(
+					cancellationToken
+				).ConfigureAwait( false );
+			}
+		}
+
+		await terminal.ShowStatusAsync(
+			ErrorExitPrompt,
+			cancellationToken
+		).ConfigureAwait( false );
+		while ( true ) {
+			WatchTerminalEvent terminalEvent = await terminal.ReadEventAsync(
+				MaximumInputWait,
+				cancellationToken
+			).ConfigureAwait( false );
+			if ( WatchTerminalEventKind.Interrupt == terminalEvent.Kind ) {
+				return Canceled;
+			}
+			if ( WatchTerminalEventKind.Input == terminalEvent.Kind ) {
+				return status;
+			}
+			if (
+				WatchTerminalEventKind.Resize == terminalEvent.Kind
+				|| WatchTerminalEventKind.Repaint == terminalEvent.Kind
+			) {
+				await terminal.RepaintAsync(
+					cancellationToken
+				).ConfigureAwait( false );
+				await terminal.ShowStatusAsync(
+					ErrorExitPrompt,
+					cancellationToken
+				).ConfigureAwait( false );
 			}
 		}
 	}

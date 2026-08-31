@@ -37,7 +37,8 @@ child finishes; `--precise` uses monotonic fixed-rate scheduling.
 -C, --no-color               ignore ANSI SGR color/style sequences
 -d, --differences[=permanent]
                               highlight visible changes between updates
--e, --errexit                exit if the command exits non-zero
+-e, --errexit                freeze on non-zero exit, then return that status
+                              after a fresh key press
 -f, --follow                 follow repeated output without comparisons
 -g, --chgexit                exit when visible output changes
 -q, --equexit <cycles>       exit after visible output is unchanged for cycles
@@ -65,6 +66,14 @@ Interactive key handling follows the procps-ng 4.0.6 profile:
 - `s` writes a plain UTF-8 screenshot of the current visible frame. By default
   screenshots are written to the current working directory; `--shotsdir`
   selects another existing directory.
+
+With `--errexit`, a non-zero child result freezes the completed display and
+writes `command exit with a non-zero status, press a key to exit` on the bottom
+row. No further child is launched. Input already pending when the child
+completed is drained before the prompt is presented, so acknowledgement
+requires fresh terminal input. Resize and resume events repaint the frozen
+terminal state, while subsequent input exits with the child's portable status.
+An interrupt still returns status 130.
 
 Screenshot filenames use `watch_YYYYMMDD-HHMMSS`, with a `-NNN` collision
 suffix when needed, and existing files are never overwritten. Repeated `s`
@@ -101,7 +110,8 @@ header rows, body rows, and geometry are preserved.
 `130`
 : Interactive interruption or cancellation.
 
-With `--errexit`, the watched command's portable exit status is returned.
+With `--errexit`, the watched command's portable exit status is returned after
+the frozen error display is acknowledged by fresh terminal input.
 
 ## PORTABILITY
 

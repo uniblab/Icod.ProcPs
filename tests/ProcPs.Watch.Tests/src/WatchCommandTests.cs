@@ -216,6 +216,16 @@ public sealed class WatchCommandTests {
 	public async Task BeepAndErrorExitPropagateChildStatus() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock, new WatchTerminalDimensions( 40, 5 ) );
+		terminal.Events.Enqueue(
+			Input(
+				' ',
+				availableDuringZeroTimeout: true
+			)
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent( WatchTerminalEventKind.Repaint )
+		);
+		terminal.Events.Enqueue( Input( 'x' ) );
 
 		CommandResult result = await RunAsync(
 			[ "--exec", "--beep", "--errexit", "tool" ],
@@ -227,6 +237,19 @@ public sealed class WatchCommandTests {
 		Assert.Equal( 7, result.ExitCode );
 		Assert.Equal( 1, terminal.AlertCount );
 		Assert.Single( terminal.Frames );
+		Assert.Equal( 1, terminal.RepaintCount );
+		Assert.Equal( 2, terminal.StatusMessages.Count );
+		Assert.All(
+			terminal.StatusMessages,
+			static message => Assert.Contains(
+				"press a key to exit",
+				message,
+				StringComparison.Ordinal
+			)
+		);
+		Assert.Equal( 4, terminal.Waits.Count );
+		Assert.Equal( TimeSpan.Zero, terminal.Waits[ 0 ] );
+		Assert.Equal( TimeSpan.Zero, terminal.Waits[ 1 ] );
 	}
 
 	[Fact]
@@ -335,6 +358,7 @@ public sealed class WatchCommandTests {
 	public async Task StandardOutputAndErrorShareDisplayStream() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock, new WatchTerminalDimensions( 40, 5 ) );
+		terminal.Events.Enqueue( Input( 'x' ) );
 
 		CommandResult result = await RunAsync(
 			[ "--exec", "--errexit", "tool" ],
@@ -695,14 +719,16 @@ public sealed class WatchCommandTests {
 	}
 
 	private static ScheduledTerminalEvent Input(
-		char value
+		char value,
+		bool availableDuringZeroTimeout = false
 	) {
 		return new ScheduledTerminalEvent(
 			WatchTerminalEventKind.Input,
 			Input: new WatchInputEvent(
 				WatchInputKey.Character,
 				new Rune( value )
-			)
+			),
+			AvailableDuringZeroTimeout: availableDuringZeroTimeout
 		);
 	}
 
@@ -873,7 +899,8 @@ public sealed class WatchCommandTests {
 	private sealed record ScheduledTerminalEvent(
 		WatchTerminalEventKind Kind,
 		WatchTerminalDimensions? Dimensions = null,
-		WatchInputEvent? Input = null
+		WatchInputEvent? Input = null,
+		bool AvailableDuringZeroTimeout = false
 	);
 
 	private sealed class FakeTerminal : IWatchTerminalSession {
@@ -902,6 +929,10 @@ public sealed class WatchCommandTests {
 		} = new();
 
 		internal List<WatchRenderFrame> Frames {
+			get;
+		} = [];
+
+		internal List<string> StatusMessages {
 			get;
 		} = [];
 
@@ -943,7 +974,16 @@ public sealed class WatchCommandTests {
 			cancellationToken.ThrowIfCancellationRequested();
 			this.Waits.Add( timeout );
 			if ( 0 < this.Events.Count ) {
-				ScheduledTerminalEvent scripted = this.Events.Dequeue();
+				ScheduledTerminalEvent scripted = this.Events.Peek();
+				if (
+					TimeSpan.Zero == timeout
+					&& !scripted.AvailableDuringZeroTimeout
+				) {
+					return ValueTask.FromResult(
+						new WatchTerminalEvent( WatchTerminalEventKind.Timeout )
+					);
+				}
+				_ = this.Events.Dequeue();
 				if ( scripted.Dimensions.HasValue ) {
 					this.dimensions = scripted.Dimensions.Value;
 				}
@@ -968,6 +1008,16 @@ public sealed class WatchCommandTests {
 			ArgumentNullException.ThrowIfNull( frame );
 			cancellationToken.ThrowIfCancellationRequested();
 			this.Frames.Add( frame );
+			return ValueTask.CompletedTask;
+		}
+
+		public ValueTask ShowStatusAsync(
+			string message,
+			CancellationToken cancellationToken = default
+		) {
+			ArgumentException.ThrowIfNullOrWhiteSpace( message );
+			cancellationToken.ThrowIfCancellationRequested();
+			this.StatusMessages.Add( message );
 			return ValueTask.CompletedTask;
 		}
 
