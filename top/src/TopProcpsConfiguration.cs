@@ -91,6 +91,10 @@ internal static partial class TopProcpsConfigurationCodec {
 			state,
 			parsed.FixedWidthExtra
 		);
+		state.InspectEntries.Clear();
+		state.InspectEntries.AddRange(
+			parsed.InspectEntries
+		);
 		state.IrixMode = parsed.IrixMode;
 		state.RestoreWindows(
 			parsed.Windows,
@@ -218,6 +222,10 @@ internal static partial class TopProcpsConfigurationCodec {
 			);
 		}
 
+		List<TopInspectEntry> inspectEntries = ParseInspectEntries(
+			lines,
+			lineIndex
+		);
 		ParseOtherFilters(
 			lines,
 			lineIndex,
@@ -250,6 +258,9 @@ internal static partial class TopProcpsConfigurationCodec {
 				currentWindowIndex
 			].WinFlags
 			& ViewNoBold
+		);
+		result.InspectEntries.AddRange(
+			inspectEntries
 		);
 		return result;
 	}
@@ -990,6 +1001,71 @@ internal static partial class TopProcpsConfigurationCodec {
 		state.VisibleFields.UnionWith(
 			visible
 		);
+	}
+
+	private static List<TopInspectEntry> ParseInspectEntries(
+		IReadOnlyList<string> lines,
+		int lineIndex
+	) {
+		ArgumentNullException.ThrowIfNull( lines );
+		if ( 0 > lineIndex || lines.Count < lineIndex ) {
+			throw new ArgumentOutOfRangeException( nameof( lineIndex ) );
+		}
+
+		var result = new List<TopInspectEntry>();
+		bool otherFilters = false;
+		for ( int index = lineIndex; index < lines.Count; index++ ) {
+			string line = lines[ index ];
+			if (
+				line.Contains(
+					"begin: saved other filter data",
+					StringComparison.Ordinal
+				)
+			) {
+				otherFilters = true;
+				continue;
+			}
+			if (
+				line.Contains(
+					"end  : saved other filter data",
+					StringComparison.Ordinal
+				)
+			) {
+				otherFilters = false;
+				continue;
+			}
+			if ( otherFilters ) {
+				continue;
+			}
+
+			string trimmed = line.Trim();
+			if (
+				0 == trimmed.Length
+				|| trimmed.StartsWith(
+					"#",
+					StringComparison.Ordinal
+				)
+			) {
+				continue;
+			}
+			if (
+				line.StartsWith(
+					"file\t",
+					StringComparison.Ordinal
+				)
+				|| line.StartsWith(
+					"pipe\t",
+					StringComparison.Ordinal
+				)
+			) {
+				result.Add(
+					TopInspectEntry.ParseNative(
+						line.TrimEnd()
+					)
+				);
+			}
+		}
+		return result;
 	}
 
 	private static void ParseOtherFilters(

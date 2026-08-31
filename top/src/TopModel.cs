@@ -293,6 +293,8 @@ internal sealed class TopRuntimeState {
 	internal TopMemoryScale TaskScale { get; set; } = TopMemoryScale.Kibibytes;
 	internal int FixedWidthExtra { get; set; }
 	internal Dictionary<TopFieldId, int> AutomaticFixedWidths { get; } = [];
+	internal List<TopInspectEntry> InspectEntries { get; } = [];
+	internal TopInspectSession? InspectSession { get; set; }
 	internal bool ShowCommandLine { get; set; }
 	internal bool ShowThreads { get; set; }
 	internal bool HideIdle { get; set; }
@@ -562,6 +564,7 @@ internal enum TopPromptKind {
 	Delay,
 	MaximumTasks,
 	FixedWidthExtra,
+	InspectProcessId,
 	Window,
 	WindowName,
 	Locate,

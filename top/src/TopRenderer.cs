@@ -63,6 +63,7 @@ internal static class TopRenderer {
 		" V              toggle process forest",
 		" F / v          focus parent / hide-show children",
 		" X              change extra fixed-width columns",
+		" Y              inspect configured file / pipe output",
 		" I              toggle Irix/Solaris CPU normalization",
 		" E / e          cycle summary / task memory scale",
 		" d or s         change refresh delay",
@@ -85,10 +86,17 @@ internal static class TopRenderer {
 	) {
 		ArgumentNullException.ThrowIfNull( sample );
 		ArgumentNullException.ThrowIfNull( state );
-		if ( 0 >= dimensions.Columns || 0 >= dimensions.Rows ) {
+		if ( 1 > dimensions.Columns || 1 > dimensions.Rows ) {
 			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
 		}
 
+		if ( state.InspectSession is not null ) {
+			return TopInspectRenderer.Render(
+				state.InspectSession,
+				dimensions,
+				state.BoldEnabled
+			);
+		}
 		if ( state.ColorManager is not null ) {
 			return RenderColorManager(
 				state,
@@ -1740,6 +1748,33 @@ internal static class TopRenderer {
 			7,
 			leftJustified: false
 		);
+	}
+
+	internal static int? GetTopmostProcessId(
+		TopSample sample,
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( sample );
+		ArgumentNullException.ThrowIfNull( state );
+
+		if ( !state.TaskDisplayVisible ) {
+			return null;
+		}
+		List<TopTaskRow> tasks = SelectAndOrderTasks(
+			sample,
+			state
+		);
+		if ( 0 == tasks.Count ) {
+			return null;
+		}
+		int topIndex = Math.Clamp(
+			state.VerticalOffset,
+			0,
+			tasks.Count - 1
+		);
+		return tasks[
+			topIndex
+		].Process.ProcessId;
 	}
 
 	internal static bool ToggleForestFocus(

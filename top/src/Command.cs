@@ -142,7 +142,7 @@ Interactive keys:
  x sort column; y running rows; z colors; Z map colors; l load/uptime; t CPU summary;
  m memory summary; C scroll coordinates; </> move sort field; c command line;
  H threads; i idle tasks; V forest; F focus parent; v hide/show children; X fixed width;
- I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
+ Y inspect; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
  O/o other filter; L locate; & locate next; k signal; r renice; W write config;
  arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
@@ -442,18 +442,30 @@ Interactive keys:
 					dimensions,
 					token
 				).ConfigureAwait( false );
-				if ( parsed.Iterations.HasValue && completed >= parsed.Iterations.Value ) {
+				if (
+					parsed.Iterations.HasValue
+					&& parsed.Iterations.Value <= completed
+				) {
 					return Success;
 				}
 
 				bool resample = false;
 				while ( !resample ) {
-					TimeSpan elapsed = clock.GetElapsedTime( cycleStarted, clock.GetTimestamp() );
-					TimeSpan remaining = parsed.State.Delay > elapsed
-						? parsed.State.Delay - elapsed
-						: TimeSpan.Zero;
-					if ( TimeSpan.Zero >= remaining ) {
-						break;
+					bool inspectPaused = parsed.State.InspectSession is not null;
+					TimeSpan remaining;
+					if ( inspectPaused ) {
+						remaining = TimeSpan.FromSeconds( 1 );
+					} else {
+						TimeSpan elapsed = clock.GetElapsedTime(
+							cycleStarted,
+							clock.GetTimestamp()
+						);
+						remaining = parsed.State.Delay > elapsed
+							? parsed.State.Delay - elapsed
+							: TimeSpan.Zero;
+						if ( remaining <= TimeSpan.Zero ) {
+							break;
+						}
 					}
 
 					TopTerminalEvent terminalEvent = await terminal.ReadEventAsync(
@@ -461,6 +473,9 @@ Interactive keys:
 						token
 					).ConfigureAwait( false );
 					if ( TopTerminalEventKind.Timeout == terminalEvent.Kind ) {
+						if ( inspectPaused ) {
+							continue;
+						}
 						break;
 					}
 					if ( TopTerminalEventKind.Interrupt == terminalEvent.Kind ) {
@@ -572,6 +587,23 @@ Interactive keys:
 		ArgumentNullException.ThrowIfNull( accountResolver );
 		ArgumentNullException.ThrowIfNull( processControl );
 		ArgumentNullException.ThrowIfNull( configurationStore );
+
+		if ( state.InspectSession is not null ) {
+			TopInspectInputResult inspectResult = await state.InspectSession.HandleInputAsync(
+				input,
+				dimensions,
+				cancellationToken
+			).ConfigureAwait( false );
+			if ( TopInspectInputResult.Close == inspectResult ) {
+				state.InspectSession = null;
+				state.Message = null;
+				return TopCommandAction.Resample;
+			}
+			return ( TopInspectInputResult.Changed == inspectResult )
+				? TopCommandAction.Rerender
+				: TopCommandAction.None
+			;
+		}
 
 		if ( state.ColorManager is not null ) {
 			return HandleColorManagerInput(
@@ -860,6 +892,28 @@ Interactive keys:
 					$"Extra fixed width (-1 auto, 0 default, max {TopFixedWidth.MaximumExtra}): "
 				);
 				return TopCommandAction.Rerender;
+			case 'Y': {
+				state.Message = null;
+				if ( 0 == state.InspectEntries.Count ) {
+					state.Message = "no Inspect entries are configured";
+					return TopCommandAction.Rerender;
+				}
+				int? defaultProcessId = TopRenderer.GetTopmostProcessId(
+					sample,
+					state
+				);
+				string label = ( defaultProcessId.HasValue )
+					? $"Inspect PID [{defaultProcessId.Value}]: "
+					: "Inspect PID: "
+				;
+				state.Prompt = new TopPromptState(
+					TopPromptKind.InspectProcessId,
+					label
+				) {
+					ProcessId = defaultProcessId
+				};
+				return TopCommandAction.Rerender;
+			}
 			case '1':
 				state.SingleCpuSummary = !state.SingleCpuSummary;
 				state.Message = "Per-CPU activity rows are not yet exposed by the shared metrics contract; aggregate CPU remains shown.";
@@ -1364,6 +1418,45 @@ Interactive keys:
 				} else {
 					state.Message = $"extra fixed width: +{fixedWidthExtra}";
 				}
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.InspectProcessId:
+				state.Prompt = null;
+				int inspectPid;
+				if ( 0 == text.Length ) {
+					if ( !prompt.ProcessId.HasValue ) {
+						state.Message = "Inspect requires a positive process identifier";
+						return TopCommandAction.Rerender;
+					}
+					inspectPid = prompt.ProcessId.Value;
+				} else if (
+					!int.TryParse(
+						text,
+						NumberStyles.Integer,
+						CultureInfo.InvariantCulture,
+						out inspectPid
+					)
+					|| 1 > inspectPid
+				) {
+					state.Message = "Inspect requires a positive process identifier";
+					return TopCommandAction.Rerender;
+				}
+
+				ProcProcessSnapshot? inspectTarget = await ResolveTargetAsync(
+					inspectPid,
+					sample,
+					processProvider,
+					cancellationToken
+				).ConfigureAwait( false );
+				if ( inspectTarget is null ) {
+					state.Message = $"process {inspectPid} is no longer available";
+					return TopCommandAction.Rerender;
+				}
+				state.InspectSession = new TopInspectSession(
+					inspectTarget.ProcessId,
+					state.InspectEntries
+				);
+				state.Message = null;
 				return TopCommandAction.Rerender;
 
 			case TopPromptKind.Window:

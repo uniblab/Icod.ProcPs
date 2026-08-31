@@ -114,6 +114,14 @@ internal static partial class TopProcpsConfigurationCodec {
 			builder,
 			state.Windows
 		);
+		foreach ( TopInspectEntry entry in state.InspectEntries ) {
+			builder.Append(
+				entry.ToNativeLine()
+			);
+			builder.Append(
+				'\n'
+			);
+		}
 		return builder.ToString();
 	}
 

@@ -707,6 +707,36 @@ internal static class TopConfigurationCodec {
 			}
 		}
 
+		state.InspectEntries.Clear();
+		if ( document.InspectEntries is not null ) {
+			foreach ( TopConfigurationInspectDocument persisted in document.InspectEntries ) {
+				if (
+					!Enum.IsDefined(
+						typeof( TopInspectEntryType ),
+						persisted.Type
+					)
+				) {
+					throw new FormatException(
+						$"unknown configured Inspect entry type '{persisted.Type}'"
+					);
+				}
+				try {
+					state.InspectEntries.Add(
+						new TopInspectEntry(
+							persisted.Type,
+							persisted.Name,
+							persisted.Format
+						)
+					);
+				} catch ( ArgumentException exception ) {
+					throw new FormatException(
+						"the configured Inspect entry is invalid",
+						exception
+					);
+				}
+			}
+		}
+
 		if ( document.Windows is null ) {
 			state.SynchronizeCurrentWindow();
 		} else {
@@ -716,8 +746,8 @@ internal static class TopConfigurationCodec {
 				);
 			}
 			if (
-				document.CurrentWindowIndex is < 0
-					or >= TopRuntimeState.WindowCount
+				0 > document.CurrentWindowIndex
+				|| TopRuntimeState.WindowCount <= document.CurrentWindowIndex
 			) {
 				throw new FormatException(
 					$"invalid current window index {document.CurrentWindowIndex}"
@@ -755,6 +785,18 @@ internal static class TopConfigurationCodec {
 		var filters = CreateFilterDocuments(
 			state.OtherFilters
 		);
+		var inspectEntries = new List<TopConfigurationInspectDocument>(
+			state.InspectEntries.Count
+		);
+		foreach ( TopInspectEntry entry in state.InspectEntries ) {
+			inspectEntries.Add(
+				new TopConfigurationInspectDocument {
+					Type = entry.Type,
+					Name = entry.Name,
+					Format = entry.Format
+				}
+			);
+		}
 		var windows = new List<TopConfigurationWindowDocument>(
 			TopRuntimeState.WindowCount
 		);
@@ -802,6 +844,7 @@ internal static class TopConfigurationCodec {
 			FieldOrder = [ .. state.FieldOrder ],
 			VisibleFields = visibleFields,
 			OtherFilters = filters,
+			InspectEntries = inspectEntries,
 			Windows = windows
 		};
 	}
@@ -1160,6 +1203,7 @@ internal sealed class TopConfigurationDocument {
 	public List<TopFieldId>? FieldOrder { get; set; }
 	public List<TopFieldId>? VisibleFields { get; set; }
 	public List<TopConfigurationFilterDocument>? OtherFilters { get; set; }
+	public List<TopConfigurationInspectDocument>? InspectEntries { get; set; }
 	public List<TopConfigurationWindowDocument>? Windows { get; set; }
 }
 
@@ -1202,4 +1246,10 @@ internal sealed class TopConfigurationColorDocument {
 internal sealed class TopConfigurationFilterDocument {
 	public string RawText { get; set; } = string.Empty;
 	public bool CaseSensitive { get; set; }
+}
+
+internal sealed class TopConfigurationInspectDocument {
+	public TopInspectEntryType Type { get; set; }
+	public string Name { get; set; } = string.Empty;
+	public string Format { get; set; } = string.Empty;
 }
