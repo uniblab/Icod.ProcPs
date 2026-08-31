@@ -593,10 +593,10 @@ internal static class TopInspectExecutor {
 			);
 		}
 
-		ValueTask<string> outputTask = process.StandardOutput.ReadToEndAsync(
+		Task<string> outputTask = process.StandardOutput.ReadToEndAsync(
 			cancellationToken
 		);
-		ValueTask<string> errorTask = process.StandardError.ReadToEndAsync(
+		Task<string> errorTask = process.StandardError.ReadToEndAsync(
 			cancellationToken
 		);
 		try {
