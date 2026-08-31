@@ -144,6 +144,7 @@ Interactive keys:
  H threads; i idle tasks; V forest; F focus parent; v hide/show children; X fixed width;
  Y inspect; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
  O/o other filter; L locate; & locate next; k signal; r renice; W write config;
+ ^A/^G/^K/^L/^N/^P/^U bottom windows; Tab/Shift+Tab select bottom items;
  arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
 
@@ -305,6 +306,7 @@ Interactive keys:
 					sampler,
 					parsed,
 					processes,
+					supplements,
 					accounts,
 					terminalFactory,
 					processControl,
@@ -378,6 +380,7 @@ Interactive keys:
 		TopSampler sampler,
 		ParsedArguments parsed,
 		IProcProcessProvider processProvider,
+		IProcMatchSupplementProvider supplementProvider,
 		IProcAccountDisplayResolver accountResolver,
 		ITopTerminalSessionFactory terminalFactory,
 		ITopProcessControl processControl,
@@ -389,6 +392,7 @@ Interactive keys:
 		ArgumentNullException.ThrowIfNull( sampler );
 		ArgumentNullException.ThrowIfNull( parsed );
 		ArgumentNullException.ThrowIfNull( processProvider );
+		ArgumentNullException.ThrowIfNull( supplementProvider );
 		ArgumentNullException.ThrowIfNull( accountResolver );
 		ArgumentNullException.ThrowIfNull( terminalFactory );
 		ArgumentNullException.ThrowIfNull( processControl );
@@ -439,6 +443,8 @@ Interactive keys:
 					terminal,
 					sample,
 					parsed.State,
+					supplementProvider,
+					accountResolver,
 					dimensions,
 					token
 				).ConfigureAwait( false );
@@ -491,6 +497,8 @@ Interactive keys:
 							terminal,
 							sample,
 							parsed.State,
+							supplementProvider,
+							accountResolver,
 							dimensions,
 							token
 						).ConfigureAwait( false );
@@ -523,6 +531,8 @@ Interactive keys:
 							terminal,
 							sample,
 							parsed.State,
+							supplementProvider,
+							accountResolver,
 							dimensions,
 							token
 						).ConfigureAwait( false );
@@ -540,12 +550,16 @@ Interactive keys:
 		ITopTerminalSession terminal,
 		TopSample sample,
 		TopRuntimeState state,
+		IProcMatchSupplementProvider supplementProvider,
+		IProcAccountDisplayResolver accountResolver,
 		TopTerminalDimensions dimensions,
 		CancellationToken cancellationToken
 	) {
 		ArgumentNullException.ThrowIfNull( terminal );
 		ArgumentNullException.ThrowIfNull( sample );
 		ArgumentNullException.ThrowIfNull( state );
+		ArgumentNullException.ThrowIfNull( supplementProvider );
+		ArgumentNullException.ThrowIfNull( accountResolver );
 		if ( !IsUsableDimensions( dimensions ) ) {
 			var lines = new List<TopRenderLine> {
 				new(
@@ -564,6 +578,13 @@ Interactive keys:
 			).ConfigureAwait( false );
 			return;
 		}
+		await TopBottomWindowController.RefreshAsync(
+			sample,
+			state,
+			supplementProvider,
+			accountResolver,
+			cancellationToken
+		).ConfigureAwait( false );
 		await terminal.RenderAsync(
 			TopRenderer.RenderInteractive( sample, state, dimensions ),
 			cancellationToken
@@ -636,6 +657,15 @@ Interactive keys:
 		}
 		if ( TopInputKey.EndOfInput == input.Key ) {
 			return TopCommandAction.Exit;
+		}
+		if (
+			TopBottomWindowCommands.TryHandle(
+				input,
+				state,
+				out TopCommandAction bottomAction
+			)
+		) {
+			return bottomAction;
 		}
 		int pageSize = Math.Max(
 			1,
@@ -1017,6 +1047,7 @@ Interactive keys:
 				}
 				return TopCommandAction.Rerender;
 			case '=':
+				state.BottomWindow = null;
 				state.ProcessIds.Clear();
 				ResetCurrentWindowDisplayLimits(
 					state
@@ -1024,6 +1055,7 @@ Interactive keys:
 				state.Message = $"display limits reset for {state.CurrentWindowLabel}";
 				return TopCommandAction.Rerender;
 			case '+':
+				state.BottomWindow = null;
 				state.ProcessIds.Clear();
 				ResetAllWindowDisplayLimits(
 					state

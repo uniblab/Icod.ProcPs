@@ -61,10 +61,20 @@ internal enum TopInputKey {
 	Other
 }
 
+/// <summary>Identifies modifiers carried by one terminal-independent top input event.</summary>
+[Flags]
+internal enum TopInputModifiers {
+	None = 0,
+	Shift = 1,
+	Control = 2,
+	Alt = 4
+}
+
 /// <summary>Represents one terminal-independent input event consumed by top.</summary>
 internal readonly record struct TopInputEvent(
 	TopInputKey Key,
-	Rune? Character
+	Rune? Character,
+	TopInputModifiers Modifiers = TopInputModifiers.None
 );
 
 /// <summary>Represents one terminal event consumed by top.</summary>
@@ -331,24 +341,44 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 				input.Character
 			);
 		}
+
+		TopInputModifiers modifiers = MapModifiers(
+			input.Modifiers
+		);
 		return input.Key switch {
-			CursesKey.Character => new TopInputEvent( TopInputKey.Character, input.Character ),
-			CursesKey.Space => new TopInputEvent( TopInputKey.Character, new Rune( ' ' ) ),
-			CursesKey.Enter => new TopInputEvent( TopInputKey.Enter, null ),
-			CursesKey.Escape => new TopInputEvent( TopInputKey.Escape, null ),
-			CursesKey.Backspace => new TopInputEvent( TopInputKey.Backspace, null ),
-			CursesKey.Up => new TopInputEvent( TopInputKey.Up, null ),
-			CursesKey.Down => new TopInputEvent( TopInputKey.Down, null ),
-			CursesKey.Left => new TopInputEvent( TopInputKey.Left, null ),
-			CursesKey.Right => new TopInputEvent( TopInputKey.Right, null ),
-			CursesKey.PageUp => new TopInputEvent( TopInputKey.PageUp, null ),
-			CursesKey.PageDown => new TopInputEvent( TopInputKey.PageDown, null ),
-			CursesKey.Home => new TopInputEvent( TopInputKey.Home, null ),
-			CursesKey.End => new TopInputEvent( TopInputKey.End, null ),
-			CursesKey.Delete => new TopInputEvent( TopInputKey.Delete, null ),
-			CursesKey.Tab => new TopInputEvent( TopInputKey.Tab, null ),
-			_ => new TopInputEvent( TopInputKey.Other, null )
+			CursesKey.Character => new TopInputEvent( TopInputKey.Character, input.Character, modifiers ),
+			CursesKey.Space => new TopInputEvent( TopInputKey.Character, new Rune( ' ' ), modifiers ),
+			CursesKey.Enter => new TopInputEvent( TopInputKey.Enter, null, modifiers ),
+			CursesKey.Escape => new TopInputEvent( TopInputKey.Escape, null, modifiers ),
+			CursesKey.Backspace => new TopInputEvent( TopInputKey.Backspace, null, modifiers ),
+			CursesKey.Up => new TopInputEvent( TopInputKey.Up, null, modifiers ),
+			CursesKey.Down => new TopInputEvent( TopInputKey.Down, null, modifiers ),
+			CursesKey.Left => new TopInputEvent( TopInputKey.Left, null, modifiers ),
+			CursesKey.Right => new TopInputEvent( TopInputKey.Right, null, modifiers ),
+			CursesKey.PageUp => new TopInputEvent( TopInputKey.PageUp, null, modifiers ),
+			CursesKey.PageDown => new TopInputEvent( TopInputKey.PageDown, null, modifiers ),
+			CursesKey.Home => new TopInputEvent( TopInputKey.Home, null, modifiers ),
+			CursesKey.End => new TopInputEvent( TopInputKey.End, null, modifiers ),
+			CursesKey.Delete => new TopInputEvent( TopInputKey.Delete, null, modifiers ),
+			CursesKey.Tab => new TopInputEvent( TopInputKey.Tab, null, modifiers ),
+			_ => new TopInputEvent( TopInputKey.Other, null, modifiers )
 		};
+	}
+
+	private static TopInputModifiers MapModifiers(
+		CursesKeyModifiers modifiers
+	) {
+		TopInputModifiers result = TopInputModifiers.None;
+		if ( 0 != ( modifiers & CursesKeyModifiers.Shift ) ) {
+			result |= TopInputModifiers.Shift;
+		}
+		if ( 0 != ( modifiers & CursesKeyModifiers.Control ) ) {
+			result |= TopInputModifiers.Control;
+		}
+		if ( 0 != ( modifiers & CursesKeyModifiers.Alt ) ) {
+			result |= TopInputModifiers.Alt;
+		}
+		return result;
 	}
 
 	private static void WriteLine(

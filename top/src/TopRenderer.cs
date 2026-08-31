@@ -73,6 +73,8 @@ internal static class TopRenderer {
 		" k              signal a process",
 		" r              change a process nice value",
 		" W              write personal configuration",
+		" ^A/^G/^K/^L/^N/^P/^U  bottom information windows",
+		" Tab/Shift+Tab  select bottom-window items",
 		" arrows/PgUp    scroll task display",
 		" Home/End       jump to first/last task",
 		" =              clear display limits, filters, scrolling",
@@ -113,10 +115,13 @@ internal static class TopRenderer {
 			return RenderHelp( state, dimensions );
 		}
 		if ( state.AlternateDisplayMode ) {
-			return RenderAlternateInteractive(
-				sample,
-				state,
-				dimensions
+			return TopBottomWindowRenderer.Apply(
+				RenderAlternateInteractive(
+					sample,
+					state,
+					dimensions
+				),
+				state.BottomWindow
 			);
 		}
 
@@ -241,11 +246,14 @@ internal static class TopRenderer {
 				) );
 			}
 		}
-		return new TopRenderFrame(
-			lines,
-			dimensions.Columns,
-			dimensions.Rows,
-			state.BoldEnabled
+		return TopBottomWindowRenderer.Apply(
+			new TopRenderFrame(
+				lines,
+				dimensions.Columns,
+				dimensions.Rows,
+				state.BoldEnabled
+			),
+			state.BottomWindow
 		);
 	}
 
@@ -1750,7 +1758,7 @@ internal static class TopRenderer {
 		);
 	}
 
-	internal static int? GetTopmostProcessId(
+	internal static TopTaskRow? GetTopmostTask(
 		TopSample sample,
 		TopRuntimeState state
 	) {
@@ -1772,9 +1780,17 @@ internal static class TopRenderer {
 			0,
 			tasks.Count - 1
 		);
-		return tasks[
-			topIndex
-		].Process.ProcessId;
+		return tasks[ topIndex ];
+	}
+
+	internal static int? GetTopmostProcessId(
+		TopSample sample,
+		TopRuntimeState state
+	) {
+		return GetTopmostTask(
+			sample,
+			state
+		)?.Process.ProcessId;
 	}
 
 	internal static bool ToggleForestFocus(

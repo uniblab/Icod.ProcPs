@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.26 adds procps top Y Inspect support: native and Icod Inspect-entry persistence, PID substitution, file and pipe execution, a paused chooser/viewer with scrolling and search, and first-displayed-task PID defaults.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.27 adds procps top bottom windows: modifier-aware Ctrl commands, live task-specific capability/cgroup/cmdline/environment/namespace/group views, ten-message recall, Tab selection, and control-character-safe rendering.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

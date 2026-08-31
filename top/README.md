@@ -210,6 +210,13 @@ profile:
   chooser pauses normal refreshes while a configured `file` or `pipe` entry is
   selected and viewed. Inspect output supports arrows, Page Up/Down, Home/End,
   `/` or `L` search, `n` or `&` find-next, and `=` source/status display.
+- Procps bottom windows run while ordinary monitoring continues. `Ctrl+A`,
+  `Ctrl+G`, `Ctrl+K`, `Ctrl+N`, `Ctrl+P`, and `Ctrl+U` show the available
+  capabilities, cgroup context, command-line vector, environment, namespaces,
+  and supplementary groups for the first displayed task. `Ctrl+L` recalls up
+  to ten recent top messages. The same Ctrl command or `=` closes the window;
+  Tab and Shift+Tab move the highlighted bottom-window element. Control
+  characters in task-provided text are neutralized before rendering.
 - `d` or `s` opens an in-screen line editor for the refresh delay.
 - `u` and `U` open an in-screen user-filter editor; an empty value clears the
   filter and an initial `!` inverts it.
@@ -363,8 +370,10 @@ Forest parent focus/collapse (`F` / `v`) now operate on the same reuse-aware
 hierarchy used by ordinary forest rendering. `X` / `Fixed_widest` now controls
 the supported fixed-width USER column with explicit or monotonic automatic
 widening. `Y` provides persisted procps Inspect file/pipe entries with a paused,
-scrollable and searchable viewer. The remaining implementable completion queue
-is the applicable procps 4.0.6 bottom-window/message-log behavior.
+scrollable and searchable viewer. Procps bottom windows now provide the
+supportable task-specific capability, cgroup, command-line, environment,
+namespace, supplementary-group and ten-message recall views without pausing
+normal monitoring.
 
 The following areas remain blocked by facts that are not yet available through
 the shared observation contracts:

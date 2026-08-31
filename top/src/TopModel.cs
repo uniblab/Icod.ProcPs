@@ -273,7 +273,10 @@ internal sealed class TopRuntimeState {
 		"Mem",
 		"Usr"
 	];
+	private const int MaximumLoggedMessages = 10;
 	private TopWindowState[] windows = CreateDefaultWindows();
+	private readonly List<string> messageHistory = [];
+	private string? message;
 
 	internal TimeSpan Delay { get; set; } = TimeSpan.FromSeconds( 3 );
 	internal TopFieldId SortField { get; set; } = TopFieldId.Cpu;
@@ -295,6 +298,7 @@ internal sealed class TopRuntimeState {
 	internal Dictionary<TopFieldId, int> AutomaticFixedWidths { get; } = [];
 	internal List<TopInspectEntry> InspectEntries { get; } = [];
 	internal TopInspectSession? InspectSession { get; set; }
+	internal TopBottomWindowState? BottomWindow { get; set; }
 	internal bool ShowCommandLine { get; set; }
 	internal bool ShowThreads { get; set; }
 	internal bool HideIdle { get; set; }
@@ -315,7 +319,30 @@ internal sealed class TopRuntimeState {
 	internal int CurrentWindowIndex { get; private set; }
 	internal int VerticalOffset { get; set; }
 	internal int HorizontalOffset { get; set; }
-	internal string? Message { get; set; }
+	internal string? Message {
+		get => this.message;
+		set {
+			this.message = value;
+			if ( string.IsNullOrEmpty( value ) ) {
+				return;
+			}
+			if (
+				0 < this.messageHistory.Count
+				&& string.Equals(
+					this.messageHistory[ this.messageHistory.Count - 1 ],
+					value,
+					StringComparison.Ordinal
+				)
+			) {
+				return;
+			}
+			this.messageHistory.Add( value );
+			if ( MaximumLoggedMessages < this.messageHistory.Count ) {
+				this.messageHistory.RemoveAt( 0 );
+			}
+		}
+	}
+	internal IReadOnlyList<string> MessageHistory => this.messageHistory;
 	internal bool ShowHelp { get; set; }
 	internal TopColorManagerState? ColorManager { get; set; }
 	internal bool ShowFieldManager { get; set; }
