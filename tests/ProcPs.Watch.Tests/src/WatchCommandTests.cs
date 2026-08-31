@@ -664,6 +664,108 @@ public sealed class WatchCommandTests {
 	}
 
 	[Fact]
+	public async Task FollowRetainsCursorAndScrollsAcrossExecutions() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new WatchTerminalDimensions( 8, 3 )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent( WatchTerminalEventKind.Timeout )
+		);
+		terminal.Events.Enqueue(
+			Input( 'q' )
+		);
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "one\ntwo" ),
+			Execution.Success( "!\nthree\nfour" )
+		);
+
+		CommandResult result = await RunAsync(
+			[
+				"--exec",
+				"--follow",
+				"--no-title",
+				"--interval=0.1",
+				"tool"
+			],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 2, executor.Options.Count );
+		Assert.Equal( 2, terminal.Frames.Count );
+		Assert.StartsWith(
+			"one",
+			VisibleRow( terminal.Frames[ 0 ].Screen, 0 ),
+			StringComparison.Ordinal
+		);
+		Assert.StartsWith(
+			"two!",
+			VisibleRow( terminal.Frames[ 1 ].Screen, 0 ),
+			StringComparison.Ordinal
+		);
+		Assert.StartsWith(
+			"three",
+			VisibleRow( terminal.Frames[ 1 ].Screen, 1 ),
+			StringComparison.Ordinal
+		);
+		Assert.StartsWith(
+			"four",
+			VisibleRow( terminal.Frames[ 1 ].Screen, 2 ),
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task FollowNoRerunResizeRepaintsRetainedBody() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new WatchTerminalDimensions( 8, 3 )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent(
+				WatchTerminalEventKind.Resize,
+				new WatchTerminalDimensions( 10, 4 )
+			)
+		);
+		terminal.Events.Enqueue( Input( 'q' ) );
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "one\ntwo" )
+		);
+
+		CommandResult result = await RunAsync(
+			[ "--exec", "--follow", "--no-title", "--no-rerun", "tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Single( executor.Options );
+		Assert.Equal( 2, terminal.Frames.Count );
+		Assert.Equal( 10, terminal.Frames[ 1 ].Screen.Width );
+		Assert.Equal( 4, terminal.Frames[ 1 ].Screen.Height );
+		Assert.StartsWith(
+			"one",
+			VisibleRow( terminal.Frames[ 1 ].Screen, 0 ),
+			StringComparison.Ordinal
+		);
+		Assert.StartsWith(
+			"two",
+			VisibleRow( terminal.Frames[ 1 ].Screen, 1 ),
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task HelpDoesNotOpenInteractiveTerminal() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock, new WatchTerminalDimensions( 40, 5 ) );
@@ -713,6 +815,30 @@ public sealed class WatchCommandTests {
 				if ( !cell.IsContinuation ) {
 					builder.Append( 0 == cell.Content.Length ? " " : cell.Content );
 				}
+			}
+		}
+		return builder.ToString();
+	}
+
+	private static string VisibleRow(
+		WatchScreen screen,
+		int row
+	) {
+		ArgumentNullException.ThrowIfNull( screen );
+		if ( 0 > row || screen.Height <= row ) {
+			throw new ArgumentOutOfRangeException( nameof( row ) );
+		}
+
+		StringBuilder builder = new();
+		for ( int column = 0; column < screen.Width; column++ ) {
+			WatchCell cell = screen.GetCell(
+				row,
+				column
+			);
+			if ( !cell.IsContinuation ) {
+				builder.Append(
+					0 == cell.Content.Length ? " " : cell.Content
+				);
 			}
 		}
 		return builder.ToString();

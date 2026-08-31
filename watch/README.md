@@ -39,7 +39,7 @@ child finishes; `--precise` uses monotonic fixed-rate scheduling.
                               highlight visible changes between updates
 -e, --errexit                freeze on non-zero exit, then return that status
                               after a fresh key press
--f, --follow                 follow repeated output without comparisons
+-f, --follow                 retain, append, and scroll repeated command output
 -g, --chgexit                exit when visible output changes
 -q, --equexit <cycles>       exit after visible output is unchanged for cycles
 -n, --interval <secs>        seconds between updates
@@ -54,6 +54,13 @@ child finishes; `--precise` uses monotonic fixed-rate scheduling.
 ```
 
 `--follow` conflicts with difference and comparison-driven exit modes.
+In follow mode the body is not cleared between executions. A new child begins
+writing at the retained cursor position left by the preceding child; newlines
+and wrapped text scroll the body when they pass its final row. The retained
+state is bounded to the visible body rather than an ever-growing transcript.
+Resize preserves the newest representable cells, and `--no-rerun` can repaint
+that resized follow state without launching a child solely because geometry
+changed.
 
 ## KEY CONTROL
 
@@ -95,7 +102,9 @@ ignore style-only changes and off-screen output.
 Resize events reset comparison baselines so geometry changes cannot trigger a
 false `--chgexit`. `--no-rerun` redraws the most recent captured output at the
 new geometry without launching another child merely because the terminal was
-resized. Screenshots serialize this same visible model rather than scraping the
+resized. In `--follow` mode the redraw uses the retained scrolling body instead
+of reconstructing only the most recent child output. Screenshots serialize this
+same visible model rather than scraping the
 physical terminal, so terminal styles are omitted while visible Unicode text,
 header rows, body rows, and geometry are preserved.
 

@@ -170,6 +170,7 @@ public static class Command {
 			long iteration = 0;
 			long unchangedCycles = 1;
 			WatchScreen? previousScreen = null;
+			WatchScreen? followScreen = null;
 			WatchRenderFrame? currentFrame = null;
 			bool[]? permanentDifferences = null;
 			string? previousRawOutput = null;
@@ -255,6 +256,31 @@ public static class Command {
 						previousScreen = null;
 						permanentDifferences = null;
 						unchangedCycles = 1;
+
+						if ( parsed.Follow && followScreen is not null ) {
+							followScreen = followScreen.ResizeForFollow(
+								dimensions,
+								parsed.NoTitle
+							);
+							WatchRenderFrame followRedrawFrame = BuildFrame(
+								followScreen,
+								parsed,
+								previousStatus,
+								previousElapsed,
+								currentHostName(),
+								currentTime(),
+								null
+							);
+							await terminal.RenderAsync(
+								followRedrawFrame,
+								refreshToken
+							).ConfigureAwait( false );
+							currentFrame = followRedrawFrame;
+							if ( parsed.NoRerun ) {
+								continue;
+							}
+							break;
+						}
 
 						if ( parsed.NoRerun && previousRawOutput is not null ) {
 							WatchScreen redrawScreen = WatchScreen.Create(
@@ -372,13 +398,26 @@ public static class Command {
 					unchangedCycles = 1;
 				}
 
-				WatchScreen screen = WatchScreen.Create(
-					childOutput,
-					dimensions,
-					parsed.NoTitle,
-					parsed.NoWrap,
-					parsed.Color
-				);
+				WatchScreen screen;
+				if ( parsed.Follow ) {
+					followScreen = WatchScreen.AppendFollow(
+						followScreen,
+						childOutput,
+						dimensions,
+						parsed.NoTitle,
+						parsed.NoWrap,
+						parsed.Color
+					);
+					screen = followScreen;
+				} else {
+					screen = WatchScreen.Create(
+						childOutput,
+						dimensions,
+						parsed.NoTitle,
+						parsed.NoWrap,
+						parsed.Color
+					);
+				}
 				bool changed = previousScreen is not null
 					&& !screen.VisibleEquals( previousScreen );
 				bool[]? highlights = parsed.Differences && previousScreen is not null
@@ -1004,8 +1043,8 @@ public static class Command {
 		" -C, --no-color              do not interpret ANSI color/style sequences",
 		" -d, --differences[=permanent]",
 		"                              highlight changes between updates",
-		" -e, --errexit               exit if command has a non-zero exit",
-		" -f, --follow                follow output without change/exit comparisons",
+		" -e, --errexit               freeze non-zero output until a fresh key press",
+		" -f, --follow                retain, append, and scroll command output",
 		" -g, --chgexit               exit when visible command output changes",
 		" -q, --equexit <cycles>      exit after visible output is unchanged for cycles",
 		" -n, --interval <secs>       seconds between updates",
@@ -1152,7 +1191,9 @@ internal sealed class WatchScreen {
 	private WatchScreen(
 		int width,
 		int height,
-		WatchCell[] cells
+		WatchCell[] cells,
+		int cursorRow = 0,
+		int cursorColumn = 0
 	) {
 		if ( 1 > width ) {
 			throw new ArgumentOutOfRangeException( nameof( width ) );
@@ -1167,10 +1208,21 @@ internal sealed class WatchScreen {
 				nameof( cells )
 			);
 		}
+		if ( 0 > cursorRow || height <= cursorRow ) {
+			throw new ArgumentOutOfRangeException( nameof( cursorRow ) );
+		}
+		if ( 0 > cursorColumn || width < cursorColumn ) {
+			throw new ArgumentOutOfRangeException( nameof( cursorColumn ) );
+		}
 		this.Width = width;
 		this.Height = height;
 		this.cells = cells;
+		this.CursorRow = cursorRow;
+		this.CursorColumn = cursorColumn;
 	}
+
+	private int CursorRow { get; }
+	private int CursorColumn { get; }
 
 	internal int Width {
 		get;
@@ -1295,6 +1347,254 @@ internal sealed class WatchScreen {
 		);
 	}
 
+	internal static WatchScreen AppendFollow(
+		WatchScreen? previous,
+		string output,
+		WatchTerminalDimensions dimensions,
+		bool noTitle,
+		bool noWrap,
+		bool preserveColor
+	) {
+		ArgumentNullException.ThrowIfNull( output );
+		int bodyHeight = dimensions.Rows - ( noTitle ? 0 : 2 );
+		if ( 1 > dimensions.Columns || 1 > bodyHeight ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
+
+		WatchScreen? basis = previous;
+		if (
+			basis is not null
+			&& (
+				basis.Width != dimensions.Columns
+				|| basis.Height != bodyHeight
+			)
+		) {
+			basis = basis.ResizeForFollow(
+				dimensions,
+				noTitle
+			);
+		}
+
+		WatchCell[] cells = new WatchCell[
+			checked( dimensions.Columns * bodyHeight )
+		];
+		Array.Fill( cells, WatchCell.Blank );
+		int row = 0;
+		int column = 0;
+		if ( basis is not null ) {
+			Array.Copy(
+				basis.cells,
+				cells,
+				cells.Length
+			);
+			row = basis.CursorRow;
+			column = basis.CursorColumn;
+		}
+
+		CursesStyle style = CursesStyle.Default;
+		bool skipUntilNewline = false;
+		int index = 0;
+		while ( index < output.Length ) {
+			if (
+				'\u001b' == output[ index ]
+				&& index + 1 < output.Length
+				&& '[' == output[ index + 1 ]
+			) {
+				int end = FindCsiEnd(
+					output,
+					index + 2
+				);
+				if ( 0 <= end ) {
+					if ( preserveColor && 'm' == output[ end ] ) {
+						style = ApplySgr(
+							style,
+							output.AsSpan(
+								index + 2,
+								end - index - 2
+							)
+						);
+					}
+					index = end + 1;
+					continue;
+				}
+			}
+
+			char character = output[ index ];
+			if ( '\n' == character ) {
+				ClearFollowLineFrom(
+					cells,
+					dimensions.Columns,
+					row,
+					column
+				);
+				AdvanceFollowRow(
+					cells,
+					dimensions.Columns,
+					bodyHeight,
+					ref row,
+					ref column
+				);
+				skipUntilNewline = false;
+				index++;
+				continue;
+			}
+			if ( '\r' == character ) {
+				column = 0;
+				skipUntilNewline = false;
+				index++;
+				continue;
+			}
+			if ( skipUntilNewline ) {
+				index++;
+				continue;
+			}
+			if ( '\t' == character ) {
+				int spaces = 8 - ( column % 8 );
+				for ( int count = 0; count < spaces; count++ ) {
+					WriteFollowElement(
+						cells,
+						dimensions.Columns,
+						bodyHeight,
+						ref row,
+						ref column,
+						" ",
+						1,
+						style,
+						noWrap,
+						ref skipUntilNewline
+					);
+					if ( skipUntilNewline ) {
+						break;
+					}
+				}
+				index++;
+				continue;
+			}
+			if ( char.IsControl( character ) ) {
+				index++;
+				continue;
+			}
+
+			string textElement = StringInfo.GetNextTextElement(
+				output,
+				index
+			);
+			int elementLength = textElement.Length;
+			int displayWidth = UnicodeCursesTextWidthProvider.Instance.GetWidth(
+				textElement
+			);
+			if ( 0 == displayWidth ) {
+				AppendZeroWidthElement(
+					cells,
+					dimensions.Columns,
+					row,
+					column,
+					textElement
+				);
+			} else {
+				WriteFollowElement(
+					cells,
+					dimensions.Columns,
+					bodyHeight,
+					ref row,
+					ref column,
+					textElement,
+					displayWidth,
+					style,
+					noWrap,
+					ref skipUntilNewline
+				);
+			}
+			index += elementLength;
+		}
+
+		return new WatchScreen(
+			dimensions.Columns,
+			bodyHeight,
+			cells,
+			row,
+			column
+		);
+	}
+
+	internal WatchScreen ResizeForFollow(
+		WatchTerminalDimensions dimensions,
+		bool noTitle
+	) {
+		int bodyHeight = dimensions.Rows - ( noTitle ? 0 : 2 );
+		if ( 1 > dimensions.Columns || 1 > bodyHeight ) {
+			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
+		}
+		if (
+			this.Width == dimensions.Columns
+			&& this.Height == bodyHeight
+		) {
+			return this;
+		}
+
+		WatchCell[] resized = new WatchCell[
+			checked( dimensions.Columns * bodyHeight )
+		];
+		Array.Fill( resized, WatchCell.Blank );
+		int rowsToCopy = Math.Min(
+			this.Height,
+			bodyHeight
+		);
+		int sourceFirstRow = Math.Max(
+			0,
+			this.Height - bodyHeight
+		);
+		int columnsToCopy = Math.Min(
+			this.Width,
+			dimensions.Columns
+		);
+		for ( int rowOffset = 0; rowOffset < rowsToCopy; rowOffset++ ) {
+			int sourceRow = sourceFirstRow + rowOffset;
+			for ( int column = 0; column < columnsToCopy; column++ ) {
+				WatchCell cell = this.GetCell(
+					sourceRow,
+					column
+				);
+				if ( cell.IsContinuation ) {
+					continue;
+				}
+				if (
+					2 == cell.DisplayWidth
+					&& dimensions.Columns <= column + 1
+				) {
+					continue;
+				}
+				int target = ( rowOffset * dimensions.Columns ) + column;
+				resized[ target ] = cell;
+				if ( 2 == cell.DisplayWidth ) {
+					resized[ target + 1 ] = WatchCell.Continuation(
+						cell.Style
+					);
+				}
+			}
+		}
+
+		int cursorRow = this.CursorRow - sourceFirstRow;
+		if ( 0 > cursorRow ) {
+			cursorRow = 0;
+		}
+		cursorRow = Math.Min(
+			cursorRow,
+			bodyHeight - 1
+		);
+		int cursorColumn = Math.Min(
+			this.CursorColumn,
+			dimensions.Columns
+		);
+		return new WatchScreen(
+			dimensions.Columns,
+			bodyHeight,
+			resized,
+			cursorRow,
+			cursorColumn
+		);
+	}
+
 	internal WatchCell GetCell(
 		int row,
 		int column
@@ -1416,6 +1716,141 @@ internal sealed class WatchScreen {
 		cells[ target ] = prior with {
 			Content = string.Concat( prior.Content, textElement )
 		};
+	}
+
+	private static void WriteFollowElement(
+		WatchCell[] cells,
+		int width,
+		int height,
+		ref int row,
+		ref int column,
+		string content,
+		int displayWidth,
+		CursesStyle style,
+		bool noWrap,
+		ref bool skipUntilNewline
+	) {
+		ArgumentNullException.ThrowIfNull( cells );
+		ArgumentException.ThrowIfNullOrEmpty( content );
+		if ( displayWidth is < 1 or > 2 ) {
+			throw new ArgumentOutOfRangeException( nameof( displayWidth ) );
+		}
+
+		if ( column >= width || column + displayWidth > width ) {
+			if ( noWrap ) {
+				skipUntilNewline = true;
+				return;
+			}
+			AdvanceFollowRow(
+				cells,
+				width,
+				height,
+				ref row,
+				ref column
+			);
+		}
+
+		ClearFollowCellForWrite(
+			cells,
+			width,
+			row,
+			column
+		);
+		if ( 2 == displayWidth ) {
+			ClearFollowCellForWrite(
+				cells,
+				width,
+				row,
+				column + 1
+			);
+		}
+
+		int cellIndex = ( row * width ) + column;
+		cells[ cellIndex ] = new WatchCell(
+			content,
+			style,
+			displayWidth,
+			false
+		);
+		if ( 2 == displayWidth ) {
+			cells[ cellIndex + 1 ] = WatchCell.Continuation( style );
+		}
+		column += displayWidth;
+	}
+
+	private static void AdvanceFollowRow(
+		WatchCell[] cells,
+		int width,
+		int height,
+		ref int row,
+		ref int column
+	) {
+		ArgumentNullException.ThrowIfNull( cells );
+		column = 0;
+		if ( row + 1 < height ) {
+			row++;
+			return;
+		}
+
+		Array.Copy(
+			cells,
+			width,
+			cells,
+			0,
+			cells.Length - width
+		);
+		Array.Fill(
+			cells,
+			WatchCell.Blank,
+			cells.Length - width,
+			width
+		);
+		row = height - 1;
+	}
+
+	private static void ClearFollowLineFrom(
+		WatchCell[] cells,
+		int width,
+		int row,
+		int column
+	) {
+		ArgumentNullException.ThrowIfNull( cells );
+		if ( width <= column ) {
+			return;
+		}
+		if (
+			0 < column
+			&& cells[ ( row * width ) + column ].IsContinuation
+		) {
+			cells[ ( row * width ) + column - 1 ] = WatchCell.Blank;
+		}
+		Array.Fill(
+			cells,
+			WatchCell.Blank,
+			( row * width ) + column,
+			width - column
+		);
+	}
+
+	private static void ClearFollowCellForWrite(
+		WatchCell[] cells,
+		int width,
+		int row,
+		int column
+	) {
+		ArgumentNullException.ThrowIfNull( cells );
+		int index = ( row * width ) + column;
+		WatchCell current = cells[ index ];
+		if ( current.IsContinuation && 0 < column ) {
+			cells[ index - 1 ] = WatchCell.Blank;
+		}
+		if (
+			2 == current.DisplayWidth
+			&& column + 1 < width
+		) {
+			cells[ index + 1 ] = WatchCell.Blank;
+		}
+		cells[ index ] = WatchCell.Blank;
 	}
 
 	private static void WriteElement(
