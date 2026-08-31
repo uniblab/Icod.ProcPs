@@ -39,10 +39,9 @@ internal sealed class TloadGraphState {
 		this.configuredScale = configuredScale;
 	}
 
-	/// <summary>Clears scrolling history after a terminal geometry change.</summary>
+	/// <summary>Clears scrolling history after a geometry change without discarding adaptive scale.</summary>
 	internal void Reset() {
 		this.history.Clear();
-		this.scaleFactor = 0d;
 	}
 
 	/// <summary>Renders one complete terminal frame for the next load observation.</summary>
@@ -75,7 +74,8 @@ internal sealed class TloadGraphState {
 		}
 
 		this.history.Add( new GraphPoint( load, this.scaleFactor ) );
-		if ( dimensions.Columns < this.history.Count ) {
+		int historyCapacity = dimensions.Columns - 1;
+		while ( historyCapacity < this.history.Count ) {
 			this.history.RemoveAt( 0 );
 		}
 

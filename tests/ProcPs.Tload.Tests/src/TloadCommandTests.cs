@@ -112,6 +112,63 @@ public sealed class TloadCommandTests {
 		Assert.Equal( '-', frame[ ( 5 * dimensions.Columns ) ] );
 	}
 
+	/// <summary>Verifies resize resets history while preserving procps adaptive-scale state.</summary>
+	[Fact]
+	public void ResizeResetPreservesAdaptiveScale() {
+		var graph = new TloadGraphState( 8d );
+		var compact = new TloadTerminalDimensions( 10, 4 );
+		string compactFrame = graph.Render(
+			new ProcLoadAverages( 1d, 0.5d, 0.25d ),
+			compact
+		);
+
+		Assert.Equal(
+			'=',
+			compactFrame[ 2 * compact.Columns ]
+		);
+
+		graph.Reset();
+
+		var expanded = new TloadTerminalDimensions( 10, 10 );
+		string expandedFrame = graph.Render(
+			new ProcLoadAverages( 1d, 0.5d, 0.25d ),
+			expanded
+		);
+
+		Assert.Equal(
+			'=',
+			expandedFrame[ 6 * expanded.Columns ]
+		);
+		Assert.Equal(
+			' ',
+			expandedFrame[ 5 * expanded.Columns ]
+		);
+	}
+
+	/// <summary>Verifies full-width scrolling leaves procps's trailing update column open.</summary>
+	[Fact]
+	public void FullWidthScrollLeavesTrailingUpdateColumnOpen() {
+		var graph = new TloadGraphState( 2d );
+		var dimensions = new TloadTerminalDimensions( 20, 4 );
+		string frame = string.Empty;
+
+		for ( int index = 0; index < dimensions.Columns; index++ ) {
+			frame = graph.Render(
+				new ProcLoadAverages( 0d, 0d, 0d ),
+				dimensions
+			);
+		}
+
+		Assert.Equal(
+			'-',
+			frame[ ( 2 * dimensions.Columns ) + dimensions.Columns - 2 ]
+		);
+		Assert.Equal(
+			' ',
+			frame[ ( 2 * dimensions.Columns ) + dimensions.Columns - 1 ]
+		);
+	}
+
 	/// <summary>Verifies an explicit terminal operand is routed to the output factory.</summary>
 	[Fact]
 	public async Task SelectedTerminalOperandIsPassedToFactory() {
