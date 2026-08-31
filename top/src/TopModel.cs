@@ -357,14 +357,18 @@ internal sealed class TopRuntimeState {
 		}
 		int targetIndex = sourceIndex + direction;
 		while (
-			targetIndex is >= 0 and < this.FieldOrder.Count
+			0 <= targetIndex
+			&& targetIndex < this.FieldOrder.Count
 			&& !this.VisibleFields.Contains(
 				this.FieldOrder[ targetIndex ]
 			)
 		) {
 			targetIndex += direction;
 		}
-		if ( targetIndex is < 0 || targetIndex >= this.FieldOrder.Count ) {
+		if (
+			0 > targetIndex
+			|| this.FieldOrder.Count <= targetIndex
+		) {
 			return false;
 		}
 
