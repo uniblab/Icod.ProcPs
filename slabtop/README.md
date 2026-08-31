@@ -53,8 +53,10 @@ logical report as the interactive display without screen-size clipping.
   `--delay`.
 
 `--human`
-: Display sizes using human-readable binary units. Without this option, sizes
-  use the procps-style kibibyte presentation.
+: Display aggregate and per-cache slab sizes using human-readable binary units.
+  As in procps-ng, `OBJ SIZE` and the minimum/average/maximum object-size
+  summary remain fixed two-decimal `K` values. Without this option, slab sizes
+  also use the procps-style kibibyte presentation.
 
 `-h`, `--help`
 : Display help and exit successfully.
@@ -83,6 +85,11 @@ Interactive mode requires a terminal of at least 40 columns by 9 rows. The
 stable `Icod.DCurses 0.1.0` defaults provide the alternate-screen, cbreak,
 no-echo, keypad, and hidden-cursor profile. DCurses and `Icod.Terminal` own the
 terminal lifecycle and restore the live terminal when the session ends.
+
+The cache-table heading is rendered in reverse video. Interactive frames reserve
+the final physical row and therefore display at most `Rows - 8` cache entries,
+matching the procps ncurses layout and avoiding terminal scrolling on the last
+screen row.
 
 The refresh deadline is monotonic and starts when a sampling cycle begins. Time
 spent reading `/proc/slabinfo` and rendering therefore counts against the
@@ -133,6 +140,8 @@ The test project injects the slab provider, terminal-session seam, and monotonic
 clock. This keeps parser, rendering, resize/repaint, cancellation, failure, and
 scheduling behavior deterministic without writing test traffic to the real
 terminal.
+It also verifies the `--human` object-size boundary, reverse-heading frame
+metadata, and procps-style reservation of the final interactive screen row.
 
 ## PLATFORM NOTES
 

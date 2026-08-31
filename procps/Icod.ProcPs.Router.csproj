@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.28 hardens procps tload graph fidelity: adaptive scale survives terminal resizes, full-width history preserves the procps trailing update column, and regression tests cover both behaviors.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.29 hardens procps slabtop display fidelity: --human scales slab sizes without changing fixed-K object-size fields, the table heading uses reverse video, and interactive frames reserve the final screen row.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>
