@@ -114,11 +114,10 @@ public sealed class TopForestInteractionTests {
 			120
 		);
 		string rootLine = Assert.Single(
-			lines.Where(
-				line => line.Contains(
-					"root",
-					StringComparison.Ordinal
-				)
+			lines,
+			line => line.Contains(
+				"root",
+				StringComparison.Ordinal
 			)
 		);
 		Assert.Contains(
