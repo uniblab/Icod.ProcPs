@@ -1253,7 +1253,7 @@ internal static partial class TopProcpsConfigurationCodec {
 		);
 		return TimeSpan.FromTicks(
 			( (long)whole * TimeSpan.TicksPerSecond )
-			+ ( (long)fractional * TimeSpan.TicksPerMillisecond )
+			+ fractionalTicks
 		);
 	}
 
