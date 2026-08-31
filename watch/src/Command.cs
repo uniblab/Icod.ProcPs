@@ -399,6 +399,7 @@ public static class Command {
 				}
 
 				WatchScreen screen;
+				int outputAlerts;
 				if ( parsed.Follow ) {
 					followScreen = WatchScreen.AppendFollow(
 						followScreen,
@@ -406,7 +407,8 @@ public static class Command {
 						dimensions,
 						parsed.NoTitle,
 						parsed.NoWrap,
-						parsed.Color
+						parsed.Color,
+						out outputAlerts
 					);
 					screen = followScreen;
 				} else {
@@ -415,7 +417,8 @@ public static class Command {
 						dimensions,
 						parsed.NoTitle,
 						parsed.NoWrap,
-						parsed.Color
+						parsed.Color,
+						out outputAlerts
 					);
 				}
 				bool changed = previousScreen is not null
@@ -443,6 +446,11 @@ public static class Command {
 					currentTime(),
 					highlights
 				);
+				for ( int alert = 0; alert < outputAlerts; alert++ ) {
+					await terminal.AlertAsync(
+						refreshToken
+					).ConfigureAwait( false );
+				}
 				if ( parsed.Beep && 0 != status ) {
 					await terminal.AlertAsync( refreshToken ).ConfigureAwait( false );
 				}
@@ -1302,7 +1310,26 @@ internal sealed class WatchScreen {
 		bool noWrap,
 		bool preserveColor
 	) {
+		return Create(
+			output,
+			dimensions,
+			noTitle,
+			noWrap,
+			preserveColor,
+			out _
+		);
+	}
+
+	internal static WatchScreen Create(
+		string output,
+		WatchTerminalDimensions dimensions,
+		bool noTitle,
+		bool noWrap,
+		bool preserveColor,
+		out int alertCount
+	) {
 		ArgumentNullException.ThrowIfNull( output );
+		alertCount = 0;
 		int bodyHeight = dimensions.Rows - ( noTitle ? 0 : 2 );
 		if ( 1 > dimensions.Columns || 1 > bodyHeight ) {
 			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
@@ -1348,6 +1375,11 @@ internal sealed class WatchScreen {
 				continue;
 			}
 			if ( skipUntilNewline ) {
+				index++;
+				continue;
+			}
+			if ( '\a' == character ) {
+				alertCount++;
 				index++;
 				continue;
 			}
@@ -1418,7 +1450,28 @@ internal sealed class WatchScreen {
 		bool noWrap,
 		bool preserveColor
 	) {
+		return AppendFollow(
+			previous,
+			output,
+			dimensions,
+			noTitle,
+			noWrap,
+			preserveColor,
+			out _
+		);
+	}
+
+	internal static WatchScreen AppendFollow(
+		WatchScreen? previous,
+		string output,
+		WatchTerminalDimensions dimensions,
+		bool noTitle,
+		bool noWrap,
+		bool preserveColor,
+		out int alertCount
+	) {
 		ArgumentNullException.ThrowIfNull( output );
+		alertCount = 0;
 		int bodyHeight = dimensions.Rows - ( noTitle ? 0 : 2 );
 		if ( 1 > dimensions.Columns || 1 > bodyHeight ) {
 			throw new ArgumentOutOfRangeException( nameof( dimensions ) );
@@ -1508,6 +1561,11 @@ internal sealed class WatchScreen {
 				continue;
 			}
 			if ( skipUntilNewline ) {
+				index++;
+				continue;
+			}
+			if ( '\a' == character ) {
+				alertCount++;
 				index++;
 				continue;
 			}

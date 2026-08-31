@@ -300,6 +300,77 @@ public sealed class WatchCommandTests {
 	}
 
 	[Fact]
+	public async Task ChildBellAlertsWithoutBeepOption() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new WatchTerminalDimensions( 20, 3 )
+		);
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "a\ab" ),
+			Execution.Success( "a\ab" )
+		);
+
+		CommandResult result = await RunAsync(
+			[ "--exec", "--no-title", "--equexit=1", "tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 2, executor.Options.Count );
+		Assert.Equal( 2, terminal.AlertCount );
+		Assert.Equal( 2, terminal.Frames.Count );
+	}
+
+	[Fact]
+	public void OrdinaryScreenDoesNotCountBellBeyondConsumedBody() {
+		WatchScreen screen = WatchScreen.Create(
+			"A\n\a",
+			new WatchTerminalDimensions( 1, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: false,
+			alertCount: out int alertCount
+		);
+
+		Assert.Equal( 0, alertCount );
+		Assert.Equal( "A", screen.GetCell( 0, 0 ).Content );
+	}
+
+	[Fact]
+	public void FollowScreenCountsBellAfterScrollingPastFirstBody() {
+		WatchScreen screen = WatchScreen.AppendFollow(
+			null,
+			"A\n\a",
+			new WatchTerminalDimensions( 1, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: false,
+			alertCount: out int alertCount
+		);
+
+		Assert.Equal( 1, alertCount );
+		Assert.Equal( string.Empty, screen.GetCell( 0, 0 ).Content );
+	}
+
+	[Fact]
+	public void NoWrapDoesNotCountBellInDiscardedLineTail() {
+		_ = WatchScreen.Create(
+			"AB\a\n",
+			new WatchTerminalDimensions( 1, 2 ),
+			noTitle: true,
+			noWrap: true,
+			preserveColor: false,
+			alertCount: out int alertCount
+		);
+
+		Assert.Equal( 0, alertCount );
+	}
+
+	[Fact]
 	public async Task EqualExitCountsUnchangedVisibleCycles() {
 		FakeClock clock = new();
 		FakeExecutor executor = new(

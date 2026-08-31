@@ -107,11 +107,19 @@ right-aligns the previous command duration and portable status as
 than one day use `in >1 day`.
 
 Child text is converted to a fixed visible cell image using the DCurses Unicode
-width policy. Tabs advance to eight-column stops. Carriage return rewinds the
-current row. C0/C1 controls other than tab, CR, and LF are discarded. ANSI CSI
-sequences are stripped; SGR sequences are translated to semantic DCurses styles
-only when `--color` is enabled. Comparison options operate on visible text and
-ignore style-only changes and off-screen output.
+width policy. BEL (`\a`) requests an audible terminal alert and is not rendered;
+this is independent of `--beep`, which alerts for a non-zero child status.
+Tabs advance to eight-column stops. Carriage return rewinds the current row.
+C0/C1 controls other than BEL, tab, CR, and LF are discarded. ANSI CSI sequences
+are stripped; SGR sequences are translated to semantic DCurses styles only when
+`--color` is enabled. Comparison options operate on visible text and ignore
+style-only changes and off-screen output.
+
+As in procps-ng, ordinary mode stops consuming display semantics after the
+visible body is exhausted, so BEL characters in the discarded tail do not
+alert. `--follow` keeps consuming output while scrolling and therefore continues
+to honor BEL characters beyond the first screenful. BEL characters skipped by
+`--no-wrap` after a line has been truncated are likewise not consumed.
 
 Resize events reset comparison baselines so geometry changes cannot trigger a
 false `--chgexit`. `--no-rerun` redraws the most recent captured output at the
