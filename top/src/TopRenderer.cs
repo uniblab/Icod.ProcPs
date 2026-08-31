@@ -23,6 +23,7 @@ namespace Icod.ProcPs.Top;
 
 using System.Globalization;
 using System.Text;
+using Icod.Processes;
 using Icod.ProcPs.Shared;
 
 /// <summary>Builds the terminal-independent screen model used by top.</summary>
@@ -60,6 +61,7 @@ internal static class TopRenderer {
 		" H              toggle thread display",
 		" i              toggle idle-task suppression",
 		" V              toggle process forest",
+		" F / v          focus parent / hide-show children",
 		" I              toggle Irix/Solaris CPU normalization",
 		" E / e          cycle summary / task memory scale",
 		" d or s         change refresh delay",
@@ -1729,29 +1731,132 @@ internal static class TopRenderer {
 		);
 	}
 
+	internal static bool ToggleForestFocus(
+		TopSample sample,
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( sample );
+		ArgumentNullException.ThrowIfNull( state );
+
+		if ( !state.Forest ) {
+			return false;
+		}
+		if ( state.ForestFocus is not null ) {
+			state.ForestFocus = null;
+			state.VerticalOffset = 0;
+			state.SynchronizeCurrentWindow();
+			return true;
+		}
+
+		List<TopTaskRow> tasks = SelectAndOrderTasks(
+			sample,
+			state
+		);
+		if ( 0 == tasks.Count ) {
+			return false;
+		}
+		int topIndex = Math.Clamp(
+			state.VerticalOffset,
+			0,
+			tasks.Count - 1
+		);
+		state.ForestFocus = tasks[
+			topIndex
+		].Process.Identity;
+		state.VerticalOffset = 0;
+		state.SynchronizeCurrentWindow();
+		return true;
+	}
+
+	internal static bool ToggleTopmostForestChildren(
+		TopSample sample,
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( sample );
+		ArgumentNullException.ThrowIfNull( state );
+
+		if ( !state.Forest ) {
+			return false;
+		}
+		List<TopTaskRow> tasks = SelectAndOrderTasks(
+			sample,
+			state
+		);
+		if ( 0 == tasks.Count ) {
+			return false;
+		}
+		int topIndex = Math.Clamp(
+			state.VerticalOffset,
+			0,
+			tasks.Count - 1
+		);
+		ProcessIdentity target = tasks[
+			topIndex
+		].Process.Identity;
+		List<TopTaskRow> candidates = SelectTaskCandidates(
+			sample,
+			state
+		);
+		if ( !TopForestProjection.HasChildren( candidates, target ) ) {
+			return false;
+		}
+
+		if ( !state.CollapsedForestParents.Remove( target ) ) {
+			state.CollapsedForestParents.Add(
+				target
+			);
+		}
+		state.SynchronizeCurrentWindow();
+		return true;
+	}
+
 	private static List<TopTaskRow> SelectAndOrderTasks(
 		TopSample sample,
 		TopRuntimeState state
 	) {
+		List<TopTaskRow> tasks = SelectTaskCandidates(
+			sample,
+			state
+		);
+		Comparison<TopTaskRow> comparison = SortComparison(
+			state.SortField,
+			state.SortHighToLow
+		);
+		if ( state.Forest ) {
+			return TopForestProjection.Order(
+				tasks,
+				comparison,
+				state
+			);
+		}
+		foreach ( TopTaskRow row in tasks ) {
+			row.ForestDepth = 0;
+		}
+		tasks.Sort( comparison );
+		return tasks;
+	}
+
+	private static List<TopTaskRow> SelectTaskCandidates(
+		TopSample sample,
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( sample );
+		ArgumentNullException.ThrowIfNull( state );
+
 		List<TopTaskRow> tasks = ApplyFilters(
 			sample.Tasks,
 			state,
 			sample.ProcessorCount
 		).ToList();
 		if ( state.HideIdle ) {
-			tasks = tasks.Where( row => 0.0001 < row.CpuPercentIrix || IsState( row, ProcProcessState.Running ) ).ToList();
+			tasks = tasks.Where(
+				row => 0.0001 < row.CpuPercentIrix
+					|| IsState(
+						row,
+						ProcProcessState.Running
+					)
+			).ToList();
 		}
-		Comparison<TopTaskRow> comparison = SortComparison(
-			state.SortField,
-			state.SortHighToLow
-		);
-		if ( state.Forest ) {
-			return OrderForest( tasks, comparison );
-		}
-		foreach ( TopTaskRow row in tasks ) {
-			row.ForestDepth = 0;
-		}
-		tasks.Sort( comparison );
 		return tasks;
 	}
 

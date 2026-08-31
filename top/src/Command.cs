@@ -141,7 +141,7 @@ Interactive keys:
  b emphasis mode; J numeric justify; j character justify; f manage fields;
  x sort column; y running rows; z colors; Z map colors; l load/uptime; t CPU summary;
  m memory summary; C scroll coordinates; </> move sort field; c command line;
- H threads; i idle tasks; V forest; I CPU normalization;
+ H threads; i idle tasks; V forest; F focus parent; v hide/show children; I CPU normalization;
  E/e memory scale; d/s delay; u/U user filter;
  O/o other filter; L locate; & locate next; k signal; r renice; W write config;
  arrows/PgUp/PgDn/Home/End scroll; h/? help.
@@ -660,25 +660,29 @@ Interactive keys:
 		if ( ' ' == value ) {
 			return TopCommandAction.Resample;
 		}
-		char key = 0x7f >= value ? (char)value : '\0';
+		char key = value <= 0x7f ? (char)value : '\0';
 		switch ( key ) {
 			case 'q':
 			case 'Q':
 				return TopCommandAction.Exit;
 			case 'P':
 				state.SortField = TopFieldId.Cpu;
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
 			case 'M':
 				state.SortField = TopFieldId.Memory;
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
 			case 'N':
 				state.SortField = TopFieldId.Pid;
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
 			case 'T':
 				state.SortField = TopFieldId.Time;
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
 			case '0':
@@ -686,6 +690,7 @@ Interactive keys:
 				return TopCommandAction.Rerender;
 			case 'R':
 				state.SortHighToLow = !state.SortHighToLow;
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				state.Message = state.SortHighToLow
 					? "sort direction: high to low"
@@ -815,6 +820,26 @@ Interactive keys:
 			case 'V':
 				state.Forest = !state.Forest;
 				state.VerticalOffset = 0;
+				return TopCommandAction.Rerender;
+			case 'F':
+				if (
+					!TopRenderer.ToggleForestFocus(
+						sample,
+						state
+					)
+				) {
+					return TopCommandAction.None;
+				}
+				return TopCommandAction.Rerender;
+			case 'v':
+				if (
+					!TopRenderer.ToggleTopmostForestChildren(
+						sample,
+						state
+					)
+				) {
+					return TopCommandAction.None;
+				}
 				return TopCommandAction.Rerender;
 			case 'I':
 				state.IrixMode = !state.IrixMode;
@@ -1078,7 +1103,7 @@ Interactive keys:
 
 		int value = input.Character.Value.Value;
 		char key = '\0';
-		if ( 0x7f >= value ) {
+		if ( value <= 0x7f ) {
 			key = (char)value;
 		}
 		switch ( key ) {
@@ -1120,6 +1145,7 @@ Interactive keys:
 				state.SortField = state.FieldOrder[
 					state.FieldCursor
 				];
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				state.Message = null;
 				return TopCommandAction.Rerender;
@@ -1139,6 +1165,7 @@ Interactive keys:
 		state.HideIdle = false;
 		state.MaximumTasks = 0;
 		state.SearchText = null;
+		state.ClearForestRestrictions();
 		state.VerticalOffset = 0;
 		state.HorizontalOffset = 0;
 		state.SynchronizeCurrentWindow();
@@ -1687,6 +1714,7 @@ Interactive keys:
 					result.Fail( $"unknown sort field '{sortText}'" );
 				} else {
 					result.State.SortField = sortField;
+					result.State.ExitForestForSort();
 					if ( sortHighToLow.HasValue ) {
 						result.State.SortHighToLow = sortHighToLow.Value;
 					}

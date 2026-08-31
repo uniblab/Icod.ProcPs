@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.23 closes additional procps top display/navigation parity: per-window load/uptime and scroll-coordinate flags now round-trip through Icod and native configuration, l and C control them interactively, and &lt;/&gt; move the visible sort field without resampling.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.24 completes procps top forest interactions available from the current process model: F maintains focus on the topmost forest parent, v collapses and expands its descendants with collapsed CPU aggregation, reset commands clear tree restrictions, and sort-selection commands leave forest mode.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

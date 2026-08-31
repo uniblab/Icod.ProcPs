@@ -80,6 +80,8 @@ internal sealed class TopWindowState {
 	internal bool ShowCommandLine { get; set; }
 	internal bool HideIdle { get; set; }
 	internal bool Forest { get; set; }
+	internal ProcessIdentity? ForestFocus { get; set; }
+	internal HashSet<ProcessIdentity> CollapsedForestParents { get; } = [];
 	internal bool LoadAverageVisible { get; set; } = true;
 	internal bool ScrollCoordinatesVisible { get; set; }
 	internal bool SingleCpuSummary { get; set; } = true;
@@ -131,6 +133,11 @@ internal sealed class TopWindowState {
 		this.ShowCommandLine = state.ShowCommandLine;
 		this.HideIdle = state.HideIdle;
 		this.Forest = state.Forest;
+		this.ForestFocus = state.ForestFocus;
+		this.CollapsedForestParents.Clear();
+		this.CollapsedForestParents.UnionWith(
+			state.CollapsedForestParents
+		);
 		this.LoadAverageVisible = state.LoadAverageVisible;
 		this.ScrollCoordinatesVisible = state.ScrollCoordinatesVisible;
 		this.SingleCpuSummary = state.SingleCpuSummary;
@@ -176,6 +183,11 @@ internal sealed class TopWindowState {
 		state.ShowCommandLine = this.ShowCommandLine;
 		state.HideIdle = this.HideIdle;
 		state.Forest = this.Forest;
+		state.ForestFocus = this.ForestFocus;
+		state.CollapsedForestParents.Clear();
+		state.CollapsedForestParents.UnionWith(
+			this.CollapsedForestParents
+		);
 		state.LoadAverageVisible = this.LoadAverageVisible;
 		state.ScrollCoordinatesVisible = this.ScrollCoordinatesVisible;
 		state.SingleCpuSummary = this.SingleCpuSummary;
@@ -221,6 +233,11 @@ internal sealed class TopWindowState {
 		this.ShowCommandLine = source.ShowCommandLine;
 		this.HideIdle = source.HideIdle;
 		this.Forest = source.Forest;
+		this.ForestFocus = source.ForestFocus;
+		this.CollapsedForestParents.Clear();
+		this.CollapsedForestParents.UnionWith(
+			source.CollapsedForestParents
+		);
 		this.LoadAverageVisible = source.LoadAverageVisible;
 		this.ScrollCoordinatesVisible = source.ScrollCoordinatesVisible;
 		this.SingleCpuSummary = source.SingleCpuSummary;
@@ -278,6 +295,8 @@ internal sealed class TopRuntimeState {
 	internal bool ShowThreads { get; set; }
 	internal bool HideIdle { get; set; }
 	internal bool Forest { get; set; }
+	internal ProcessIdentity? ForestFocus { get; set; }
+	internal HashSet<ProcessIdentity> CollapsedForestParents { get; } = [];
 	internal bool IrixMode { get; set; } = true;
 	internal bool SecureMode { get; set; }
 	internal bool LoadAverageVisible { get; set; } = true;
@@ -378,6 +397,16 @@ internal sealed class TopRuntimeState {
 		this.HorizontalOffset = 0;
 		this.SynchronizeCurrentWindow();
 		return true;
+	}
+
+	internal void ClearForestRestrictions() {
+		this.ForestFocus = null;
+		this.CollapsedForestParents.Clear();
+	}
+
+	internal void ExitForestForSort() {
+		this.Forest = false;
+		this.ClearForestRestrictions();
 	}
 
 	internal void ToggleAllTaskDisplays() {
@@ -575,6 +604,23 @@ internal sealed class TopTaskRow {
 		this.CpuPercentIrix = Math.Max( 0.0, cpuPercentIrix );
 		this.MemoryPercent = Math.Max( 0.0, memoryPercent );
 		this.CpuSeconds = cpuSeconds;
+	}
+
+	internal TopTaskRow CreateForestPresentation(
+		double cpuPercentIrix,
+		int forestDepth
+	) {
+		ArgumentOutOfRangeException.ThrowIfNegative( forestDepth );
+		return new TopTaskRow(
+			this.Process,
+			this.ThreadGroupId,
+			this.User,
+			cpuPercentIrix,
+			this.MemoryPercent,
+			this.CpuSeconds
+		) {
+			ForestDepth = forestDepth
+		};
 	}
 
 	internal ProcProcessSnapshot Process { get; }

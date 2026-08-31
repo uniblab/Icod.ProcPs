@@ -188,6 +188,15 @@ profile:
 - `H` toggles process/thread presentation globally and resamples immediately.
 - `i` toggles current-window idle-task suppression and `V` toggles its forest
   ordering.
+- While forest mode is active, `F` toggles parent focus on the topmost displayed
+  task. Focus keeps that task at the top and suppresses processes outside its
+  descendant subtree. `v` collapses or expands the children of the topmost
+  displayed task; a collapsed parent's `%CPU` includes its suppressed
+  descendants, matching procps behavior. Both commands are no-ops outside
+  forest mode.
+- `P`, `M`, `N`, `T`, `R`, Fields Management `s`, and command-line `-o` leave
+  forest mode when they change sorting. Forest focus and collapse selections are
+  transient per-window display limits rather than persisted configuration.
 - `I` toggles Irix CPU normalization, where 100% represents one processor, and
   total-capacity normalization.
 - `E` and `e` cycle summary and task memory scales.
@@ -220,8 +229,9 @@ profile:
   Right scroll horizontally. `C` toggles procps-style scroll coordinates in the
   otherwise-unused message line; prompts and explicit messages take precedence.
 - `=` clears current-window idle/max-task limits, PID/user/Other Filter
-  restrictions, locate state, and scrolling while forcing that task display
-  visible. `+` applies the window-local reset to all four field groups.
+  restrictions, forest focus/collapse, locate state, and scrolling while
+  forcing that task display visible. `+` applies the window-local reset to all
+  four field groups.
 - `h` or `?` displays a compact help screen.
 
 In secure mode the `d`/`s`, `k`, and `r` commands are disabled.
@@ -336,8 +346,9 @@ interactions supported by the current observation model. Per-window native
 configuration and is controlled by `l` / `C`; `<` / `>` provide direct sort
 field movement in addition to Fields Management.
 
-Additional procps conveniences that do not require new kernel facts remain on
-the completion queue: forest parent focus/collapse (`F` / `v`), fixed-width
+Forest parent focus/collapse (`F` / `v`) now operate on the same reuse-aware
+hierarchy used by ordinary forest rendering. Additional procps conveniences
+that do not require new kernel facts remain on the completion queue: fixed-width
 expansion (`X` / `Fixed_widest`), Inspect (`Y`), and the applicable 4.0.6
 bottom-window/message-log views.
 
