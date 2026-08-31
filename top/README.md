@@ -140,6 +140,11 @@ profile:
   Up/Down cycle the full native procps `-1..255` range. `a` / `w` switch
   windows, while `B`, `b`, and `z` remain available in the manager. Enter
   keeps the edits; `q` or Escape restores the state that existed on entry.
+- `t` cycles the task/CPU summary through detailed percentages, a compact bar
+  graph, a compact block graph, and hidden. `m` applies the same four-way cycle
+  to the memory/swap summary. When a native configuration hides a summary while
+  retaining a non-detailed graph selector, the first `t` or `m` restores that
+  retained selector instead of discarding it.
 - `J` toggles numeric columns between right justification (the default) and
   left justification.
 - `j` toggles character columns between left justification (the default) and
@@ -319,11 +324,13 @@ on the current host.
 ## CURRENT SCOPE
 
 This tranche establishes the production monitor engine and terminal lifecycle.
-The following large procps `top` subsystems are intentionally left for later
-tranches rather than represented incompletely:
+The current renderer now consumes the persisted procps CPU/memory summary
+selectors directly: detailed, bar, block, and hidden presentations round-trip
+through native and Icod configuration and are selectable with `t` / `m`.
 
-- rendered CPU/memory bar and block graphs plus interactive `t` / `m` cycling;
-  their native visibility and graph-selector state is already persisted;
+The following procps `top` areas remain intentionally incomplete because their
+source facts are not yet available through the shared observation contracts:
+
 - per-logical-CPU activity rows until the Shared metrics contract exposes them;
 - cumulative dead-child CPU time (`-S`); and
 - fields whose source facts are not yet present in the neutral process model,

@@ -139,9 +139,9 @@ Interactive keys:
  A alternate display; a/w next/previous window; g/G choose/rename window;
  -/_ show/hide current/all windows; =/+ reset current/all windows; B bold enable;
  b emphasis mode; J numeric justify; j character justify; f manage fields;
- x sort column; y running rows; z colors; Z map colors; c command line; H threads;
- i idle tasks;
- V forest; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
+ x sort column; y running rows; z colors; Z map colors; t CPU summary; m memory summary;
+ c command line; H threads; i idle tasks; V forest; I CPU normalization;
+ E/e memory scale; d/s delay; u/U user filter;
  O/o other filter; L locate; & locate next; k signal; r renice; W write config;
  arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
@@ -755,6 +755,12 @@ Interactive keys:
 				state.ColorManager = new TopColorManagerState(
 					state
 				);
+				return TopCommandAction.Rerender;
+			case 't':
+				state.CycleCpuSummaryPresentation();
+				return TopCommandAction.Rerender;
+			case 'm':
+				state.CycleMemorySummaryPresentation();
 				return TopCommandAction.Rerender;
 			case 'J':
 				state.NumericLeftJustified = !state.NumericLeftJustified;

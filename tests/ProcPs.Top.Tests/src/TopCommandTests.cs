@@ -1519,6 +1519,48 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task SummaryGraphKeysCycleWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 't' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'm' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+		var configurationStore = new SystemTopConfigurationStore(
+			_ => null,
+			systemRestrictionsPath: null,
+			privilegedUserProvider: () => false
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes,
+			configurationStore: configurationStore
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 3, terminal.Frames.Count );
+		Assert.Contains(
+			terminal.Frames[ 1 ].Lines,
+			line => line.Text.StartsWith(
+				"%Cpu",
+				StringComparison.Ordinal
+			) && line.Text.Contains( '|' )
+		);
+		Assert.Contains(
+			terminal.Frames[ 2 ].Lines,
+			line => line.Text.Contains(
+				" Mem :",
+				StringComparison.Ordinal
+			) && line.Text.Contains( '|' )
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task AlternateDisplayCyclesWindowsWithoutResampling() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock );

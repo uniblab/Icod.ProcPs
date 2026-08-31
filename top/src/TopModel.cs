@@ -405,6 +405,59 @@ internal sealed class TopRuntimeState {
 		this.FieldMoveActive = false;
 	}
 
+	internal void CycleCpuSummaryPresentation() {
+		(bool visible, TopSummaryGraphMode mode) = NextSummaryPresentation(
+			this.CpuSummaryVisible,
+			this.CpuSummaryGraphMode
+		);
+		this.CpuSummaryVisible = visible;
+		this.CpuSummaryGraphMode = mode;
+	}
+
+	internal void CycleMemorySummaryPresentation() {
+		(bool visible, TopSummaryGraphMode mode) = NextSummaryPresentation(
+			this.MemorySummaryVisible,
+			this.MemorySummaryGraphMode
+		);
+		this.MemorySummaryVisible = visible;
+		this.MemorySummaryGraphMode = mode;
+	}
+
+	private static (bool Visible, TopSummaryGraphMode Mode) NextSummaryPresentation(
+		bool visible,
+		TopSummaryGraphMode mode
+	) {
+		if ( !Enum.IsDefined( typeof( TopSummaryGraphMode ), mode ) ) {
+			throw new InvalidOperationException(
+				$"The top summary graph mode '{mode}' is not recognized."
+			);
+		}
+		if ( !visible ) {
+			return (
+				true,
+				mode
+			);
+		}
+
+		return mode switch {
+			TopSummaryGraphMode.Detailed => (
+				true,
+				TopSummaryGraphMode.Bar
+			),
+			TopSummaryGraphMode.Bar => (
+				true,
+				TopSummaryGraphMode.Block
+			),
+			TopSummaryGraphMode.Block => (
+				false,
+				TopSummaryGraphMode.Detailed
+			),
+			_ => throw new InvalidOperationException(
+				$"The top summary graph mode '{mode}' is not recognized."
+			)
+		};
+	}
+
 	private static TopWindowState[] CreateDefaultWindows() {
 		var result = new TopWindowState[
 			WindowCount

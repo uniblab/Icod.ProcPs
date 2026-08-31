@@ -27,7 +27,6 @@ using Icod.ProcPs.Shared;
 
 /// <summary>Builds the terminal-independent screen model used by top.</summary>
 internal static class TopRenderer {
-	private const int SummaryRows = 5;
 	private const int TableHeaderRows = 1;
 
 	private readonly record struct TopFormattedTaskLine(
@@ -51,6 +50,7 @@ internal static class TopRenderer {
 		" +              reset and show all windows",
 		" B/b/x/y        emphasis and highlighting",
 		" z / Z          toggle colors / map window colors",
+		" t / m          cycle CPU / memory summary presentation",
 		" J / j          justify numeric / character columns",
 		" f              manage task fields",
 		" c              toggle command name / command line",
@@ -122,7 +122,11 @@ internal static class TopRenderer {
 		state.HorizontalOffset = Math.Max( 0, state.HorizontalOffset );
 
 		var lines = new List<TopRenderLine>( dimensions.Rows );
-		foreach ( string line in BuildSummaryLines( sample, state ) ) {
+		foreach ( string line in BuildSummaryLines(
+			sample,
+			state,
+			dimensions.Columns
+		) ) {
 			lines.Add( new TopRenderLine(
 				SliceForDisplay( line, state.HorizontalOffset, dimensions.Columns ),
 				TopLineStyle.Summary,
@@ -237,7 +241,11 @@ internal static class TopRenderer {
 		var lines = new List<TopRenderLine>(
 			dimensions.Rows
 		);
-		foreach ( string line in BuildSummaryLines( sample, state ) ) {
+		foreach ( string line in BuildSummaryLines(
+			sample,
+			state,
+			dimensions.Columns
+		) ) {
 			lines.Add(
 				new TopRenderLine(
 					SliceForDisplay(
@@ -254,12 +262,15 @@ internal static class TopRenderer {
 			);
 		}
 
-		int windowAreaRows = dimensions.Rows - SummaryRows - footerRows;
+		int summaryRows = GetSummaryRowCount(
+			state
+		);
+		int windowAreaRows = dimensions.Rows - summaryRows - footerRows;
 		if ( visibleWindowCount > windowAreaRows ) {
 			lines.Add(
 				new TopRenderLine(
 					LimitRunes(
-						$"alternate display requires at least {SummaryRows + visibleWindowCount} terminal rows",
+						$"alternate display requires at least {summaryRows + visibleWindowCount} terminal rows",
 						dimensions.Columns
 					),
 					TopLineStyle.Message,
@@ -468,7 +479,15 @@ internal static class TopRenderer {
 		ArgumentNullException.ThrowIfNull( state );
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
 		var lines = new List<string>();
-		lines.AddRange( BuildSummaryLines( sample, state ).Select( line => LimitRunes( line, width ) ) );
+		lines.AddRange(
+			BuildSummaryLines(
+				sample,
+				state,
+				width
+			).Select(
+				line => LimitRunes( line, width )
+			)
+		);
 		lines.Add( LimitRunes( BuildHeader( state ), width ) );
 		foreach ( TopTaskRow task in SelectAndOrderTasks( sample, state ) ) {
 			lines.Add( LimitRunes(
@@ -562,7 +581,7 @@ internal static class TopRenderer {
 
 		int result = Math.Max(
 			0,
-			dimensions.Rows - SummaryRows - TableHeaderRows - footerRows
+			dimensions.Rows - GetSummaryRowCount( state ) - TableHeaderRows - footerRows
 		);
 		if ( 0 < state.MaximumTasks ) {
 			result = Math.Min(
@@ -604,7 +623,7 @@ internal static class TopRenderer {
 
 		int windowAreaRows = Math.Max(
 			0,
-			dimensions.Rows - SummaryRows - footerRows
+			dimensions.Rows - GetSummaryRowCount( state ) - footerRows
 		);
 		int visibleWindowCount = CountVisibleTaskWindows(
 			state
@@ -1061,25 +1080,82 @@ internal static class TopRenderer {
 
 	private static IReadOnlyList<string> BuildSummaryLines(
 		TopSample sample,
+		TopRuntimeState state,
+		int width
+	) {
+		ArgumentNullException.ThrowIfNull( sample );
+		ArgumentNullException.ThrowIfNull( state );
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
+
+		var result = new List<string>(
+			GetSummaryRowCount( state )
+		) {
+			BuildTopLine( sample )
+		};
+		if ( state.CpuSummaryVisible ) {
+			string taskLabel = ( state.ShowThreads )
+				? "Threads"
+				: "Tasks"
+			;
+			IReadOnlyList<TopTaskRow> visible = ApplyFilters(
+				sample.Tasks,
+				state,
+				sample.ProcessorCount
+			).ToList().AsReadOnly();
+			int running = visible.Count( row => IsState( row, ProcProcessState.Running ) );
+			int sleeping = visible.Count( row => IsState( row, ProcProcessState.Sleeping ) );
+			int stopped = visible.Count(
+				row => IsState( row, ProcProcessState.Stopped )
+					|| IsState( row, ProcProcessState.TracingStop )
+			);
+			int zombie = visible.Count( row => IsState( row, ProcProcessState.Zombie ) );
+			result.Add(
+				$"{taskLabel}: {visible.Count,5} total, {running,4} running, {sleeping,4} sleeping, {stopped,4} stopped, {zombie,4} zombie"
+			);
+			result.Add(
+				BuildCpuLine(
+					sample.CpuSummary,
+					sample.ProcessorCount,
+					state.SingleCpuSummary,
+					state.CpuSummaryGraphMode,
+					width
+				)
+			);
+		}
+		if ( state.MemorySummaryVisible ) {
+			result.Add(
+				BuildMemoryLine(
+					sample.System,
+					state.SummaryScale,
+					state.MemorySummaryGraphMode,
+					width
+				)
+			);
+			result.Add(
+				BuildSwapLine(
+					sample.System,
+					state.SummaryScale,
+					state.MemorySummaryGraphMode,
+					width
+				)
+			);
+		}
+		return result;
+	}
+
+	internal static int GetSummaryRowCount(
 		TopRuntimeState state
 	) {
-		string taskLabel = state.ShowThreads ? "Threads" : "Tasks";
-		IReadOnlyList<TopTaskRow> visible = ApplyFilters(
-			sample.Tasks,
-			state,
-			sample.ProcessorCount
-		).ToList().AsReadOnly();
-		int running = visible.Count( row => IsState( row, ProcProcessState.Running ) );
-		int sleeping = visible.Count( row => IsState( row, ProcProcessState.Sleeping ) );
-		int stopped = visible.Count( row => IsState( row, ProcProcessState.Stopped ) || IsState( row, ProcProcessState.TracingStop ) );
-		int zombie = visible.Count( row => IsState( row, ProcProcessState.Zombie ) );
-		return [
-			BuildTopLine( sample ),
-			$"{taskLabel}: {visible.Count,5} total, {running,4} running, {sleeping,4} sleeping, {stopped,4} stopped, {zombie,4} zombie",
-			BuildCpuLine( sample.CpuSummary, sample.ProcessorCount, state.SingleCpuSummary ),
-			BuildMemoryLine( sample.System, state.SummaryScale ),
-			BuildSwapLine( sample.System, state.SummaryScale )
-		];
+		ArgumentNullException.ThrowIfNull( state );
+
+		int result = 1;
+		if ( state.CpuSummaryVisible ) {
+			result += 2;
+		}
+		if ( state.MemorySummaryVisible ) {
+			result += 2;
+		}
+		return result;
 	}
 
 	private static string BuildTopLine( TopSample sample ) {
@@ -1112,43 +1188,80 @@ internal static class TopRenderer {
 	private static string BuildCpuLine(
 		TopCpuSummary cpu,
 		int processorCount,
-		bool singleCpuSummary
+		bool singleCpuSummary,
+		TopSummaryGraphMode mode,
+		int width
 	) {
-		string prefix = singleCpuSummary
+		ArgumentNullException.ThrowIfNull( cpu );
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( processorCount );
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
+
+		string prefix = ( singleCpuSummary )
 			? "%Cpu(s)"
-			: $"%Cpu(s/{processorCount})";
-		if ( cpu.LinuxDetailed ) {
+			: $"%Cpu(s/{processorCount})"
+		;
+		if ( TopSummaryGraphMode.Detailed == mode ) {
+			if ( cpu.LinuxDetailed ) {
+				return string.Format(
+					CultureInfo.InvariantCulture,
+					"{0}: {1,5:0.0} us, {2,5:0.0} sy, {3,5:0.0} ni, {4,5:0.0} id, {5,5:0.0} wa, {6,5:0.0} hi, {7,5:0.0} si, {8,5:0.0} st",
+					prefix,
+					cpu.User,
+					cpu.System,
+					cpu.Nice,
+					cpu.Idle,
+					cpu.Wait,
+					cpu.Irq,
+					cpu.SoftIrq,
+					cpu.Steal
+				);
+			}
 			return string.Format(
 				CultureInfo.InvariantCulture,
-				"{0}: {1,5:0.0} us, {2,5:0.0} sy, {3,5:0.0} ni, {4,5:0.0} id, {5,5:0.0} wa, {6,5:0.0} hi, {7,5:0.0} si, {8,5:0.0} st",
+				"{0}: {1,5:0.0} us, {2,5:0.0} sy, {3,5:0.0} ni, {4,5:0.0} id, {5,5:0.0} wa, {6,5:0.0} ot",
 				prefix,
 				cpu.User,
 				cpu.System,
 				cpu.Nice,
 				cpu.Idle,
 				cpu.Wait,
-				cpu.Irq,
-				cpu.SoftIrq,
-				cpu.Steal
+				cpu.Other
 			);
 		}
+
+		double user = ClampPercentage(
+			cpu.User + cpu.Nice
+		);
+		double system = ClampPercentage(
+			cpu.System + cpu.Irq + cpu.SoftIrq + cpu.Other
+		);
+		double total = ClampPercentage(
+			user + system
+		);
 		return string.Format(
 			CultureInfo.InvariantCulture,
-			"{0}: {1,5:0.0} us, {2,5:0.0} sy, {3,5:0.0} ni, {4,5:0.0} id, {5,5:0.0} wa, {6,5:0.0} ot",
+			"{0}: {1,5:0.0}/{2,5:0.0} {3,5:0.0}% {4}",
 			prefix,
-			cpu.User,
-			cpu.System,
-			cpu.Nice,
-			cpu.Idle,
-			cpu.Wait,
-			cpu.Other
+			user,
+			system,
+			total,
+			BuildSummaryGraph(
+				total,
+				mode,
+				width
+			)
 		);
 	}
 
 	private static string BuildMemoryLine(
 		ProcSystemSnapshot system,
-		TopMemoryScale scale
+		TopMemoryScale scale,
+		TopSummaryGraphMode mode,
+		int width
 	) {
+		ArgumentNullException.ThrowIfNull( system );
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
+
 		if ( !system.Memory.HasValue ) {
 			return $"{ScaleLabel( scale )} Mem : unavailable";
 		}
@@ -1159,21 +1272,50 @@ internal static class TopRenderer {
 		ulong? used = total.HasValue && free.HasValue
 			? SaturatingSubtract( total.Value, SaturatingAdd( free.Value, bufferCache ?? 0UL ) )
 			: null;
-		return string.Format(
-			CultureInfo.InvariantCulture,
-			"{0} Mem : {1,10} total, {2,10} free, {3,10} used, {4,10} buff/cache",
-			ScaleLabel( scale ),
-			FormatMemory( total, scale ),
-			FormatMemory( free, scale ),
-			FormatMemory( used, scale ),
-			FormatMemory( bufferCache, scale )
+		if ( TopSummaryGraphMode.Detailed == mode ) {
+			return string.Format(
+				CultureInfo.InvariantCulture,
+				"{0} Mem : {1,10} total, {2,10} free, {3,10} used, {4,10} buff/cache",
+				ScaleLabel( scale ),
+				FormatMemory( total, scale ),
+				FormatMemory( free, scale ),
+				FormatMemory( used, scale ),
+				FormatMemory( bufferCache, scale )
+			);
+		}
+
+		ulong? available = memory.AvailableBytes;
+		if ( !available.HasValue && free.HasValue ) {
+			available = SaturatingAdd(
+				free.Value,
+				bufferCache ?? 0UL
+			);
+		}
+		double percentage = UsedPercentage(
+			total,
+			( available.HasValue && total.HasValue )
+				? SaturatingSubtract( total.Value, available.Value )
+				: null
+		);
+		return BuildMemoryGraphLine(
+			"Mem ",
+			total,
+			percentage,
+			scale,
+			mode,
+			width
 		);
 	}
 
 	private static string BuildSwapLine(
 		ProcSystemSnapshot system,
-		TopMemoryScale scale
+		TopMemoryScale scale,
+		TopSummaryGraphMode mode,
+		int width
 	) {
+		ArgumentNullException.ThrowIfNull( system );
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
+
 		if ( !system.Memory.HasValue ) {
 			return $"{ScaleLabel( scale )} Swap: unavailable";
 		}
@@ -1183,14 +1325,114 @@ internal static class TopRenderer {
 		ulong? used = total.HasValue && free.HasValue
 			? SaturatingSubtract( total.Value, free.Value )
 			: null;
+		if ( TopSummaryGraphMode.Detailed == mode ) {
+			return string.Format(
+				CultureInfo.InvariantCulture,
+				"{0} Swap: {1,10} total, {2,10} free, {3,10} used, {4,10} avail Mem",
+				ScaleLabel( scale ),
+				FormatMemory( total, scale ),
+				FormatMemory( free, scale ),
+				FormatMemory( used, scale ),
+				FormatMemory( memory.AvailableBytes, scale )
+			);
+		}
+
+		return BuildMemoryGraphLine(
+			"Swap",
+			total,
+			UsedPercentage(
+				total,
+				used
+			),
+			scale,
+			mode,
+			width
+		);
+	}
+
+	private static string BuildMemoryGraphLine(
+		string label,
+		ulong? total,
+		double percentage,
+		TopMemoryScale scale,
+		TopSummaryGraphMode mode,
+		int width
+	) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( label );
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
+
 		return string.Format(
 			CultureInfo.InvariantCulture,
-			"{0} Swap: {1,10} total, {2,10} free, {3,10} used, {4,10} avail Mem",
+			"{0} {1}: {2,5:0.0}%/{3,-10} {4}",
 			ScaleLabel( scale ),
+			label,
+			percentage,
 			FormatMemory( total, scale ),
-			FormatMemory( free, scale ),
-			FormatMemory( used, scale ),
-			FormatMemory( memory.AvailableBytes, scale )
+			BuildSummaryGraph(
+				percentage,
+				mode,
+				width
+			)
+		);
+	}
+
+	private static double UsedPercentage(
+		ulong? total,
+		ulong? used
+	) {
+		if (
+			!total.HasValue
+			|| 0UL == total.Value
+			|| !used.HasValue
+		) {
+			return 0.0;
+		}
+		return ClampPercentage(
+			100.0 * used.Value / total.Value
+		);
+	}
+
+	private static double ClampPercentage(
+		double value
+	) {
+		return Math.Clamp(
+			value,
+			0.0,
+			100.0
+		);
+	}
+
+	private static string BuildSummaryGraph(
+		double percentage,
+		TopSummaryGraphMode mode,
+		int width
+	) {
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
+		char fill = mode switch {
+			TopSummaryGraphMode.Bar => '|',
+			TopSummaryGraphMode.Block => '#',
+			_ => throw new InvalidOperationException(
+				$"Graph output is unavailable for summary mode '{mode}'."
+			)
+		};
+		int graphWidth = Math.Clamp(
+			width - 30,
+			10,
+			100
+		);
+		int filled = Math.Clamp(
+			(int)Math.Round(
+				graphWidth * ClampPercentage( percentage ) / 100.0,
+				MidpointRounding.AwayFromZero
+			),
+			0,
+			graphWidth
+		);
+		return string.Concat(
+			"[",
+			new string( fill, filled ),
+			new string( ' ', graphWidth - filled ),
+			"]"
 		);
 	}
 
