@@ -109,8 +109,9 @@ than one day use `in >1 day`.
 Child text is converted to a fixed visible cell image using the DCurses Unicode
 width policy. BEL (`\a`) requests an audible terminal alert and is not rendered;
 this is independent of `--beep`, which alerts for a non-zero child status.
-Tabs advance to eight-column stops. Carriage return rewinds the current row.
-C0/C1 controls other than ESC, BEL, tab, CR, and LF are discarded. With
+Tabs advance to eight-column stops. Carriage return is ignored as non-printing
+child output, matching procps-ng 4.0.6 rather than rewinding the current row.
+C0/C1 controls other than ESC, BEL, tab, and LF are discarded. With
 `--color`, ESC processing follows the procps-ng 4.0.6 numeric SGR consumer:
 standard and bright colors, indexed
 `38;5;n` / `48;5;n` colors through 255, bold, dim, underline, reverse, and their
@@ -143,16 +144,30 @@ same visible model rather than scraping the
 physical terminal, so terminal styles are omitted while visible Unicode text,
 header rows, body rows, and geometry are preserved.
 
+The resolved display geometry is also supplied to every watched child through
+`COLUMNS` and `LINES`, matching procps-ng. Explicit positive values inherited
+through those variables therefore remain fixed geometry overrides; otherwise
+the values follow live terminal dimensions after resize.
+
 ## EXIT STATUS
 
 `0`
 : Requested normal completion, including `--chgexit` or `--equexit`.
 
+`1`
+: Invalid command-line usage, non-interactive invocation, or a general terminal
+  session failure.
+
 `2`
-: Invalid command-line usage or terminal/process-management failure.
+: Terminal geometry or child-execution management failure before a portable
+  watched-command status is available.
 
 `130`
 : Interactive interruption or cancellation.
+
+`127`
+: Portable watched-command status used when the execution path cannot be
+  launched. With `--errexit`, this is returned after fresh acknowledgement.
 
 With `--errexit`, the watched command's portable exit status is returned after
 the frozen error display is acknowledged by fresh terminal input.
