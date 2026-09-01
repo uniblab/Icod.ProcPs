@@ -40,20 +40,17 @@ jobs:
           }
 
           $tagVersion = $Matches.version
-          [xml]$project = Get-Content -LiteralPath 'procps/Icod.ProcPs.Router.csproj' -Raw
-          $versionNode = $project.SelectSingleNode('/Project/PropertyGroup/Version')
-          $packageVersionNode = $project.SelectSingleNode('/Project/PropertyGroup/PackageVersion')
-          if ($null -eq $versionNode -or $null -eq $packageVersionNode) {
-              throw 'procps router project must declare both Version and PackageVersion.'
+          [xml]$suiteProperties = Get-Content -LiteralPath 'Directory.Build.props' -Raw
+          $versionNode = $suiteProperties.SelectSingleNode(
+              '/Project/PropertyGroup/IcodProcPsSuiteVersion'
+          )
+          if ($null -eq $versionNode -or [string]::IsNullOrWhiteSpace($versionNode.InnerText)) {
+              throw 'Directory.Build.props must declare IcodProcPsSuiteVersion.'
           }
 
-          $projectVersion = $versionNode.InnerText
-          $packageVersion = $packageVersionNode.InnerText
-          if ($projectVersion -ne $packageVersion) {
-              throw "Version '$projectVersion' does not match PackageVersion '$packageVersion'."
-          }
-          if ($tagVersion -ne $packageVersion) {
-              throw "Tag version '$tagVersion' does not match PackageVersion '$packageVersion'."
+          $suiteVersion = $versionNode.InnerText.Trim()
+          if ($tagVersion -ne $suiteVersion) {
+              throw "Tag version '$tagVersion' does not match suite version '$suiteVersion'."
           }
 
           "version=$tagVersion" >> $env:GITHUB_OUTPUT
