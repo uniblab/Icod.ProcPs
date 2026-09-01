@@ -1100,6 +1100,8 @@ public sealed class TopCommandTests {
 		terminal.Events.Enqueue( KeyEvent( TopInputKey.Home ) );
 		terminal.Events.Enqueue( KeyEvent( TopInputKey.Right ) );
 		terminal.Events.Enqueue( KeyEvent( TopInputKey.Down ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Down ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Down ) );
 		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
 		terminal.Events.Enqueue( CharacterEvent( 's' ) );
 		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
@@ -1115,7 +1117,7 @@ public sealed class TopCommandTests {
 
 		Assert.Equal( 0, result.ExitCode );
 		Assert.Equal( 1, processes.CaptureCount );
-		Assert.Equal( 12, terminal.Frames.Count );
+		Assert.Equal( 14, terminal.Frames.Count );
 
 		Assert.Contains(
 			terminal.Frames[ 1 ].Lines,
@@ -1132,7 +1134,7 @@ public sealed class TopCommandTests {
 			terminal.Frames[ 4 ].Lines[ 6 ].Spans
 		);
 
-		TopRenderFrame reordered = terminal.Frames[ 11 ];
+		TopRenderFrame reordered = terminal.Frames[ 13 ];
 		string header = reordered.Lines[ 5 ].Text;
 		Assert.StartsWith(
 			"USER", header, StringComparison.Ordinal

@@ -128,8 +128,12 @@ public sealed class TopProcpsConfigurationTests {
 		Assert.False( state.NumericLeftJustified );
 		Assert.Contains( TopFieldId.Pid, state.VisibleFields );
 		Assert.Contains( TopFieldId.User, state.VisibleFields );
+		Assert.DoesNotContain( TopFieldId.ParentProcessId, state.VisibleFields );
+		Assert.DoesNotContain( TopFieldId.EffectiveUserId, state.VisibleFields );
 		Assert.Equal( TopFieldId.Pid, state.FieldOrder[ 0 ] );
-		Assert.Equal( TopFieldId.User, state.FieldOrder[ 1 ] );
+		Assert.Equal( TopFieldId.ParentProcessId, state.FieldOrder[ 1 ] );
+		Assert.Equal( TopFieldId.EffectiveUserId, state.FieldOrder[ 2 ] );
+		Assert.Equal( TopFieldId.User, state.FieldOrder[ 3 ] );
 	}
 
 	[Theory]
