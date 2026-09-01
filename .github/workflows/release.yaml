@@ -163,6 +163,7 @@ jobs:
   publish-nuget:
     needs: [metadata, archives, package]
     runs-on: ubuntu-latest
+    environment: Release
     permissions:
       contents: read
       id-token: write
