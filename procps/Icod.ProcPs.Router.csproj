@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.35 closes the focused procps watch fidelity pass: carriage return is ignored as non-printing child output, watched-command launch failures normalize to status 127, resolved COLUMNS and LINES are supplied to every child, and follow screenshots are locked to the retained scrolling frame.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.36 closes the slabtop release-readiness audit: documentation now records the procps-ng 4.0.6 slab-memory accounting caveats, the exact /proc/slabinfo data source, upstream authorship, and the two intentional managed deviations for sort-preserving input and live DCurses geometry.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>
