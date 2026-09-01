@@ -32,6 +32,7 @@ public static class Command {
 	private const int Success = 0;
 	private const int Failure = 1;
 	private const int ExecutionFailure = 2;
+	private const int CommandLaunchFailure = 127;
 	private const int Canceled = 130;
 	private const double MinimumIntervalSeconds = 0.1;
 	private const double MaximumIntervalSeconds = 31.0 * 24.0 * 60.0 * 60.0;
@@ -334,7 +335,11 @@ public static class Command {
 				}
 
 				using MergedCaptureStream capture = new();
-				ProcessRunOptions processOptions = BuildProcessOptions( parsed, capture );
+				ProcessRunOptions processOptions = BuildProcessOptions(
+					parsed,
+					capture,
+					dimensions
+				);
 				ProcessResult processResult;
 				try {
 					processResult = await executor.RunAsync(
@@ -361,7 +366,9 @@ public static class Command {
 					return Canceled;
 				}
 
-				int status = processResult.Termination.ToPortableExitCode();
+				int status = ProcessTerminationKind.LaunchFailed == processResult.Termination.Kind
+					? CommandLaunchFailure
+					: processResult.Termination.ToPortableExitCode();
 				string childOutput = capture.GetText();
 				if ( 0 == childOutput.Length ) {
 					childOutput = string.Concat(
@@ -574,10 +581,16 @@ public static class Command {
 
 	private static ProcessRunOptions BuildProcessOptions(
 		ParsedArguments parsed,
-		Stream capture
+		Stream capture,
+		WatchTerminalDimensions dimensions
 	) {
 		ArgumentNullException.ThrowIfNull( parsed );
 		ArgumentNullException.ThrowIfNull( capture );
+		if ( 1 > dimensions.Columns || 1 > dimensions.Rows ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( dimensions )
+			);
+		}
 
 		ProcessRunOptions options;
 		if ( parsed.Exec ) {
@@ -601,6 +614,12 @@ public static class Command {
 		options.ReturnLaunchFailureResult = true;
 		options.StandardOutput = capture;
 		options.StandardError = capture;
+		options.EnvironmentVariables[ "COLUMNS" ] = dimensions.Columns.ToString(
+			CultureInfo.InvariantCulture
+		);
+		options.EnvironmentVariables[ "LINES" ] = dimensions.Rows.ToString(
+			CultureInfo.InvariantCulture
+		);
 		return options;
 	}
 
