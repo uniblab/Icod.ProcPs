@@ -61,10 +61,20 @@ internal enum TopInputKey {
 	Other
 }
 
+/// <summary>Identifies modifiers carried by one terminal-independent top input event.</summary>
+[Flags]
+internal enum TopInputModifiers {
+	None = 0,
+	Shift = 1,
+	Control = 2,
+	Alt = 4
+}
+
 /// <summary>Represents one terminal-independent input event consumed by top.</summary>
 internal readonly record struct TopInputEvent(
 	TopInputKey Key,
-	Rune? Character
+	Rune? Character,
+	TopInputModifiers Modifiers = TopInputModifiers.None
 );
 
 /// <summary>Represents one terminal event consumed by top.</summary>
@@ -89,14 +99,16 @@ internal enum TopLineStyle {
 internal readonly record struct TopRenderSpan(
 	int Start,
 	int Length,
-	TopLineStyle Style
+	TopLineStyle Style,
+	int? ForegroundColor = null
 );
 
 /// <summary>Represents one rendered top line.</summary>
 internal readonly record struct TopRenderLine(
 	string Text,
 	TopLineStyle Style = TopLineStyle.Default,
-	IReadOnlyList<TopRenderSpan>? Spans = null
+	IReadOnlyList<TopRenderSpan>? Spans = null,
+	int? ForegroundColor = null
 );
 
 /// <summary>Represents a complete top display frame.</summary>
@@ -329,24 +341,44 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 				input.Character
 			);
 		}
+
+		TopInputModifiers modifiers = MapModifiers(
+			input.Modifiers
+		);
 		return input.Key switch {
-			CursesKey.Character => new TopInputEvent( TopInputKey.Character, input.Character ),
-			CursesKey.Space => new TopInputEvent( TopInputKey.Character, new Rune( ' ' ) ),
-			CursesKey.Enter => new TopInputEvent( TopInputKey.Enter, null ),
-			CursesKey.Escape => new TopInputEvent( TopInputKey.Escape, null ),
-			CursesKey.Backspace => new TopInputEvent( TopInputKey.Backspace, null ),
-			CursesKey.Up => new TopInputEvent( TopInputKey.Up, null ),
-			CursesKey.Down => new TopInputEvent( TopInputKey.Down, null ),
-			CursesKey.Left => new TopInputEvent( TopInputKey.Left, null ),
-			CursesKey.Right => new TopInputEvent( TopInputKey.Right, null ),
-			CursesKey.PageUp => new TopInputEvent( TopInputKey.PageUp, null ),
-			CursesKey.PageDown => new TopInputEvent( TopInputKey.PageDown, null ),
-			CursesKey.Home => new TopInputEvent( TopInputKey.Home, null ),
-			CursesKey.End => new TopInputEvent( TopInputKey.End, null ),
-			CursesKey.Delete => new TopInputEvent( TopInputKey.Delete, null ),
-			CursesKey.Tab => new TopInputEvent( TopInputKey.Tab, null ),
-			_ => new TopInputEvent( TopInputKey.Other, null )
+			CursesKey.Character => new TopInputEvent( TopInputKey.Character, input.Character, modifiers ),
+			CursesKey.Space => new TopInputEvent( TopInputKey.Character, new Rune( ' ' ), modifiers ),
+			CursesKey.Enter => new TopInputEvent( TopInputKey.Enter, null, modifiers ),
+			CursesKey.Escape => new TopInputEvent( TopInputKey.Escape, null, modifiers ),
+			CursesKey.Backspace => new TopInputEvent( TopInputKey.Backspace, null, modifiers ),
+			CursesKey.Up => new TopInputEvent( TopInputKey.Up, null, modifiers ),
+			CursesKey.Down => new TopInputEvent( TopInputKey.Down, null, modifiers ),
+			CursesKey.Left => new TopInputEvent( TopInputKey.Left, null, modifiers ),
+			CursesKey.Right => new TopInputEvent( TopInputKey.Right, null, modifiers ),
+			CursesKey.PageUp => new TopInputEvent( TopInputKey.PageUp, null, modifiers ),
+			CursesKey.PageDown => new TopInputEvent( TopInputKey.PageDown, null, modifiers ),
+			CursesKey.Home => new TopInputEvent( TopInputKey.Home, null, modifiers ),
+			CursesKey.End => new TopInputEvent( TopInputKey.End, null, modifiers ),
+			CursesKey.Delete => new TopInputEvent( TopInputKey.Delete, null, modifiers ),
+			CursesKey.Tab => new TopInputEvent( TopInputKey.Tab, null, modifiers ),
+			_ => new TopInputEvent( TopInputKey.Other, null, modifiers )
 		};
+	}
+
+	private static TopInputModifiers MapModifiers(
+		CursesKeyModifiers modifiers
+	) {
+		TopInputModifiers result = TopInputModifiers.None;
+		if ( 0 != ( modifiers & CursesKeyModifiers.Shift ) ) {
+			result |= TopInputModifiers.Shift;
+		}
+		if ( 0 != ( modifiers & CursesKeyModifiers.Control ) ) {
+			result |= TopInputModifiers.Control;
+		}
+		if ( 0 != ( modifiers & CursesKeyModifiers.Alt ) ) {
+			result |= TopInputModifiers.Alt;
+		}
+		return result;
 	}
 
 	private static void WriteLine(
@@ -358,7 +390,8 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 
 		CursesStyle baseStyle = StyleFor(
 			line.Style,
-			boldEnabled
+			boldEnabled,
+			line.ForegroundColor
 		);
 		if ( line.Spans is null || 0 == line.Spans.Count ) {
 			window.Write(
@@ -394,7 +427,8 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 				),
 				StyleFor(
 					span.Style,
-					boldEnabled
+					boldEnabled,
+					span.ForegroundColor
 				)
 			);
 			position = span.Start + span.Length;
@@ -409,7 +443,8 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 
 	private static CursesStyle StyleFor(
 		TopLineStyle style,
-		bool boldEnabled
+		bool boldEnabled,
+		int? foregroundColor
 	) {
 		CursesStyle result = style switch {
 			TopLineStyle.Summary => SummaryStyle,
@@ -421,11 +456,34 @@ internal sealed class DCursesTopTerminalSession : ITopTerminalSession {
 			TopLineStyle.HighlightReverse => HighlightReverseStyle,
 			_ => CursesStyle.Default
 		};
-		if ( boldEnabled ) {
-			return result;
+		if ( !boldEnabled ) {
+			result = result.WithAttributes(
+				result.Attributes & ~CursesTextAttributes.Bold
+			);
 		}
-		return result.WithAttributes(
-			result.Attributes & ~CursesTextAttributes.Bold
+		if ( foregroundColor.HasValue ) {
+			result = result.WithForeground(
+				ColorFor(
+					foregroundColor.Value
+				)
+			);
+		}
+		return result;
+	}
+
+	private static CursesColor ColorFor(
+		int color
+	) {
+		if ( -1 == color ) {
+			return CursesColor.Default;
+		}
+		if ( color is < 0 or > 255 ) {
+			throw new InvalidOperationException(
+				$"A top render color must be -1 through 255, not {color}."
+			);
+		}
+		return CursesColor.Indexed(
+			color
 		);
 	}
 }

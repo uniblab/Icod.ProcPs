@@ -110,6 +110,11 @@ internal sealed class SystemSlabTopTerminalSessionFactory
 
 /// <summary>Adapts a DCurses session to the slabtop-specific terminal seam.</summary>
 internal sealed class DCursesSlabTopTerminalSession : ISlabTopTerminalSession {
+	private static readonly CursesStyle HeaderStyle = new(
+		CursesColor.Default,
+		CursesColor.Default,
+		CursesTextAttributes.Reverse
+	);
 	private readonly CursesSession session;
 
 	internal DCursesSlabTopTerminalSession( CursesSession session ) {
@@ -201,7 +206,12 @@ internal sealed class DCursesSlabTopTerminalSession : ISlabTopTerminalSession {
 				continue;
 			}
 			window.Move( row, 0 );
-			window.Write( line, CursesStyle.Default );
+			window.Write(
+				line,
+				frame.HeaderRow == row
+					? HeaderStyle
+					: CursesStyle.Default
+			);
 		}
 		window.Move( 0, 0 );
 		await this.session.RefreshAsync( cancellationToken ).ConfigureAwait( false );

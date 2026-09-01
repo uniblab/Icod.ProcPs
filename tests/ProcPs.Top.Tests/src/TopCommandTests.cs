@@ -75,6 +75,9 @@ public sealed class TopCommandTests {
 		Assert.Contains( global::Icod.ProcPs.Tests.ProcPsTestVersion.FormatCommand( "Icod.ProcPs.Top" ), version.Stdout, StringComparison.Ordinal );
 		Assert.Equal( 0, fields.ExitCode );
 		Assert.Contains( "PID", fields.Stdout, StringComparison.Ordinal );
+		Assert.Contains( "PPID", fields.Stdout, StringComparison.Ordinal );
+		Assert.Contains( "UID", fields.Stdout, StringComparison.Ordinal );
+		Assert.Contains( "nTH", fields.Stdout, StringComparison.Ordinal );
 		Assert.Contains( "SHR", fields.Stdout, StringComparison.Ordinal );
 		Assert.Equal( 0, terminal.OpenCount );
 		Assert.Equal( 0, processes.CaptureCount );
@@ -186,6 +189,251 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task TaskScaleRejectsExbibytesWhileSummaryScaleAcceptsIt() {
+		FakeClock rejectedClock = new();
+		FakeTerminal rejectedTerminal = new( rejectedClock );
+		CommandResult rejected = await RunCoreAsync(
+			[ "-b", "-n", "1", "-e", "e" ],
+			rejectedTerminal,
+			rejectedClock
+		);
+
+		FakeClock acceptedClock = new();
+		CommandResult accepted = await RunCoreAsync(
+			[ "-b", "-n", "1", "-E", "e" ],
+			new FakeTerminal( acceptedClock ),
+			acceptedClock
+		);
+
+		Assert.Equal( 1, rejected.ExitCode );
+		Assert.Contains(
+			"invalid task memory scale",
+			rejected.Stderr,
+			StringComparison.Ordinal
+		);
+		Assert.Equal( 0, rejectedTerminal.OpenCount );
+		Assert.Equal( 0, accepted.ExitCode );
+	}
+
+	[Theory]
+	[InlineData( "--width=2" )]
+	[InlineData( "--width=513" )]
+	[InlineData( "-w2" )]
+	[InlineData( "-w513" )]
+	public async Task ExplicitWidthUsesProcpsRange(
+		string widthOption
+	) {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			[ "-b", "-n", "1", widthOption ],
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 1, result.ExitCode );
+		Assert.Contains(
+			"3 through 512",
+			result.Stderr,
+			StringComparison.Ordinal
+		);
+		Assert.Equal( 0, processes.CaptureCount );
+	}
+
+	[Fact]
+	public async Task OptionalWidthArgumentMustBeAttached() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		FakeProcessProvider processes = new( CreateProcesses() );
+
+		CommandResult result = await RunCoreAsync(
+			[ "-b", "-n", "1", "-w", "48" ],
+			terminal,
+			clock,
+			processes
+		);
+
+		Assert.Equal( 1, result.ExitCode );
+		Assert.Contains(
+			"48",
+			result.Stderr,
+			StringComparison.Ordinal
+		);
+		Assert.Equal( 0, processes.CaptureCount );
+	}
+
+	[Fact]
+	public async Task BareWidthUsesColumnsAndLinesEnvironment() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+
+		CommandResult result = await RunCoreAsync(
+			[ "-b", "-n", "1", "-w", "-c" ],
+			terminal,
+			clock,
+			environmentVariableProvider: name => name switch {
+				"COLUMNS" => "48",
+				"LINES" => "7",
+				_ => null
+			}
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		string[] lines = SplitLines( result.Stdout );
+		Assert.Equal( 7, lines.Length );
+		Assert.All(
+			lines,
+			line => Assert.True( 48 >= CountRunes( line ) )
+		);
+	}
+
+	[Fact]
+	public async Task EnvironmentGeometryIsIgnoredWithoutWidthOption() {
+		FakeClock clock = new();
+
+		CommandResult result = await RunCoreAsync(
+			[ "-b", "-n", "1", "-c" ],
+			new FakeTerminal( clock ),
+			clock,
+			environmentVariableProvider: name => name switch {
+				"COLUMNS" => "20",
+				"LINES" => "3",
+				_ => null
+			}
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		string[] lines = SplitLines( result.Stdout );
+		Assert.True( 3 < lines.Length );
+		Assert.Contains(
+			lines,
+			line => 20 < CountRunes( line )
+		);
+	}
+
+	[Fact]
+	public async Task InteractiveWidthOverrideNeverEnlargesTerminal() {
+		FakeClock wideClock = new();
+		FakeTerminal wideTerminal = new(
+			wideClock,
+			new TopTerminalDimensions( 80, 14 )
+		);
+		wideTerminal.Events.Enqueue( CharacterEvent( 'q' ) );
+
+		CommandResult wide = await RunCoreAsync(
+			[ "--width=120" ],
+			wideTerminal,
+			wideClock
+		);
+
+		FakeClock narrowClock = new();
+		FakeTerminal narrowTerminal = new(
+			narrowClock,
+			new TopTerminalDimensions( 80, 14 )
+		);
+		narrowTerminal.Events.Enqueue( CharacterEvent( 'q' ) );
+
+		CommandResult narrow = await RunCoreAsync(
+			[ "--width=60" ],
+			narrowTerminal,
+			narrowClock
+		);
+
+		Assert.Equal( 0, wide.ExitCode );
+		Assert.Equal( 80, Assert.Single( wideTerminal.Frames ).Columns );
+		Assert.Equal( 0, narrow.ExitCode );
+		Assert.Equal( 60, Assert.Single( narrowTerminal.Frames ).Columns );
+	}
+
+	[Fact]
+	public async Task ProcessAndUserSelectorsFollowProcpsClashRules() {
+		FakeClock repeatedClock = new();
+		FakeProcessProvider repeatedProcesses = new( CreateProcesses() );
+		CommandResult repeatedUser = await RunCoreAsync(
+			[ "-b", "-n", "1", "-u", "alice", "-U", "alice" ],
+			new FakeTerminal( repeatedClock ),
+			repeatedClock,
+			repeatedProcesses
+		);
+
+		FakeClock mixedClock = new();
+		FakeProcessProvider mixedProcesses = new( CreateProcesses() );
+		CommandResult mixed = await RunCoreAsync(
+			[ "-b", "-n", "1", "-p", "101", "-u", "alice" ],
+			new FakeTerminal( mixedClock ),
+			mixedClock,
+			mixedProcesses
+		);
+
+		Assert.Equal( 1, repeatedUser.ExitCode );
+		Assert.Contains(
+			"mutually exclusive",
+			repeatedUser.Stderr,
+			StringComparison.Ordinal
+		);
+		Assert.Equal( 0, repeatedProcesses.CaptureCount );
+		Assert.Equal( 1, mixed.ExitCode );
+		Assert.Contains(
+			"mutually exclusive",
+			mixed.Stderr,
+			StringComparison.Ordinal
+		);
+		Assert.Equal( 0, mixedProcesses.CaptureCount );
+	}
+
+	[Fact]
+	public async Task CommandLineIdleToggleClearsConfiguredMaximumTasks() {
+		string root = CreateConfigurationDirectory();
+		try {
+			string configurationPath = Path.Combine(
+				root,
+				"procps",
+				"icod-toprc.json"
+			);
+			Directory.CreateDirectory(
+				Path.GetDirectoryName( configurationPath )!
+			);
+			TopRuntimeState configured = new() {
+				HideIdle = true,
+				MaximumTasks = 1
+			};
+			await File.WriteAllTextAsync(
+				configurationPath,
+				TopConfigurationCodec.Serialize( configured )
+			);
+
+			FakeClock clock = new();
+			CommandResult result = await RunCoreAsync(
+				[ "-b", "-n", "1", "-i" ],
+				new FakeTerminal( clock ),
+				clock,
+				environmentVariableProvider: name =>
+					"XDG_CONFIG_HOME" == name ? root : null
+			);
+
+			Assert.Equal( 0, result.ExitCode );
+			Assert.Contains(
+				"alpha",
+				result.Stdout,
+				StringComparison.Ordinal
+			);
+			Assert.Contains(
+				"beta",
+				result.Stdout,
+				StringComparison.Ordinal
+			);
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
 	public async Task BatchRefreshUsesFixedRateCadence() {
 		FakeClock clock = new();
 		FakeProcessProvider processes = new(
@@ -274,6 +522,84 @@ public sealed class TopCommandTests {
 		Assert.Equal( TimeSpan.FromSeconds( 3 ), terminal.Waits[ 0 ] );
 		Assert.Single( terminal.Frames );
 		Assert.Equal( 1, processes.CaptureCount );
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task WindowVisibilityResetAndRenameDoNotResample() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'A' ) );
+		terminal.Events.Enqueue( CharacterEvent( '-' ) );
+		terminal.Events.Enqueue( CharacterEvent( '=' ) );
+		terminal.Events.Enqueue( CharacterEvent( '_' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'a' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'G' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'S' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'y' ) );
+		terminal.Events.Enqueue( CharacterEvent( 's' ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
+		terminal.Events.Enqueue( CharacterEvent( '+' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+		var configurationStore = new SystemTopConfigurationStore(
+			_ => null,
+			systemRestrictionsPath: null,
+			privilegedUserProvider: () => false
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes,
+			configurationStore: configurationStore
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.DoesNotContain(
+			terminal.Frames[ 2 ].Lines,
+			line =>
+				TopLineStyle.Header == line.Style
+				&& line.Text.Contains(
+					"1:Def",
+					StringComparison.Ordinal
+				)
+		);
+		Assert.Contains(
+			terminal.Frames[ 3 ].Lines,
+			line => line.Text.StartsWith(
+				">1:Def ",
+				StringComparison.Ordinal
+			)
+		);
+		Assert.DoesNotContain(
+			terminal.Frames[ 4 ].Lines,
+			line => line.Text.Contains(
+				":Def ",
+				StringComparison.Ordinal
+			)
+				|| line.Text.Contains(
+					":Job ",
+					StringComparison.Ordinal
+				)
+				|| line.Text.Contains(
+					":Mem ",
+					StringComparison.Ordinal
+				)
+				|| line.Text.Contains(
+					":Usr ",
+					StringComparison.Ordinal
+				)
+		);
+		Assert.Contains(
+			terminal.Frames[ ^1 ].Lines,
+			line => line.Text.StartsWith(
+				">2:Sys ",
+				StringComparison.Ordinal
+			)
+		);
 		Assert.True( terminal.Disposed );
 	}
 
@@ -755,7 +1081,7 @@ public sealed class TopCommandTests {
 			StringComparison.Ordinal
 		);
 		Assert.Contains(
-			"display limits, filters, and scrolling reset",
+			"display limits reset for 1:Def",
 			reset.Lines[ ^1 ].Text,
 			StringComparison.Ordinal
 		);
@@ -774,6 +1100,8 @@ public sealed class TopCommandTests {
 		terminal.Events.Enqueue( KeyEvent( TopInputKey.Home ) );
 		terminal.Events.Enqueue( KeyEvent( TopInputKey.Right ) );
 		terminal.Events.Enqueue( KeyEvent( TopInputKey.Down ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Down ) );
+		terminal.Events.Enqueue( KeyEvent( TopInputKey.Down ) );
 		terminal.Events.Enqueue( KeyEvent( TopInputKey.Enter ) );
 		terminal.Events.Enqueue( CharacterEvent( 's' ) );
 		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
@@ -789,7 +1117,7 @@ public sealed class TopCommandTests {
 
 		Assert.Equal( 0, result.ExitCode );
 		Assert.Equal( 1, processes.CaptureCount );
-		Assert.Equal( 12, terminal.Frames.Count );
+		Assert.Equal( 14, terminal.Frames.Count );
 
 		Assert.Contains(
 			terminal.Frames[ 1 ].Lines,
@@ -806,7 +1134,7 @@ public sealed class TopCommandTests {
 			terminal.Frames[ 4 ].Lines[ 6 ].Spans
 		);
 
-		TopRenderFrame reordered = terminal.Frames[ 11 ];
+		TopRenderFrame reordered = terminal.Frames[ 13 ];
 		string header = reordered.Lines[ 5 ].Text;
 		Assert.StartsWith(
 			"USER", header, StringComparison.Ordinal
@@ -1243,6 +1571,296 @@ public sealed class TopCommandTests {
 	}
 
 	[Fact]
+	public async Task PersonalConfigurationLoadsBeforeCommandLineToggle() {
+		string root = CreateConfigurationDirectory();
+		try {
+			string configurationPath = Path.Combine(
+				root,
+				"procps",
+				"icod-toprc.json"
+			);
+			Directory.CreateDirectory(
+				Path.GetDirectoryName( configurationPath )!
+			);
+			TopRuntimeState configured = new() {
+				ShowCommandLine = true
+			};
+			await File.WriteAllTextAsync(
+				configurationPath,
+				TopConfigurationCodec.Serialize( configured )
+			);
+
+			FakeClock clock = new();
+			CommandResult result = await RunCoreAsync(
+				[ "-b", "-n", "1", "-c" ],
+				new FakeTerminal( clock ),
+				clock,
+				environmentVariableProvider: name =>
+					"XDG_CONFIG_HOME" == name ? root : null
+			);
+
+			Assert.Equal( 0, result.ExitCode );
+			Assert.Contains( "alpha", result.Stdout, StringComparison.Ordinal );
+			Assert.DoesNotContain( "--worker", result.Stdout, StringComparison.Ordinal );
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
+	public async Task WriteConfigurationDoesNotResampleProcesses() {
+		string root = CreateConfigurationDirectory();
+		try {
+			FakeClock clock = new();
+			FakeTerminal terminal = new( clock );
+			terminal.Events.Enqueue( CharacterEvent( 'M' ) );
+			terminal.Events.Enqueue( CharacterEvent( 'W' ) );
+			terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+			FakeProcessProvider processes = new( CreateProcesses() );
+
+			CommandResult result = await RunCoreAsync(
+				Array.Empty<string>(),
+				terminal,
+				clock,
+				processes,
+				environmentVariableProvider: name =>
+					"XDG_CONFIG_HOME" == name ? root : null
+			);
+
+			Assert.Equal( 0, result.ExitCode );
+			Assert.Equal( 1, processes.CaptureCount );
+			Assert.Equal( 3, terminal.Frames.Count );
+			string configurationPath = Path.Combine(
+				root,
+				"procps",
+				"icod-toprc.json"
+			);
+			Assert.True( File.Exists( configurationPath ) );
+			TopRuntimeState restored = new();
+			TopConfigurationCodec.Apply(
+				await File.ReadAllTextAsync( configurationPath ),
+				restored
+			);
+			Assert.Equal( TopFieldId.Memory, restored.SortField );
+			Assert.True( terminal.Disposed );
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
+	public async Task ApplyDefaultsSkipsInvalidPersonalConfiguration() {
+		string root = CreateConfigurationDirectory();
+		try {
+			string configurationPath = Path.Combine(
+				root,
+				"procps",
+				"icod-toprc.json"
+			);
+			Directory.CreateDirectory(
+				Path.GetDirectoryName( configurationPath )!
+			);
+			await File.WriteAllTextAsync(
+				configurationPath,
+				"{ invalid"
+			);
+			FakeClock clock = new();
+			FakeTerminal terminal = new( clock );
+			terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+
+			CommandResult result = await RunCoreAsync(
+				[ "-A" ],
+				terminal,
+				clock,
+				environmentVariableProvider: name =>
+					"XDG_CONFIG_HOME" == name ? root : null
+			);
+
+			Assert.Equal( 0, result.ExitCode );
+			Assert.True( terminal.Disposed );
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
+	public async Task ApplyDefaultsStillHonorsSystemRestrictions() {
+		string root = CreateConfigurationDirectory();
+		try {
+			string restrictionsPath = Path.Combine(
+				root,
+				"toprc"
+			);
+			await File.WriteAllTextAsync(
+				restrictionsPath,
+				"s\n5.0\n"
+			);
+			var configurationStore = new SystemTopConfigurationStore(
+				_ => null,
+				restrictionsPath,
+				() => false
+			);
+			FakeClock clock = new();
+			FakeTerminal terminal = new( clock );
+			terminal.Events.Enqueue( CharacterEvent( 'd' ) );
+			terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+			FakeProcessProvider processes = new( CreateProcesses() );
+
+			CommandResult result = await RunCoreAsync(
+				[ "-A" ],
+				terminal,
+				clock,
+				processes,
+				configurationStore: configurationStore
+			);
+
+			Assert.Equal( 0, result.ExitCode );
+			Assert.Equal( 1, processes.CaptureCount );
+			Assert.Equal( 2, terminal.Frames.Count );
+			Assert.Contains(
+				"secure mode: changing the delay is disabled",
+				terminal.Frames[ 1 ].Lines[ ^1 ].Text,
+				StringComparison.Ordinal
+			);
+			Assert.True( terminal.Disposed );
+		} finally {
+			Directory.Delete(
+				root,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
+	public async Task ForcedSecureModeRejectsCommandLineDelayRegardlessOfOrder() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		FakeProcessProvider processes = new( CreateProcesses() );
+		var configurationStore = new SystemTopConfigurationStore(
+			_ => null,
+			systemRestrictionsPath: null,
+			privilegedUserProvider: () => false
+		);
+
+		CommandResult result = await RunCoreAsync(
+			[ "-d", "1", "-s" ],
+			terminal,
+			clock,
+			processes,
+			configurationStore: configurationStore
+		);
+
+		Assert.Equal( 1, result.ExitCode );
+		Assert.Contains(
+			"-d/--delay is unavailable in secure mode",
+			result.Stderr,
+			StringComparison.Ordinal
+		);
+		Assert.Equal( 0, processes.CaptureCount );
+	}
+
+	[Fact]
+	public async Task SummaryGraphKeysCycleWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 't' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'm' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+		var configurationStore = new SystemTopConfigurationStore(
+			_ => null,
+			systemRestrictionsPath: null,
+			privilegedUserProvider: () => false
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes,
+			configurationStore: configurationStore
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 3, terminal.Frames.Count );
+		Assert.Contains(
+			terminal.Frames[ 1 ].Lines,
+			line => line.Text.StartsWith(
+				"%Cpu",
+				StringComparison.Ordinal
+			) && line.Text.Contains( '|' )
+		);
+		Assert.Contains(
+			terminal.Frames[ 2 ].Lines,
+			line => line.Text.Contains(
+				" Mem :",
+				StringComparison.Ordinal
+			) && line.Text.Contains( '|' )
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task AlternateDisplayCyclesWindowsWithoutResampling() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new( clock );
+		terminal.Events.Enqueue( CharacterEvent( 'A' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'a' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'w' ) );
+		terminal.Events.Enqueue( CharacterEvent( 'q' ) );
+		FakeProcessProvider processes = new( CreateProcesses() );
+		var configurationStore = new SystemTopConfigurationStore(
+			_ => null,
+			systemRestrictionsPath: null,
+			privilegedUserProvider: () => false
+		);
+
+		CommandResult result = await RunCoreAsync(
+			Array.Empty<string>(),
+			terminal,
+			clock,
+			processes,
+			configurationStore: configurationStore
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 1, processes.CaptureCount );
+		Assert.Equal( 4, terminal.Frames.Count );
+		Assert.Contains(
+			terminal.Frames[ 1 ].Lines,
+			line => line.Text.StartsWith(
+				">1:Def ",
+				StringComparison.Ordinal
+			)
+		);
+		Assert.Contains(
+			terminal.Frames[ 2 ].Lines,
+			line => line.Text.StartsWith(
+				">2:Job ",
+				StringComparison.Ordinal
+			)
+		);
+		Assert.Contains(
+			terminal.Frames[ 3 ].Lines,
+			line => line.Text.StartsWith(
+				">1:Def ",
+				StringComparison.Ordinal
+			)
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
 	public async Task NonInteractiveTerminalFailsBeforeSamplingAndIsDisposed() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock, isInteractive: false );
@@ -1290,7 +1908,9 @@ public sealed class TopCommandTests {
 		FakeAccountResolver? accountResolver = null,
 		FakeProcessorProvider? processorProvider = null,
 		ITopProcessControl? processControl = null,
-		CancellationToken cancellationToken = default
+		CancellationToken cancellationToken = default,
+		Func<string, string?>? environmentVariableProvider = null,
+		SystemTopConfigurationStore? configurationStore = null
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		ArgumentNullException.ThrowIfNull( terminal );
@@ -1308,11 +1928,12 @@ public sealed class TopCommandTests {
 			processorProvider ?? new FakeProcessorProvider( 4 ),
 			clock,
 			() => ObservationTime,
-			_ => null,
+			environmentVariableProvider ?? ( _ => null ),
 			() => 9999,
 			terminal,
 			processControl ?? new FakeProcessControl(),
-			cancellationToken
+			cancellationToken,
+			configurationStore
 		);
 		return new CommandResult(
 			exitCode,
@@ -1399,6 +2020,15 @@ public sealed class TopCommandTests {
 		ProcObservationSource.LinuxProcfs,
 		ProcObservationFidelity.Exact
 	);
+
+	private static string CreateConfigurationDirectory() {
+		string path = Path.Combine(
+			Path.GetTempPath(),
+			$"icod-procps-top-{Guid.NewGuid():N}"
+		);
+		Directory.CreateDirectory( path );
+		return path;
+	}
 
 	private static ScheduledTerminalEvent CharacterEvent( char value ) => new(
 		TopTerminalEventKind.Input,

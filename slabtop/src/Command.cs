@@ -681,7 +681,8 @@ internal sealed class SlabTopRenderFrame {
 	internal SlabTopRenderFrame(
 		int columns,
 		int rows,
-		IReadOnlyList<string> lines
+		IReadOnlyList<string> lines,
+		int? headerRow = null
 	) {
 		if ( 1 > columns ) {
 			throw new ArgumentOutOfRangeException( nameof( columns ) );
@@ -696,18 +697,28 @@ internal sealed class SlabTopRenderFrame {
 				nameof( lines )
 			);
 		}
+		if (
+			headerRow.HasValue
+			&& ( 0 > headerRow.Value || rows <= headerRow.Value )
+		) {
+			throw new ArgumentOutOfRangeException( nameof( headerRow ) );
+		}
 		this.Columns = columns;
 		this.Rows = rows;
 		this.Lines = lines.ToArray();
+		this.HeaderRow = headerRow;
 	}
 
 	internal int Columns { get; }
 	internal int Rows { get; }
 	internal IReadOnlyList<string> Lines { get; }
+	internal int? HeaderRow { get; }
 }
 
 /// <summary>Renders procps-ng-style slabtop reports independently from terminal I/O.</summary>
 internal static class SlabTopRenderer {
+	private const int HeaderRow = 6;
+
 	internal static string Render(
 		IReadOnlyList<ProcSlabCacheEntry> entries,
 		SlabSortCriterion sort,
@@ -734,15 +745,22 @@ internal static class SlabTopRenderer {
 
 		IReadOnlyList<string> source = BuildLines( entries, sort, human );
 		string[] lines = new string[ dimensions.Rows ];
+		int visibleRows = Math.Max(
+			0,
+			dimensions.Rows - 1
+		);
 		for ( int index = 0; index < dimensions.Rows; index++ ) {
-			lines[ index ] = index < source.Count
+			lines[ index ] = index < visibleRows && index < source.Count
 				? source[ index ]
 				: string.Empty;
 		}
 		return new SlabTopRenderFrame(
 			dimensions.Columns,
 			dimensions.Rows,
-			lines
+			lines,
+			HeaderRow < dimensions.Rows
+				? HeaderRow
+				: null
 		);
 	}
 
@@ -776,7 +794,7 @@ internal static class SlabTopRenderer {
 			$" Active / Total Slabs (% used)         : {activeSlabs} / {totalSlabs} ({Percent( activeSlabs, totalSlabs ):0.0}%)",
 			$" Active / Total Caches (% used)        : {activeCaches} / {totalCaches} ({Percent( activeCaches, totalCaches ):0.0}%)",
 			$" Active / Total Size (% used)          : {FormatBytes( activeSize, human )} / {FormatBytes( totalSize, human )} ({Percent( activeSize, totalSize ):0.0}%)",
-			$" Minimum / Average / Maximum Object    : {FormatBytes( minObjectSize, human )} / {FormatBytes( (ulong)Math.Round( averageObjectSize ), human )} / {FormatBytes( maxObjectSize, human )}",
+			$" Minimum / Average / Maximum Object    : {FormatObjectSize( minObjectSize )} / {FormatObjectSize( (ulong)Math.Round( averageObjectSize ) )} / {FormatObjectSize( maxObjectSize )}",
 			string.Empty,
 			"    OBJS   ACTIVE  USE OBJ SIZE  SLABS OBJ/SLAB CACHE SIZE NAME"
 		];
@@ -784,7 +802,7 @@ internal static class SlabTopRenderer {
 			lines.Add(
 				string.Concat(
 					$"{entry.TotalObjects,8} {entry.ActiveObjects,8} {Percent( entry.ActiveObjects, entry.TotalObjects ),4:0}% ",
-					$"{FormatBytes( entry.ObjectSizeBytes, human ),8} {entry.TotalSlabs,6} {entry.ObjectsPerSlab,8} ",
+					$"{FormatObjectSize( entry.ObjectSizeBytes ),8} {entry.TotalSlabs,6} {entry.ObjectsPerSlab,8} ",
 					$"{FormatBytes( CacheSize( entry ), human ),10} {entry.Name}"
 				)
 			);
@@ -867,6 +885,12 @@ internal static class SlabTopRenderer {
 			return 0;
 		}
 		return 100d * active / total;
+	}
+
+	private static string FormatObjectSize(
+		ulong bytes
+	) {
+		return $"{bytes / 1024d:0.00}K";
 	}
 
 	private static string FormatBytes( ulong bytes, bool human ) {

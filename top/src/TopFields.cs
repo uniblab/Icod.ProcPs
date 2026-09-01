@@ -21,12 +21,23 @@
 
 namespace Icod.ProcPs.Top;
 
+using Icod.ProcPs.Shared;
+
 /// <summary>Identifies one task field known to top.</summary>
 internal enum TopFieldId {
 	Pid,
+	ParentProcessId,
+	EffectiveUserId,
 	User,
+	RealUserId,
+	EffectiveGroupId,
+	ProcessGroupId,
+	Terminal,
+	ForegroundProcessGroupId,
+	SessionId,
 	Priority,
 	Nice,
+	ThreadCount,
 	VirtualMemory,
 	ResidentMemory,
 	SharedMemory,
@@ -105,6 +116,40 @@ internal static class TopFieldCatalog {
 				)
 		),
 		new(
+			TopFieldId.ParentProcessId,
+			"PPID",
+			"parent process identifier",
+			7,
+			numeric: true,
+			defaultVisible: false,
+			formatter: ( row, state, processorCount ) =>
+				FormatObserved( row.Process.ParentProcessId ),
+			highToLowComparison: ( left, right ) =>
+				TopRenderer.CompareFieldDescending(
+					SortObserved( left.Process.ParentProcessId ),
+					SortObserved( right.Process.ParentProcessId ),
+					left,
+					right
+				)
+		),
+		new(
+			TopFieldId.EffectiveUserId,
+			"UID",
+			"effective user identifier",
+			5,
+			numeric: true,
+			defaultVisible: false,
+			formatter: ( row, state, processorCount ) =>
+				FormatObserved( row.Process.EffectiveUserId ),
+			highToLowComparison: ( left, right ) =>
+				TopRenderer.CompareFieldDescending(
+					SortObserved( left.Process.EffectiveUserId ),
+					SortObserved( right.Process.EffectiveUserId ),
+					left,
+					right
+				)
+		),
+		new(
 			TopFieldId.User,
 			"USER",
 			"effective user name or numeric identifier",
@@ -112,7 +157,10 @@ internal static class TopFieldCatalog {
 			numeric: false,
 			defaultVisible: true,
 			formatter: ( row, state, processorCount ) =>
-				TopRenderer.FieldTruncateUser( row.User ),
+				TopRenderer.FieldTruncateUser(
+					row.User,
+					state
+				),
 			highToLowComparison: ( left, right ) =>
 				TopRenderer.CompareFieldDescending(
 					left.User,
@@ -122,24 +170,119 @@ internal static class TopFieldCatalog {
 				)
 		),
 		new(
+			TopFieldId.RealUserId,
+			"RUID",
+			"real user identifier",
+			5,
+			numeric: true,
+			defaultVisible: false,
+			formatter: ( row, state, processorCount ) =>
+				FormatObserved( row.Process.RealUserId ),
+			highToLowComparison: ( left, right ) =>
+				TopRenderer.CompareFieldDescending(
+					SortObserved( left.Process.RealUserId ),
+					SortObserved( right.Process.RealUserId ),
+					left,
+					right
+				)
+		),
+		new(
+			TopFieldId.EffectiveGroupId,
+			"GID",
+			"effective group identifier",
+			5,
+			numeric: true,
+			defaultVisible: false,
+			formatter: ( row, state, processorCount ) =>
+				FormatObserved( row.Process.EffectiveGroupId ),
+			highToLowComparison: ( left, right ) =>
+				TopRenderer.CompareFieldDescending(
+					SortObserved( left.Process.EffectiveGroupId ),
+					SortObserved( right.Process.EffectiveGroupId ),
+					left,
+					right
+				)
+		),
+		new(
+			TopFieldId.ProcessGroupId,
+			"PGRP",
+			"process group identifier",
+			7,
+			numeric: true,
+			defaultVisible: false,
+			formatter: ( row, state, processorCount ) =>
+				FormatObserved( row.Process.ProcessGroupId ),
+			highToLowComparison: ( left, right ) =>
+				TopRenderer.CompareFieldDescending(
+					SortObserved( left.Process.ProcessGroupId ),
+					SortObserved( right.Process.ProcessGroupId ),
+					left,
+					right
+				)
+		),
+		new(
+			TopFieldId.Terminal,
+			"TTY",
+			"controlling terminal",
+			8,
+			numeric: false,
+			defaultVisible: false,
+			formatter: ( row, state, processorCount ) =>
+				FormatTerminal( row.Process.Terminal ),
+			highToLowComparison: ( left, right ) =>
+				TopRenderer.CompareFieldDescending(
+					FormatTerminal( left.Process.Terminal ),
+					FormatTerminal( right.Process.Terminal ),
+					left,
+					right
+				)
+		),
+		new(
+			TopFieldId.ForegroundProcessGroupId,
+			"TPGID",
+			"terminal foreground process group identifier",
+			7,
+			numeric: true,
+			defaultVisible: false,
+			formatter: ( row, state, processorCount ) =>
+				FormatObserved( row.Process.ForegroundProcessGroupId ),
+			highToLowComparison: ( left, right ) =>
+				TopRenderer.CompareFieldDescending(
+					SortObserved( left.Process.ForegroundProcessGroupId ),
+					SortObserved( right.Process.ForegroundProcessGroupId ),
+					left,
+					right
+				)
+		),
+		new(
+			TopFieldId.SessionId,
+			"SID",
+			"session identifier",
+			7,
+			numeric: true,
+			defaultVisible: false,
+			formatter: ( row, state, processorCount ) =>
+				FormatObserved( row.Process.SessionId ),
+			highToLowComparison: ( left, right ) =>
+				TopRenderer.CompareFieldDescending(
+					SortObserved( left.Process.SessionId ),
+					SortObserved( right.Process.SessionId ),
+					left,
+					right
+				)
+		),
+		new(
 			TopFieldId.Priority,
 			"PR",
-			"portable priority derived from the observed nice value",
+			"scheduler priority (unavailable until observed)",
 			3,
 			numeric: true,
 			defaultVisible: true,
-			formatter: ( row, state, processorCount ) => {
-				if ( !row.Process.NiceValue.HasValue ) {
-					return "?";
-				}
-				return ( 20 + row.Process.NiceValue.Value ).ToString(
-					System.Globalization.CultureInfo.InvariantCulture
-				);
-			},
+			formatter: ( row, state, processorCount ) => "-",
 			highToLowComparison: ( left, right ) =>
 				TopRenderer.CompareFieldDescending(
-					TopRenderer.FieldObservedPriority( left.Process ),
-					TopRenderer.FieldObservedPriority( right.Process ),
+					0,
+					0,
 					left,
 					right
 				)
@@ -163,6 +306,23 @@ internal static class TopFieldCatalog {
 				TopRenderer.CompareFieldDescending(
 					TopRenderer.FieldObservedNice( left.Process ),
 					TopRenderer.FieldObservedNice( right.Process ),
+					left,
+					right
+				)
+		),
+		new(
+			TopFieldId.ThreadCount,
+			"nTH",
+			"number of threads",
+			3,
+			numeric: true,
+			defaultVisible: false,
+			formatter: ( row, state, processorCount ) =>
+				FormatObserved( row.Process.ThreadCount ),
+			highToLowComparison: ( left, right ) =>
+				TopRenderer.CompareFieldDescending(
+					SortObserved( left.Process.ThreadCount ),
+					SortObserved( right.Process.ThreadCount ),
 					left,
 					right
 				)
@@ -366,6 +526,68 @@ internal static class TopFieldCatalog {
 		)
 	];
 
+	private static string FormatObserved(
+		ProcObservedValue<int> value
+	) {
+		return value.HasValue
+			? value.Value.ToString(
+				System.Globalization.CultureInfo.InvariantCulture
+			)
+			: "?"
+		;
+	}
+
+	private static string FormatObserved(
+		ProcObservedValue<uint> value
+	) {
+		return value.HasValue
+			? value.Value.ToString(
+				System.Globalization.CultureInfo.InvariantCulture
+			)
+			: "?"
+		;
+	}
+
+	private static long SortObserved(
+		ProcObservedValue<int> value
+	) {
+		return value.HasValue
+			? value.Value
+			: long.MinValue
+		;
+	}
+
+	private static long SortObserved(
+		ProcObservedValue<uint> value
+	) {
+		return value.HasValue
+			? value.Value
+			: long.MinValue
+		;
+	}
+
+	private static string FormatTerminal(
+		ProcObservedValue<ProcTerminalInfo> value
+	) {
+		if ( !value.HasValue ) {
+			return "?";
+		}
+		string? name = value.Value.Name;
+		if ( string.IsNullOrWhiteSpace( name ) ) {
+			return "?";
+		}
+		const string devicePrefix = "/dev/";
+		return name.StartsWith(
+			devicePrefix,
+			StringComparison.Ordinal
+		)
+			? name[
+				devicePrefix.Length..
+			]
+			: name
+		;
+	}
+
 	internal static IReadOnlyList<TopFieldDefinition> Definitions => FieldDefinitions;
 
 	internal static List<TopFieldId> CreateDefaultOrder() {
@@ -416,6 +638,33 @@ internal static class TopFieldCatalog {
 			case "PID":
 			case "N":
 				field = TopFieldId.Pid;
+				return true;
+			case "PPID":
+				field = TopFieldId.ParentProcessId;
+				return true;
+			case "UID":
+				field = TopFieldId.EffectiveUserId;
+				return true;
+			case "RUID":
+				field = TopFieldId.RealUserId;
+				return true;
+			case "GID":
+				field = TopFieldId.EffectiveGroupId;
+				return true;
+			case "PGRP":
+				field = TopFieldId.ProcessGroupId;
+				return true;
+			case "TTY":
+				field = TopFieldId.Terminal;
+				return true;
+			case "TPGID":
+				field = TopFieldId.ForegroundProcessGroupId;
+				return true;
+			case "SID":
+				field = TopFieldId.SessionId;
+				return true;
+			case "NTH":
+				field = TopFieldId.ThreadCount;
 				return true;
 			case "TIME":
 			case "TIME+":

@@ -37,6 +37,13 @@ internal enum TopMemoryScale {
 	Exbibytes
 }
 
+/// <summary>Identifies the native procps summary graph selector retained for a summary area.</summary>
+internal enum TopSummaryGraphMode {
+	Detailed,
+	Bar,
+	Block
+}
+
 /// <summary>Describes a command-line or interactive user restriction.</summary>
 internal sealed class TopUserFilter {
 	internal TopUserFilter( uint userId, bool anyUser, bool negate ) {
@@ -50,14 +57,235 @@ internal sealed class TopUserFilter {
 	internal bool Negate { get; }
 }
 
+/// <summary>Contains the separately configurable state of one top field group/window.</summary>
+internal sealed class TopWindowState {
+	internal TopWindowState( string name ) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( name );
+		this.Name = name;
+	}
+
+	internal string Name { get; private set; }
+	internal bool TaskDisplayVisible { get; set; } = true;
+	internal TopFieldId SortField { get; set; } = TopFieldId.Cpu;
+	internal bool SortHighToLow { get; set; } = true;
+	internal bool HighlightBold { get; set; } = true;
+	internal bool HighlightRunning { get; set; } = true;
+	internal bool HighlightSortColumn { get; set; }
+	internal bool ColorsEnabled { get; set; } = true;
+	internal TopColorPalette Colors { get; set; } = TopColorPalette.ForWindow( 0 );
+	internal bool NumericLeftJustified { get; set; }
+	internal bool CharacterRightJustified { get; set; }
+	internal int MaximumTasks { get; set; }
+	internal string? SearchText { get; set; }
+	internal bool ShowCommandLine { get; set; }
+	internal bool HideIdle { get; set; }
+	internal bool Forest { get; set; }
+	internal ProcessIdentity? ForestFocus { get; set; }
+	internal HashSet<ProcessIdentity> CollapsedForestParents { get; } = [];
+	internal bool LoadAverageVisible { get; set; } = true;
+	internal bool ScrollCoordinatesVisible { get; set; }
+	internal bool SingleCpuSummary { get; set; } = true;
+	internal bool CpuSummaryVisible { get; set; } = true;
+	internal TopSummaryGraphMode CpuSummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
+	internal bool MemorySummaryVisible { get; set; } = true;
+	internal TopSummaryGraphMode MemorySummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
+	internal int VerticalOffset { get; set; }
+	internal int HorizontalOffset { get; set; }
+	internal TopUserFilter? UserFilter { get; set; }
+	internal List<TopOtherFilter> OtherFilters { get; } = [];
+	internal List<TopFieldId> FieldOrder { get; } = TopFieldCatalog.CreateDefaultOrder();
+	internal HashSet<TopFieldId> VisibleFields { get; } = TopFieldCatalog.CreateDefaultVisible();
+
+	internal TopWindowState Clone() {
+		var result = new TopWindowState(
+			this.Name
+		);
+		result.CopyFrom(
+			this
+		);
+		return result;
+	}
+
+	internal void Rename(
+		string name
+	) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( name );
+		this.Name = name;
+	}
+
+	internal void CaptureFrom(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		this.TaskDisplayVisible = state.TaskDisplayVisible;
+		this.SortField = state.SortField;
+		this.SortHighToLow = state.SortHighToLow;
+		this.HighlightBold = state.HighlightBold;
+		this.HighlightRunning = state.HighlightRunning;
+		this.ColorsEnabled = state.ColorsEnabled;
+		this.Colors = state.Colors;
+		this.HighlightSortColumn = state.HighlightSortColumn;
+		this.NumericLeftJustified = state.NumericLeftJustified;
+		this.CharacterRightJustified = state.CharacterRightJustified;
+		this.MaximumTasks = state.MaximumTasks;
+		this.SearchText = state.SearchText;
+		this.ShowCommandLine = state.ShowCommandLine;
+		this.HideIdle = state.HideIdle;
+		this.Forest = state.Forest;
+		this.ForestFocus = state.ForestFocus;
+		this.CollapsedForestParents.Clear();
+		this.CollapsedForestParents.UnionWith(
+			state.CollapsedForestParents
+		);
+		this.LoadAverageVisible = state.LoadAverageVisible;
+		this.ScrollCoordinatesVisible = state.ScrollCoordinatesVisible;
+		this.SingleCpuSummary = state.SingleCpuSummary;
+		this.CpuSummaryVisible = state.CpuSummaryVisible;
+		this.CpuSummaryGraphMode = state.CpuSummaryGraphMode;
+		this.MemorySummaryVisible = state.MemorySummaryVisible;
+		this.MemorySummaryGraphMode = state.MemorySummaryGraphMode;
+		this.VerticalOffset = state.VerticalOffset;
+		this.HorizontalOffset = state.HorizontalOffset;
+		this.UserFilter = state.UserFilter;
+
+		this.OtherFilters.Clear();
+		this.OtherFilters.AddRange(
+			state.OtherFilters
+		);
+		this.FieldOrder.Clear();
+		this.FieldOrder.AddRange(
+			state.FieldOrder
+		);
+		this.VisibleFields.Clear();
+		this.VisibleFields.UnionWith(
+			state.VisibleFields
+		);
+	}
+
+	internal void ApplyTo(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		state.TaskDisplayVisible = this.TaskDisplayVisible;
+		state.SortField = this.SortField;
+		state.SortHighToLow = this.SortHighToLow;
+		state.HighlightBold = this.HighlightBold;
+		state.HighlightRunning = this.HighlightRunning;
+		state.ColorsEnabled = this.ColorsEnabled;
+		state.Colors = this.Colors;
+		state.HighlightSortColumn = this.HighlightSortColumn;
+		state.NumericLeftJustified = this.NumericLeftJustified;
+		state.CharacterRightJustified = this.CharacterRightJustified;
+		state.MaximumTasks = this.MaximumTasks;
+		state.SearchText = this.SearchText;
+		state.ShowCommandLine = this.ShowCommandLine;
+		state.HideIdle = this.HideIdle;
+		state.Forest = this.Forest;
+		state.ForestFocus = this.ForestFocus;
+		state.CollapsedForestParents.Clear();
+		state.CollapsedForestParents.UnionWith(
+			this.CollapsedForestParents
+		);
+		state.LoadAverageVisible = this.LoadAverageVisible;
+		state.ScrollCoordinatesVisible = this.ScrollCoordinatesVisible;
+		state.SingleCpuSummary = this.SingleCpuSummary;
+		state.CpuSummaryVisible = this.CpuSummaryVisible;
+		state.CpuSummaryGraphMode = this.CpuSummaryGraphMode;
+		state.MemorySummaryVisible = this.MemorySummaryVisible;
+		state.MemorySummaryGraphMode = this.MemorySummaryGraphMode;
+		state.VerticalOffset = this.VerticalOffset;
+		state.HorizontalOffset = this.HorizontalOffset;
+		state.UserFilter = this.UserFilter;
+
+		state.OtherFilters.Clear();
+		state.OtherFilters.AddRange(
+			this.OtherFilters
+		);
+		state.FieldOrder.Clear();
+		state.FieldOrder.AddRange(
+			this.FieldOrder
+		);
+		state.VisibleFields.Clear();
+		state.VisibleFields.UnionWith(
+			this.VisibleFields
+		);
+	}
+
+	private void CopyFrom(
+		TopWindowState source
+	) {
+		ArgumentNullException.ThrowIfNull( source );
+
+		this.TaskDisplayVisible = source.TaskDisplayVisible;
+		this.SortField = source.SortField;
+		this.SortHighToLow = source.SortHighToLow;
+		this.HighlightBold = source.HighlightBold;
+		this.HighlightRunning = source.HighlightRunning;
+		this.ColorsEnabled = source.ColorsEnabled;
+		this.Colors = source.Colors;
+		this.HighlightSortColumn = source.HighlightSortColumn;
+		this.NumericLeftJustified = source.NumericLeftJustified;
+		this.CharacterRightJustified = source.CharacterRightJustified;
+		this.MaximumTasks = source.MaximumTasks;
+		this.SearchText = source.SearchText;
+		this.ShowCommandLine = source.ShowCommandLine;
+		this.HideIdle = source.HideIdle;
+		this.Forest = source.Forest;
+		this.ForestFocus = source.ForestFocus;
+		this.CollapsedForestParents.Clear();
+		this.CollapsedForestParents.UnionWith(
+			source.CollapsedForestParents
+		);
+		this.LoadAverageVisible = source.LoadAverageVisible;
+		this.ScrollCoordinatesVisible = source.ScrollCoordinatesVisible;
+		this.SingleCpuSummary = source.SingleCpuSummary;
+		this.CpuSummaryVisible = source.CpuSummaryVisible;
+		this.CpuSummaryGraphMode = source.CpuSummaryGraphMode;
+		this.MemorySummaryVisible = source.MemorySummaryVisible;
+		this.MemorySummaryGraphMode = source.MemorySummaryGraphMode;
+		this.VerticalOffset = source.VerticalOffset;
+		this.HorizontalOffset = source.HorizontalOffset;
+		this.UserFilter = source.UserFilter;
+
+		this.OtherFilters.Clear();
+		this.OtherFilters.AddRange(
+			source.OtherFilters
+		);
+		this.FieldOrder.Clear();
+		this.FieldOrder.AddRange(
+			source.FieldOrder
+		);
+		this.VisibleFields.Clear();
+		this.VisibleFields.UnionWith(
+			source.VisibleFields
+		);
+	}
+}
+
 /// <summary>Contains runtime presentation state shared between refreshes.</summary>
 internal sealed class TopRuntimeState {
+	internal const int WindowCount = 4;
+	private static readonly string[] WindowNames = [
+		"Def",
+		"Job",
+		"Mem",
+		"Usr"
+	];
+	private const int MaximumLoggedMessages = 10;
+	private TopWindowState[] windows = CreateDefaultWindows();
+	private readonly List<string> messageHistory = [];
+	private string? message;
+
 	internal TimeSpan Delay { get; set; } = TimeSpan.FromSeconds( 3 );
 	internal TopFieldId SortField { get; set; } = TopFieldId.Cpu;
 	internal bool SortHighToLow { get; set; } = true;
 	internal bool BoldEnabled { get; set; } = true;
 	internal bool HighlightBold { get; set; } = true;
 	internal bool HighlightRunning { get; set; } = true;
+	internal bool ColorsEnabled { get; set; } = true;
+	internal TopColorPalette Colors { get; set; } = TopColorPalette.ForWindow( 0 );
 	internal bool HighlightSortColumn { get; set; }
 	internal bool NumericLeftJustified { get; set; }
 	internal bool CharacterRightJustified { get; set; }
@@ -66,17 +294,57 @@ internal sealed class TopRuntimeState {
 	internal string? SearchText { get; set; }
 	internal TopMemoryScale SummaryScale { get; set; } = TopMemoryScale.Mebibytes;
 	internal TopMemoryScale TaskScale { get; set; } = TopMemoryScale.Kibibytes;
+	internal int FixedWidthExtra { get; set; }
+	internal Dictionary<TopFieldId, int> AutomaticFixedWidths { get; } = [];
+	internal List<TopInspectEntry> InspectEntries { get; } = [];
+	internal TopInspectSession? InspectSession { get; set; }
+	internal TopBottomWindowState? BottomWindow { get; set; }
 	internal bool ShowCommandLine { get; set; }
 	internal bool ShowThreads { get; set; }
 	internal bool HideIdle { get; set; }
 	internal bool Forest { get; set; }
+	internal ProcessIdentity? ForestFocus { get; set; }
+	internal HashSet<ProcessIdentity> CollapsedForestParents { get; } = [];
 	internal bool IrixMode { get; set; } = true;
 	internal bool SecureMode { get; set; }
+	internal bool LoadAverageVisible { get; set; } = true;
+	internal bool ScrollCoordinatesVisible { get; set; }
 	internal bool SingleCpuSummary { get; set; } = true;
+	internal bool CpuSummaryVisible { get; set; } = true;
+	internal TopSummaryGraphMode CpuSummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
+	internal bool MemorySummaryVisible { get; set; } = true;
+	internal TopSummaryGraphMode MemorySummaryGraphMode { get; set; } = TopSummaryGraphMode.Detailed;
+	internal bool AlternateDisplayMode { get; set; }
+	internal bool TaskDisplayVisible { get; set; } = true;
+	internal int CurrentWindowIndex { get; private set; }
 	internal int VerticalOffset { get; set; }
 	internal int HorizontalOffset { get; set; }
-	internal string? Message { get; set; }
+	internal string? Message {
+		get => this.message;
+		set {
+			this.message = value;
+			if ( string.IsNullOrEmpty( value ) ) {
+				return;
+			}
+			if (
+				0 < this.messageHistory.Count
+				&& string.Equals(
+					this.messageHistory[ this.messageHistory.Count - 1 ],
+					value,
+					StringComparison.Ordinal
+				)
+			) {
+				return;
+			}
+			this.messageHistory.Add( value );
+			if ( MaximumLoggedMessages < this.messageHistory.Count ) {
+				this.messageHistory.RemoveAt( 0 );
+			}
+		}
+	}
+	internal IReadOnlyList<string> MessageHistory => this.messageHistory;
 	internal bool ShowHelp { get; set; }
+	internal TopColorManagerState? ColorManager { get; set; }
 	internal bool ShowFieldManager { get; set; }
 	internal int FieldCursor { get; set; }
 	internal bool FieldMoveActive { get; set; }
@@ -86,12 +354,246 @@ internal sealed class TopRuntimeState {
 	internal List<TopOtherFilter> OtherFilters { get; } = [];
 	internal List<TopFieldId> FieldOrder { get; } = TopFieldCatalog.CreateDefaultOrder();
 	internal HashSet<TopFieldId> VisibleFields { get; } = TopFieldCatalog.CreateDefaultVisible();
+	internal IReadOnlyList<TopWindowState> Windows => this.windows;
+	internal string CurrentWindowLabel => $"{this.CurrentWindowIndex + 1}:{this.windows[ this.CurrentWindowIndex ].Name}";
+
+	internal static string GetWindowName(
+		int index
+	) {
+		if ( index is < 0 or >= WindowCount ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( index )
+			);
+		}
+		return WindowNames[ index ];
+	}
+
+	internal void SynchronizeCurrentWindow() {
+		this.windows[
+			this.CurrentWindowIndex
+		].CaptureFrom(
+			this
+		);
+	}
+
+	internal void RenameCurrentWindow(
+		string name
+	) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( name );
+		this.windows[
+			this.CurrentWindowIndex
+		].Rename(
+			name
+		);
+	}
+
+	internal bool MoveSortField(
+		int direction
+	) {
+		if ( direction is not -1 and not 1 ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( direction )
+			);
+		}
+		if ( !this.VisibleFields.Contains( this.SortField ) ) {
+			return false;
+		}
+
+		int sourceIndex = this.FieldOrder.IndexOf(
+			this.SortField
+		);
+		if ( 0 > sourceIndex ) {
+			return false;
+		}
+		int targetIndex = sourceIndex + direction;
+		while (
+			0 <= targetIndex
+			&& targetIndex < this.FieldOrder.Count
+			&& !this.VisibleFields.Contains(
+				this.FieldOrder[ targetIndex ]
+			)
+		) {
+			targetIndex += direction;
+		}
+		if (
+			0 > targetIndex
+			|| this.FieldOrder.Count <= targetIndex
+		) {
+			return false;
+		}
+
+		TopFieldId target = this.FieldOrder[ targetIndex ];
+		this.FieldOrder[ targetIndex ] = this.SortField;
+		this.FieldOrder[ sourceIndex ] = target;
+		this.HorizontalOffset = 0;
+		this.SynchronizeCurrentWindow();
+		return true;
+	}
+
+	internal void ClearForestRestrictions() {
+		this.ForestFocus = null;
+		this.CollapsedForestParents.Clear();
+	}
+
+	internal void ExitForestForSort() {
+		this.Forest = false;
+		this.ClearForestRestrictions();
+	}
+
+	internal void ToggleAllTaskDisplays() {
+		this.SynchronizeCurrentWindow();
+		foreach ( TopWindowState window in this.windows ) {
+			window.TaskDisplayVisible = !window.TaskDisplayVisible;
+		}
+		this.windows[
+			this.CurrentWindowIndex
+		].ApplyTo(
+			this
+		);
+	}
+
+	internal void ShowAllTaskDisplays() {
+		this.SynchronizeCurrentWindow();
+		foreach ( TopWindowState window in this.windows ) {
+			window.TaskDisplayVisible = true;
+		}
+		this.windows[
+			this.CurrentWindowIndex
+		].ApplyTo(
+			this
+		);
+	}
+
+	internal void ActivateWindow(
+		int index
+	) {
+		if ( index is < 0 or >= WindowCount ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( index )
+			);
+		}
+
+		this.SynchronizeCurrentWindow();
+		this.CurrentWindowIndex = index;
+		this.windows[
+			index
+		].ApplyTo(
+			this
+		);
+		this.FieldMoveActive = false;
+	}
+
+	internal void RestoreWindows(
+		IReadOnlyList<TopWindowState> restoredWindows,
+		int currentWindowIndex
+	) {
+		ArgumentNullException.ThrowIfNull( restoredWindows );
+		if ( WindowCount != restoredWindows.Count ) {
+			throw new ArgumentException(
+				$"Exactly {WindowCount} top windows are required.",
+				nameof( restoredWindows )
+			);
+		}
+		if ( currentWindowIndex is < 0 or >= WindowCount ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( currentWindowIndex )
+			);
+		}
+
+		var replacement = new TopWindowState[
+			WindowCount
+		];
+		for ( int index = 0; index < WindowCount; index++ ) {
+			replacement[ index ] = restoredWindows[
+				index
+			].Clone();
+		}
+		this.windows = replacement;
+		this.CurrentWindowIndex = currentWindowIndex;
+		this.windows[
+			currentWindowIndex
+		].ApplyTo(
+			this
+		);
+		this.FieldMoveActive = false;
+	}
+
+	internal void CycleCpuSummaryPresentation() {
+		(bool visible, TopSummaryGraphMode mode) = NextSummaryPresentation(
+			this.CpuSummaryVisible,
+			this.CpuSummaryGraphMode
+		);
+		this.CpuSummaryVisible = visible;
+		this.CpuSummaryGraphMode = mode;
+	}
+
+	internal void CycleMemorySummaryPresentation() {
+		(bool visible, TopSummaryGraphMode mode) = NextSummaryPresentation(
+			this.MemorySummaryVisible,
+			this.MemorySummaryGraphMode
+		);
+		this.MemorySummaryVisible = visible;
+		this.MemorySummaryGraphMode = mode;
+	}
+
+	private static (bool Visible, TopSummaryGraphMode Mode) NextSummaryPresentation(
+		bool visible,
+		TopSummaryGraphMode mode
+	) {
+		if ( !Enum.IsDefined( typeof( TopSummaryGraphMode ), mode ) ) {
+			throw new InvalidOperationException(
+				$"The top summary graph mode '{mode}' is not recognized."
+			);
+		}
+		if ( !visible ) {
+			return (
+				true,
+				mode
+			);
+		}
+
+		return mode switch {
+			TopSummaryGraphMode.Detailed => (
+				true,
+				TopSummaryGraphMode.Bar
+			),
+			TopSummaryGraphMode.Bar => (
+				true,
+				TopSummaryGraphMode.Block
+			),
+			TopSummaryGraphMode.Block => (
+				false,
+				TopSummaryGraphMode.Detailed
+			),
+			_ => throw new InvalidOperationException(
+				$"The top summary graph mode '{mode}' is not recognized."
+			)
+		};
+	}
+
+	private static TopWindowState[] CreateDefaultWindows() {
+		var result = new TopWindowState[
+			WindowCount
+		];
+		for ( int index = 0; index < WindowCount; index++ ) {
+			result[ index ] = new TopWindowState(
+				WindowNames[ index ]
+			) {
+				Colors = TopColorPalette.ForWindow( index )
+			};
+		}
+		return result;
+	}
 }
 
 /// <summary>Identifies one interactive top prompt.</summary>
 internal enum TopPromptKind {
 	Delay,
 	MaximumTasks,
+	FixedWidthExtra,
+	InspectProcessId,
+	Window,
+	WindowName,
 	Locate,
 	OtherFilterCaseSensitive,
 	OtherFilterIgnoreCase,
@@ -135,6 +637,23 @@ internal sealed class TopTaskRow {
 		this.CpuPercentIrix = Math.Max( 0.0, cpuPercentIrix );
 		this.MemoryPercent = Math.Max( 0.0, memoryPercent );
 		this.CpuSeconds = cpuSeconds;
+	}
+
+	internal TopTaskRow CreateForestPresentation(
+		double cpuPercentIrix,
+		int forestDepth
+	) {
+		ArgumentOutOfRangeException.ThrowIfNegative( forestDepth );
+		return new TopTaskRow(
+			this.Process,
+			this.ThreadGroupId,
+			this.User,
+			cpuPercentIrix,
+			this.MemoryPercent,
+			this.CpuSeconds
+		) {
+			ForestDepth = forestDepth
+		};
 	}
 
 	internal ProcProcessSnapshot Process { get; }

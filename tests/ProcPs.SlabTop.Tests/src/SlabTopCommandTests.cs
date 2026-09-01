@@ -57,7 +57,36 @@ public sealed class SlabTopCommandTests {
 			result.Stdout.IndexOf( "a_small_cache", StringComparison.Ordinal )
 				< result.Stdout.IndexOf( "z_large_cache", StringComparison.Ordinal )
 		);
-		Assert.Contains( "1.0Ki", result.Stdout, StringComparison.Ordinal );
+		Assert.Contains( "1.00K", result.Stdout, StringComparison.Ordinal );
+		Assert.Contains( "Ki", result.Stdout, StringComparison.Ordinal );
+		Assert.DoesNotContain( "1.0Ki", result.Stdout, StringComparison.Ordinal );
+	}
+
+	[Fact]
+	public void InteractiveFrameMatchesProcpsHeadingAndBottomRowLayout() {
+		ProcObservedValue<IReadOnlyList<ProcSlabCacheEntry>> observed =
+			AvailableSlabs();
+		var dimensions = new SlabTopTerminalDimensions( 80, 9 );
+
+		SlabTopRenderFrame frame = SlabTopRenderer.RenderFrame(
+			observed.Value,
+			SlabSortCriterion.Objects,
+			false,
+			dimensions
+		);
+
+		Assert.Equal<int?>( 6, frame.HeaderRow );
+		Assert.Equal( string.Empty, frame.Lines[ ^1 ] );
+		Assert.Contains(
+			"z_large_cache",
+			frame.Lines[ 7 ],
+			StringComparison.Ordinal
+		);
+		Assert.DoesNotContain(
+			"a_small_cache",
+			string.Join( Environment.NewLine, frame.Lines ),
+			StringComparison.Ordinal
+		);
 	}
 
 	[Theory]

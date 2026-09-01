@@ -89,6 +89,11 @@ internal interface IWatchTerminalSession : IAsyncDisposable {
 		CancellationToken cancellationToken = default
 	);
 
+	ValueTask ShowStatusAsync(
+		string message,
+		CancellationToken cancellationToken = default
+	);
+
 	ValueTask RepaintAsync(
 		CancellationToken cancellationToken = default
 	);
@@ -256,6 +261,36 @@ internal sealed class DCursesWatchTerminalSession
 
 		window.Move( 0, 0 );
 		await this.session.RefreshAsync( cancellationToken ).ConfigureAwait( false );
+	}
+
+	public async ValueTask ShowStatusAsync(
+		string message,
+		CancellationToken cancellationToken = default
+	) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( message );
+		cancellationToken.ThrowIfCancellationRequested();
+
+		_ = this.session.SynchronizeDimensions();
+		CursesWindow window = this.session.StandardScreen;
+		if ( 1 > window.Rows || 1 > window.Columns ) {
+			return;
+		}
+
+		string clipped = WatchTextLayout.ClipToWidth(
+			message,
+			window.Columns
+		);
+		window.Move(
+			window.Rows - 1,
+			0
+		);
+		window.Write(
+			clipped,
+			CursesStyle.Default
+		);
+		await this.session.RefreshAsync(
+			cancellationToken
+		).ConfigureAwait( false );
 	}
 
 	public async ValueTask RepaintAsync(

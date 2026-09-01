@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.12 adds procps-compatible top O/o Other Filtering with include/exclude criteria, substring equality, relational string comparisons, multiple active filters, and reset integration.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0 completes the procps-ng 4.0.6 release-readiness work for the Icod.ProcPs command suite, including the DCurses-backed top, slabtop, and watch monitors, the output-only tload monitor, expanded top configuration and field compatibility, and cross-platform distribution validation for Windows, Linux, and macOS.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

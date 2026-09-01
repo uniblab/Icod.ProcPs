@@ -58,13 +58,18 @@ permitted, as in procps-ng, and receives the cursor-home sequence followed by th
 complete graph frame on every refresh.
 
 A geometry change detected between refreshes clears the accumulated scrolling
-history and begins a new graph at the new size.
+history and begins a new graph at the new size without discarding the adaptive
+scale already established by earlier samples.
 
 ## GRAPH
 
 Each refresh contributes one column to the graph. `*` characters represent the
 one-minute load average. Horizontal scale marks are rendered with `-`; a mark
 that intersects the load graph is rendered as `=`.
+
+As the graph reaches the terminal width, history scrolls left before the frame
+is emitted so the rightmost column remains open for the next update, matching
+the procps display model.
 
 With automatic scaling, the graph reduces its scale when the current load would
 exceed the available height and gradually increases the scale again when there
@@ -92,11 +97,11 @@ ability to target another terminal without taking ownership of terminal input.
 ## TESTING
 
 `tests/ProcPs.Tload.Tests` covers default graph rendering, delay and scale
-options, output-only terminal selection, redirected output, geometry changes,
-unavailable and invalid load observations, write failures, cancellation,
-command-line validation, and the pre-terminal help/version paths. Timing and
-terminal behavior are exercised through deterministic fake ProcPs samplers and
-output sessions.
+options, output-only terminal selection, redirected output, geometry changes
+with adaptive-scale continuity, procps-style full-width scrolling, unavailable
+and invalid load observations, write failures, cancellation, command-line
+validation, and the pre-terminal help/version paths. Timing and terminal behavior
+are exercised through deterministic fake ProcPs samplers and output sessions.
 
 ## EXIT STATUS
 

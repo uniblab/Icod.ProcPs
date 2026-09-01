@@ -146,7 +146,10 @@ internal static class TopOtherFilterParser {
 			}
 			selectionValue = TopRenderer.FieldAlign(
 				selectionValue,
-				definition.Width,
+				TopFixedWidth.Width(
+					state,
+					definition
+				),
 				leftJustified
 			);
 		}

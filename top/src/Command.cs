@@ -28,6 +28,14 @@ using Icod.Processes;
 using Icod.ProcPs.Shared;
 using Icod.Timing;
 
+/// <summary>Identifies the action requested by one interactive top command.</summary>
+internal enum TopCommandAction {
+	None,
+	Rerender,
+	Resample,
+	Exit
+}
+
 /// <summary>Defines process-control operations consumed by top's interactive commands.</summary>
 internal interface ITopProcessControl {
 	ProcessOperationResult<ProcessSignal> ParseSignal( string text );
@@ -101,7 +109,10 @@ public static class Command {
 	private const int Canceled = 130;
 	private const int MinimumColumns = 40;
 	private const int MinimumRows = 7;
-	private const int DefaultBatchWidth = 512;
+	private const int MinimumOutputColumns = 3;
+	private const int MinimumOutputRows = 3;
+	private const int MaximumOutputColumns = 512;
+	private const int DefaultBatchWidth = MaximumOutputColumns;
 	private const int MaximumMonitoredProcessIds = 20;
 	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
 		"Icod.ProcPs.Top",
@@ -113,34 +124,38 @@ Usage:
  top [options]
 
 Options:
- -A, --apply-defaults          use built-in defaults (no personal top configuration)
+ -A, --apply-defaults          use built-in defaults plus system restrictions
  -b, --batch                   run in non-interactive batch mode
- -c, --cmdline-toggle          start by displaying command lines
+ -c, --cmdline-toggle          reverse the remembered command name/line state
  -d, --delay SECONDS           set the refresh delay; fractional seconds are accepted
  -E, --scale-summary-mem SCALE set summary memory scale: k, m, g, t, p, or e
- -e, --scale-task-mem SCALE    set task memory scale: k, m, g, t, p, or e
+ -e, --scale-task-mem SCALE    set task memory scale: k, m, g, t, or p
  -H, --threads-show            show individual lightweight tasks where supported
- -i, --idle-toggle             suppress tasks idle during the most recent interval
+ -i, --idle-toggle             reverse the remembered idle-task state
  -n, --iterations NUMBER       exit after NUMBER refreshes
  -O, --list-fields             list fields implemented by this top and exit
- -o, --sort-override FIELD     sort by PID, USER, PR, NI, VIRT, RES, SHR, S, %CPU, %MEM, TIME+, or COMMAND
+ -o, --sort-override FIELD     sort by any field listed by -O/--list-fields
  -p, --pid PIDLIST             monitor only the selected process IDs (maximum 20)
- -s, --secure-mode             disable interactive delay, signal, and renice commands
+ -s, --secure-mode             force secure mode, including for privileged users
  -S, --accum-time-toggle       not available: child CPU counters are not yet observed
  -U, --filter-any-user USER    filter by any observed real/effective user ID
  -u, --filter-only-euser USER  filter by effective user ID
- -w, --width [COLUMNS]         batch output width; without COLUMNS use 512
- -1, --single-cpu-toggle       toggle the aggregate CPU presentation label
+ -w, --width[=COLUMNS]         constrain geometry; bare -w uses COLUMNS/LINES
+ -1, --single-cpu-toggle       reverse the remembered aggregate CPU state
  -V, --version                 display version information and exit
  -h, --help                    display this help and exit
 
 Interactive keys:
  q quit; 0 zero suppress; n/# max tasks; P/M/N/T sort; R reverse/normal sort;
- B bold enable; b emphasis mode; J numeric justify; j character justify;
- f manage fields; x sort column; y running rows; c command line; H threads;
- i idle tasks;
- V forest; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
- O/o other filter; L locate; & locate next; k signal; r renice; = reset limits;
+ A alternate display; a/w next/previous window; g/G choose/rename window;
+ -/_ show/hide current/all windows; =/+ reset current/all windows; B bold enable;
+ b emphasis mode; J numeric justify; j character justify; f manage fields;
+ x sort column; y running rows; z colors; Z map colors; l load/uptime; t CPU summary;
+ m memory summary; C scroll coordinates; </> move sort field; c command line;
+ H threads; i idle tasks; V forest; F focus parent; v hide/show children; X fixed width;
+ Y inspect; I CPU normalization; E/e memory scale; d/s delay; u/U user filter;
+ O/o other filter; L locate; & locate next; k signal; r renice; W write config;
+ ^A/^G/^K/^L/^N/^P/^U bottom windows; Tab/Shift+Tab select bottom items;
  arrows/PgUp/PgDn/Home/End scroll; h/? help.
 """;
 
@@ -205,7 +220,8 @@ Interactive keys:
 		Func<int>? currentProcessIdProvider,
 		ITopTerminalSessionFactory terminalFactory,
 		ITopProcessControl processControl,
-		CancellationToken cancellationToken
+		CancellationToken cancellationToken,
+		SystemTopConfigurationStore? configurationStore = null
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		ArgumentNullException.ThrowIfNull( terminalFactory );
@@ -216,7 +232,42 @@ Interactive keys:
 		IProcAccountDisplayResolver accounts = accountResolver ?? SystemProcAccountDisplayResolver.Instance;
 		Func<string, string?> environment = environmentVariableProvider ?? Environment.GetEnvironmentVariable;
 		int currentProcessId = currentProcessIdProvider?.Invoke() ?? Environment.ProcessId;
-		ParsedArguments parsed = Parse( args, accounts, environment, currentProcessId );
+		configurationStore ??= new SystemTopConfigurationStore(
+			environment
+		);
+		TopRuntimeState startupState = new();
+		if ( ShouldLoadConfiguration( args ) ) {
+			try {
+				await configurationStore.LoadAsync(
+					startupState,
+					ShouldLoadPersonalConfiguration( args ),
+					cancellationToken
+				).ConfigureAwait( false );
+			} catch ( OperationCanceledException ) {
+				return Canceled;
+			} catch ( Exception exception ) when (
+				exception is IOException
+					or UnauthorizedAccessException
+					or FormatException
+			) {
+				await WriteLineAsync(
+					errorOutput,
+					$"top: {exception.Message}",
+					CancellationToken.None
+				).ConfigureAwait( false );
+				return Failure;
+			}
+		}
+		if ( ForcesSecureMode( args ) ) {
+			startupState.SecureMode = true;
+		}
+		ParsedArguments parsed = Parse(
+			args,
+			accounts,
+			environment,
+			currentProcessId,
+			startupState
+		);
 		if ( parsed.Error is not null ) {
 			await WriteLineAsync( errorOutput, $"top: {parsed.Error}", cancellationToken ).ConfigureAwait( false );
 			await WriteTextAsync( errorOutput, NormalizeLineEndings( Usage ), cancellationToken ).ConfigureAwait( false );
@@ -266,9 +317,11 @@ Interactive keys:
 					sampler,
 					parsed,
 					processes,
+					supplements,
 					accounts,
 					terminalFactory,
 					processControl,
+					configurationStore,
 					monotonicClock,
 					errorOutput,
 					cancellationToken
@@ -315,7 +368,8 @@ Interactive keys:
 			foreach ( string line in TopRenderer.RenderBatch(
 				sample,
 				parsed.State,
-				parsed.BatchWidth
+				parsed.BatchWidth,
+				parsed.BatchHeight
 			) ) {
 				await WriteLineAsync( output, line, cancellationToken ).ConfigureAwait( false );
 			}
@@ -338,9 +392,11 @@ Interactive keys:
 		TopSampler sampler,
 		ParsedArguments parsed,
 		IProcProcessProvider processProvider,
+		IProcMatchSupplementProvider supplementProvider,
 		IProcAccountDisplayResolver accountResolver,
 		ITopTerminalSessionFactory terminalFactory,
 		ITopProcessControl processControl,
+		SystemTopConfigurationStore configurationStore,
 		IMonotonicClock clock,
 		Stream errorOutput,
 		CancellationToken cancellationToken
@@ -348,9 +404,11 @@ Interactive keys:
 		ArgumentNullException.ThrowIfNull( sampler );
 		ArgumentNullException.ThrowIfNull( parsed );
 		ArgumentNullException.ThrowIfNull( processProvider );
+		ArgumentNullException.ThrowIfNull( supplementProvider );
 		ArgumentNullException.ThrowIfNull( accountResolver );
 		ArgumentNullException.ThrowIfNull( terminalFactory );
 		ArgumentNullException.ThrowIfNull( processControl );
+		ArgumentNullException.ThrowIfNull( configurationStore );
 		ArgumentNullException.ThrowIfNull( clock );
 		ArgumentNullException.ThrowIfNull( errorOutput );
 
@@ -365,7 +423,10 @@ Interactive keys:
 				).ConfigureAwait( false );
 				return Failure;
 			}
-			TopTerminalDimensions dimensions = terminal.GetDimensions();
+			TopTerminalDimensions dimensions = ApplyOutputDimensions(
+				terminal.GetDimensions(),
+				parsed
+			);
 			if ( !IsUsableDimensions( dimensions ) ) {
 				await WriteLineAsync(
 					errorOutput,
@@ -389,7 +450,10 @@ Interactive keys:
 					token
 				).ConfigureAwait( false );
 				completed++;
-				dimensions = terminal.GetDimensions();
+				dimensions = ApplyOutputDimensions(
+					terminal.GetDimensions(),
+					parsed
+				);
 				if ( !IsUsableDimensions( dimensions ) ) {
 					parsed.State.Message = "terminal is too small for the top display";
 				}
@@ -397,21 +461,35 @@ Interactive keys:
 					terminal,
 					sample,
 					parsed.State,
+					supplementProvider,
+					accountResolver,
 					dimensions,
 					token
 				).ConfigureAwait( false );
-				if ( parsed.Iterations.HasValue && completed >= parsed.Iterations.Value ) {
+				if (
+					parsed.Iterations.HasValue
+					&& parsed.Iterations.Value <= completed
+				) {
 					return Success;
 				}
 
 				bool resample = false;
 				while ( !resample ) {
-					TimeSpan elapsed = clock.GetElapsedTime( cycleStarted, clock.GetTimestamp() );
-					TimeSpan remaining = parsed.State.Delay > elapsed
-						? parsed.State.Delay - elapsed
-						: TimeSpan.Zero;
-					if ( TimeSpan.Zero >= remaining ) {
-						break;
+					bool inspectPaused = parsed.State.InspectSession is not null;
+					TimeSpan remaining;
+					if ( inspectPaused ) {
+						remaining = TimeSpan.FromSeconds( 1 );
+					} else {
+						TimeSpan elapsed = clock.GetElapsedTime(
+							cycleStarted,
+							clock.GetTimestamp()
+						);
+						remaining = parsed.State.Delay > elapsed
+							? parsed.State.Delay - elapsed
+							: TimeSpan.Zero;
+						if ( remaining <= TimeSpan.Zero ) {
+							break;
+						}
 					}
 
 					TopTerminalEvent terminalEvent = await terminal.ReadEventAsync(
@@ -419,6 +497,9 @@ Interactive keys:
 						token
 					).ConfigureAwait( false );
 					if ( TopTerminalEventKind.Timeout == terminalEvent.Kind ) {
+						if ( inspectPaused ) {
+							continue;
+						}
 						break;
 					}
 					if ( TopTerminalEventKind.Interrupt == terminalEvent.Kind ) {
@@ -429,11 +510,16 @@ Interactive keys:
 						continue;
 					}
 					if ( TopTerminalEventKind.Resize == terminalEvent.Kind ) {
-						dimensions = terminal.GetDimensions();
+						dimensions = ApplyOutputDimensions(
+							terminal.GetDimensions(),
+							parsed
+						);
 						await RenderInteractiveAsync(
 							terminal,
 							sample,
 							parsed.State,
+							supplementProvider,
+							accountResolver,
 							dimensions,
 							token
 						).ConfigureAwait( false );
@@ -450,6 +536,7 @@ Interactive keys:
 						processProvider,
 						accountResolver,
 						processControl,
+						configurationStore,
 						dimensions,
 						token
 					).ConfigureAwait( false );
@@ -465,6 +552,8 @@ Interactive keys:
 							terminal,
 							sample,
 							parsed.State,
+							supplementProvider,
+							accountResolver,
 							dimensions,
 							token
 						).ConfigureAwait( false );
@@ -482,12 +571,16 @@ Interactive keys:
 		ITopTerminalSession terminal,
 		TopSample sample,
 		TopRuntimeState state,
+		IProcMatchSupplementProvider supplementProvider,
+		IProcAccountDisplayResolver accountResolver,
 		TopTerminalDimensions dimensions,
 		CancellationToken cancellationToken
 	) {
 		ArgumentNullException.ThrowIfNull( terminal );
 		ArgumentNullException.ThrowIfNull( sample );
 		ArgumentNullException.ThrowIfNull( state );
+		ArgumentNullException.ThrowIfNull( supplementProvider );
+		ArgumentNullException.ThrowIfNull( accountResolver );
 		if ( !IsUsableDimensions( dimensions ) ) {
 			var lines = new List<TopRenderLine> {
 				new(
@@ -506,6 +599,13 @@ Interactive keys:
 			).ConfigureAwait( false );
 			return;
 		}
+		await TopBottomWindowController.RefreshAsync(
+			sample,
+			state,
+			supplementProvider,
+			accountResolver,
+			cancellationToken
+		).ConfigureAwait( false );
 		await terminal.RenderAsync(
 			TopRenderer.RenderInteractive( sample, state, dimensions ),
 			cancellationToken
@@ -519,6 +619,7 @@ Interactive keys:
 		IProcProcessProvider processProvider,
 		IProcAccountDisplayResolver accountResolver,
 		ITopProcessControl processControl,
+		SystemTopConfigurationStore configurationStore,
 		TopTerminalDimensions dimensions,
 		CancellationToken cancellationToken
 	) {
@@ -527,7 +628,31 @@ Interactive keys:
 		ArgumentNullException.ThrowIfNull( processProvider );
 		ArgumentNullException.ThrowIfNull( accountResolver );
 		ArgumentNullException.ThrowIfNull( processControl );
+		ArgumentNullException.ThrowIfNull( configurationStore );
 
+		if ( state.InspectSession is not null ) {
+			TopInspectInputResult inspectResult = await state.InspectSession.HandleInputAsync(
+				input,
+				dimensions,
+				cancellationToken
+			).ConfigureAwait( false );
+			if ( TopInspectInputResult.Close == inspectResult ) {
+				state.InspectSession = null;
+				state.Message = null;
+				return TopCommandAction.Resample;
+			}
+			return ( TopInspectInputResult.Changed == inspectResult )
+				? TopCommandAction.Rerender
+				: TopCommandAction.None
+			;
+		}
+
+		if ( state.ColorManager is not null ) {
+			return HandleColorManagerInput(
+				input,
+				state
+			);
+		}
 		if ( state.ShowFieldManager ) {
 			return HandleFieldManagerInput(
 				input,
@@ -554,16 +679,22 @@ Interactive keys:
 		if ( TopInputKey.EndOfInput == input.Key ) {
 			return TopCommandAction.Exit;
 		}
+		if (
+			TopBottomWindowCommands.TryHandle(
+				input,
+				state,
+				out TopCommandAction bottomAction
+			)
+		) {
+			return bottomAction;
+		}
 		int pageSize = Math.Max(
 			1,
-			dimensions.Rows - 7
+			TopRenderer.GetTaskPageSize(
+				state,
+				dimensions
+			)
 		);
-		if ( 0 < state.MaximumTasks ) {
-			pageSize = Math.Min(
-				pageSize,
-				state.MaximumTasks
-			);
-		}
 
 		if ( TopInputKey.Up == input.Key ) {
 			state.VerticalOffset = Math.Max( 0, state.VerticalOffset - 1 );
@@ -612,25 +743,29 @@ Interactive keys:
 		if ( ' ' == value ) {
 			return TopCommandAction.Resample;
 		}
-		char key = 0x7f >= value ? (char)value : '\0';
+		char key = value <= 0x7f ? (char)value : '\0';
 		switch ( key ) {
 			case 'q':
 			case 'Q':
 				return TopCommandAction.Exit;
 			case 'P':
 				state.SortField = TopFieldId.Cpu;
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
 			case 'M':
 				state.SortField = TopFieldId.Memory;
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
 			case 'N':
 				state.SortField = TopFieldId.Pid;
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
 			case 'T':
 				state.SortField = TopFieldId.Time;
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
 			case '0':
@@ -638,16 +773,89 @@ Interactive keys:
 				return TopCommandAction.Rerender;
 			case 'R':
 				state.SortHighToLow = !state.SortHighToLow;
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				state.Message = state.SortHighToLow
 					? "sort direction: high to low"
 					: "sort direction: low to high";
+				return TopCommandAction.Rerender;
+			case 'A':
+				state.SynchronizeCurrentWindow();
+				state.AlternateDisplayMode = !state.AlternateDisplayMode;
+				state.Message = ( state.AlternateDisplayMode )
+					? "alternate display mode enabled"
+					: $"full-screen display: {state.CurrentWindowLabel}"
+				;
+				return TopCommandAction.Rerender;
+			case '-':
+				if ( !state.AlternateDisplayMode ) {
+					state.Message = "window visibility is available only in alternate-display mode";
+					return TopCommandAction.Rerender;
+				}
+				state.TaskDisplayVisible = !state.TaskDisplayVisible;
+				state.SynchronizeCurrentWindow();
+				state.Message = ( state.TaskDisplayVisible )
+					? $"{state.CurrentWindowLabel} task display shown"
+					: $"{state.CurrentWindowLabel} task display hidden"
+				;
+				return TopCommandAction.Rerender;
+			case '_':
+				if ( !state.AlternateDisplayMode ) {
+					state.Message = "window visibility is available only in alternate-display mode";
+					return TopCommandAction.Rerender;
+				}
+				state.ToggleAllTaskDisplays();
+				state.Message = "all task-window visibility toggled";
+				return TopCommandAction.Rerender;
+			case 'a':
+				ActivateRelativeWindow(
+					state,
+					1
+				);
+				return TopCommandAction.Rerender;
+			case 'w':
+				ActivateRelativeWindow(
+					state,
+					-1
+				);
+				return TopCommandAction.Rerender;
+			case 'g':
+				state.Prompt = new TopPromptState(
+					TopPromptKind.Window,
+					"Choose window (1-4): "
+				);
+				return TopCommandAction.Rerender;
+			case 'G':
+				state.Prompt = new TopPromptState(
+					TopPromptKind.WindowName,
+					$"Name {state.CurrentWindowLabel} (1-3 UTF-8 bytes): "
+				);
 				return TopCommandAction.Rerender;
 			case 'B':
 				state.BoldEnabled = !state.BoldEnabled;
 				return TopCommandAction.Rerender;
 			case 'b':
 				state.HighlightBold = !state.HighlightBold;
+				return TopCommandAction.Rerender;
+			case 'z':
+				state.ColorsEnabled = !state.ColorsEnabled;
+				return TopCommandAction.Rerender;
+			case 'Z':
+				state.ColorManager = new TopColorManagerState(
+					state
+				);
+				return TopCommandAction.Rerender;
+			case 'l':
+				state.LoadAverageVisible = !state.LoadAverageVisible;
+				return TopCommandAction.Rerender;
+			case 'C':
+				state.ScrollCoordinatesVisible = !state.ScrollCoordinatesVisible;
+				return TopCommandAction.Rerender;
+			case 't':
+				state.CycleCpuSummaryPresentation();
+				return TopCommandAction.Rerender;
+			case 'm':
+				state.CycleMemorySummaryPresentation();
 				return TopCommandAction.Rerender;
 			case 'J':
 				state.NumericLeftJustified = !state.NumericLeftJustified;
@@ -669,6 +877,12 @@ Interactive keys:
 				}
 				return TopCommandAction.Rerender;
 			}
+			case '<':
+				_ = state.MoveSortField( -1 );
+				return TopCommandAction.Rerender;
+			case '>':
+				_ = state.MoveSortField( 1 );
+				return TopCommandAction.Rerender;
 			case 'x':
 				state.HighlightSortColumn = !state.HighlightSortColumn;
 				return TopCommandAction.Rerender;
@@ -690,6 +904,26 @@ Interactive keys:
 				state.Forest = !state.Forest;
 				state.VerticalOffset = 0;
 				return TopCommandAction.Rerender;
+			case 'F':
+				if (
+					!TopRenderer.ToggleForestFocus(
+						sample,
+						state
+					)
+				) {
+					return TopCommandAction.None;
+				}
+				return TopCommandAction.Rerender;
+			case 'v':
+				if (
+					!TopRenderer.ToggleTopmostForestChildren(
+						sample,
+						state
+					)
+				) {
+					return TopCommandAction.None;
+				}
+				return TopCommandAction.Rerender;
 			case 'I':
 				state.IrixMode = !state.IrixMode;
 				state.Message = state.IrixMode
@@ -700,8 +934,37 @@ Interactive keys:
 				state.SummaryScale = TopRenderer.NextScale( state.SummaryScale );
 				return TopCommandAction.Rerender;
 			case 'e':
-				state.TaskScale = TopRenderer.NextScale( state.TaskScale );
+				state.TaskScale = TopRenderer.NextTaskScale( state.TaskScale );
 				return TopCommandAction.Rerender;
+			case 'X':
+				state.Message = null;
+				state.Prompt = new TopPromptState(
+					TopPromptKind.FixedWidthExtra,
+					$"Extra fixed width (-1 auto, 0 default, max {TopFixedWidth.MaximumExtra}): "
+				);
+				return TopCommandAction.Rerender;
+			case 'Y': {
+				state.Message = null;
+				if ( 0 == state.InspectEntries.Count ) {
+					state.Message = "no Inspect entries are configured";
+					return TopCommandAction.Rerender;
+				}
+				int? defaultProcessId = TopRenderer.GetTopmostProcessId(
+					sample,
+					state
+				);
+				string label = ( defaultProcessId.HasValue )
+					? $"Inspect PID [{defaultProcessId.Value}]: "
+					: "Inspect PID: "
+				;
+				state.Prompt = new TopPromptState(
+					TopPromptKind.InspectProcessId,
+					label
+				) {
+					ProcessId = defaultProcessId
+				};
+				return TopCommandAction.Rerender;
+			}
 			case '1':
 				state.SingleCpuSummary = !state.SingleCpuSummary;
 				state.Message = "Per-CPU activity rows are not yet exposed by the shared metrics contract; aggregate CPU remains shown.";
@@ -790,20 +1053,74 @@ Interactive keys:
 					"Any observed user (blank clears): "
 				);
 				return TopCommandAction.Rerender;
+			case 'W':
+				try {
+					string path = await configurationStore.SaveAsync(
+						state,
+						cancellationToken
+					).ConfigureAwait( false );
+					state.Message = $"configuration written to {path}";
+				} catch ( Exception exception ) when (
+					exception is IOException
+						or UnauthorizedAccessException
+				) {
+					state.Message = $"configuration write failed: {exception.Message}";
+				}
+				return TopCommandAction.Rerender;
 			case '=':
+				state.BottomWindow = null;
 				state.ProcessIds.Clear();
-				state.UserFilter = null;
-				state.OtherFilters.Clear();
-				state.HideIdle = false;
-				state.MaximumTasks = 0;
-				state.SearchText = null;
-				state.VerticalOffset = 0;
-				state.HorizontalOffset = 0;
-				state.Message = "display limits, filters, and scrolling reset";
+				ResetCurrentWindowDisplayLimits(
+					state
+				);
+				state.Message = $"display limits reset for {state.CurrentWindowLabel}";
+				return TopCommandAction.Rerender;
+			case '+':
+				state.BottomWindow = null;
+				state.ProcessIds.Clear();
+				ResetAllWindowDisplayLimits(
+					state
+				);
+				state.Message = "display limits reset for all windows";
 				return TopCommandAction.Rerender;
 			case 'h':
 			case '?':
 				state.ShowHelp = true;
+				return TopCommandAction.Rerender;
+			default:
+				return TopCommandAction.None;
+		}
+	}
+
+	private static TopCommandAction HandleColorManagerInput(
+		TopInputEvent input,
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		TopColorManagerState manager = state.ColorManager
+			?? throw new InvalidOperationException(
+				"Color mapping input was requested without an active color manager."
+			);
+		if ( TopInputKey.EndOfInput == input.Key ) {
+			manager.Restore(
+				state
+			);
+			state.ColorManager = null;
+			return TopCommandAction.Exit;
+		}
+
+		TopColorManagerInputResult result = manager.HandleInput(
+			input,
+			state
+		);
+		switch ( result ) {
+			case TopColorManagerInputResult.Commit:
+			case TopColorManagerInputResult.Cancel:
+				state.ColorManager = null;
+				state.Message = null;
+				return TopCommandAction.Rerender;
+			case TopColorManagerInputResult.Changed:
 				return TopCommandAction.Rerender;
 			default:
 				return TopCommandAction.None;
@@ -900,7 +1217,7 @@ Interactive keys:
 
 		int value = input.Character.Value.Value;
 		char key = '\0';
-		if ( 0x7f >= value ) {
+		if ( value <= 0x7f ) {
 			key = (char)value;
 		}
 		switch ( key ) {
@@ -908,6 +1225,24 @@ Interactive keys:
 			case 'Q':
 				state.ShowFieldManager = false;
 				state.FieldMoveActive = false;
+				return TopCommandAction.Rerender;
+			case 'a':
+				ActivateRelativeWindow(
+					state,
+					1
+				);
+				SelectCurrentSortField(
+					state
+				);
+				return TopCommandAction.Rerender;
+			case 'w':
+				ActivateRelativeWindow(
+					state,
+					-1
+				);
+				SelectCurrentSortField(
+					state
+				);
 				return TopCommandAction.Rerender;
 			case 'd':
 			case ' ': {
@@ -924,12 +1259,87 @@ Interactive keys:
 				state.SortField = state.FieldOrder[
 					state.FieldCursor
 				];
+				state.ExitForestForSort();
 				state.VerticalOffset = 0;
 				state.Message = null;
 				return TopCommandAction.Rerender;
 			default:
 				return TopCommandAction.None;
 		}
+	}
+
+	private static void ResetCurrentWindowDisplayLimits(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		state.TaskDisplayVisible = true;
+		state.UserFilter = null;
+		state.OtherFilters.Clear();
+		state.HideIdle = false;
+		state.MaximumTasks = 0;
+		state.SearchText = null;
+		state.ClearForestRestrictions();
+		state.VerticalOffset = 0;
+		state.HorizontalOffset = 0;
+		state.SynchronizeCurrentWindow();
+	}
+
+	private static void ResetAllWindowDisplayLimits(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		int currentWindowIndex = state.CurrentWindowIndex;
+		for ( int index = 0; index < TopRuntimeState.WindowCount; index++ ) {
+			state.ActivateWindow(
+				index
+			);
+			ResetCurrentWindowDisplayLimits(
+				state
+			);
+		}
+		state.ShowAllTaskDisplays();
+		state.ActivateWindow(
+			currentWindowIndex
+		);
+	}
+
+	private static void ActivateRelativeWindow(
+		TopRuntimeState state,
+		int delta
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+		if ( delta is not -1 and not 1 ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( delta )
+			);
+		}
+
+		int windowIndex = (
+			state.CurrentWindowIndex
+			+ delta
+			+ TopRuntimeState.WindowCount
+		) % TopRuntimeState.WindowCount;
+		state.ActivateWindow(
+			windowIndex
+		);
+		state.Message = $"current window: {state.CurrentWindowLabel}";
+	}
+
+	private static void SelectCurrentSortField(
+		TopRuntimeState state
+	) {
+		ArgumentNullException.ThrowIfNull( state );
+
+		int sortFieldIndex = state.FieldOrder.IndexOf(
+			state.SortField
+		);
+		state.FieldCursor = ( 0 <= sortFieldIndex )
+			? sortFieldIndex
+			: 0
+		;
+		state.FieldMoveActive = false;
 	}
 
 	private static void MoveFieldCursor(
@@ -1034,6 +1444,108 @@ Interactive keys:
 				state.Message = 0 == maximumTasks
 					? "maximum tasks: unlimited"
 					: $"maximum tasks set to {maximumTasks}";
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.FixedWidthExtra:
+				state.Prompt = null;
+				if (
+					!int.TryParse(
+						text,
+						NumberStyles.Integer,
+						CultureInfo.InvariantCulture,
+						out int fixedWidthExtra
+					)
+					|| !TopFixedWidth.IsValid( fixedWidthExtra )
+				) {
+					state.Message = $"extra fixed width must be between -1 and {TopFixedWidth.MaximumExtra}";
+					return TopCommandAction.Rerender;
+				}
+				TopFixedWidth.Configure(
+					state,
+					fixedWidthExtra
+				);
+				if ( -1 == fixedWidthExtra ) {
+					state.Message = "extra fixed width: automatic";
+				} else if ( 0 == fixedWidthExtra ) {
+					state.Message = "extra fixed width: defaults";
+				} else {
+					state.Message = $"extra fixed width: +{fixedWidthExtra}";
+				}
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.InspectProcessId:
+				state.Prompt = null;
+				int inspectPid;
+				if ( 0 == text.Length ) {
+					if ( !prompt.ProcessId.HasValue ) {
+						state.Message = "Inspect requires a positive process identifier";
+						return TopCommandAction.Rerender;
+					}
+					inspectPid = prompt.ProcessId.Value;
+				} else if (
+					!int.TryParse(
+						text,
+						NumberStyles.Integer,
+						CultureInfo.InvariantCulture,
+						out inspectPid
+					)
+					|| 1 > inspectPid
+				) {
+					state.Message = "Inspect requires a positive process identifier";
+					return TopCommandAction.Rerender;
+				}
+
+				ProcProcessSnapshot? inspectTarget = await ResolveTargetAsync(
+					inspectPid,
+					sample,
+					processProvider,
+					cancellationToken
+				).ConfigureAwait( false );
+				if ( inspectTarget is null ) {
+					state.Message = $"process {inspectPid} is no longer available";
+					return TopCommandAction.Rerender;
+				}
+				state.InspectSession = new TopInspectSession(
+					inspectTarget.ProcessId,
+					state.InspectEntries
+				);
+				state.Message = null;
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.Window:
+				state.Prompt = null;
+				if (
+					!int.TryParse(
+						text,
+						NumberStyles.None,
+						CultureInfo.InvariantCulture,
+						out int selectedWindow
+					)
+					|| selectedWindow is < 1 or > TopRuntimeState.WindowCount
+				) {
+					state.Message = $"window must be between 1 and {TopRuntimeState.WindowCount}";
+					return TopCommandAction.Rerender;
+				}
+				state.ActivateWindow(
+					selectedWindow - 1
+				);
+				state.Message = $"current window: {state.CurrentWindowLabel}";
+				return TopCommandAction.Rerender;
+
+			case TopPromptKind.WindowName:
+				state.Prompt = null;
+				string windowName = prompt.Buffer.Trim();
+				int windowNameBytes = Utf8.GetByteCount(
+					windowName
+				);
+				if ( windowNameBytes is < 1 or > 3 ) {
+					state.Message = "window name must occupy 1 through 3 UTF-8 bytes";
+					return TopCommandAction.Rerender;
+				}
+				state.RenameCurrentWindow(
+					windowName
+				);
+				state.Message = $"window renamed: {state.CurrentWindowLabel}";
 				return TopCommandAction.Rerender;
 
 			case TopPromptKind.Locate:
@@ -1221,22 +1733,62 @@ Interactive keys:
 		return observed.HasValue ? observed.Value : null;
 	}
 
+	private static bool ShouldLoadConfiguration(
+		IReadOnlyList<string> args
+	) {
+		ArgumentNullException.ThrowIfNull( args );
+
+		foreach ( string argument in args ) {
+			if (
+				argument is "-h" or "--help"
+					or "-V" or "--version"
+					or "-O" or "--list-fields"
+			) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static bool ShouldLoadPersonalConfiguration(
+		IReadOnlyList<string> args
+	) {
+		ArgumentNullException.ThrowIfNull( args );
+
+		foreach ( string argument in args ) {
+			if ( argument is "-A" or "--apply-defaults" ) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static bool ForcesSecureMode(
+		IReadOnlyList<string> args
+	) {
+		ArgumentNullException.ThrowIfNull( args );
+
+		foreach ( string argument in args ) {
+			if ( argument is "-s" or "--secure-mode" ) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	private static ParsedArguments Parse(
 		IReadOnlyList<string> args,
 		IProcAccountDisplayResolver accountResolver,
 		Func<string, string?> environmentVariableProvider,
-		int currentProcessId
+		int currentProcessId,
+		TopRuntimeState startupState
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		ArgumentNullException.ThrowIfNull( accountResolver );
 		ArgumentNullException.ThrowIfNull( environmentVariableProvider );
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( currentProcessId );
-		var result = new ParsedArguments();
-		string? columns = environmentVariableProvider( "COLUMNS" );
-		if ( int.TryParse( columns, NumberStyles.None, CultureInfo.InvariantCulture, out int environmentWidth )
-			&& 0 < environmentWidth ) {
-			result.BatchWidth = environmentWidth;
-		}
+		ArgumentNullException.ThrowIfNull( startupState );
+		var result = new ParsedArguments( startupState );
 
 		for ( int index = 0; index < args.Count && result.Error is null; index++ ) {
 			string argument = args[ index ];
@@ -1263,7 +1815,7 @@ Interactive keys:
 				continue;
 			}
 			if ( argument is "-c" or "--cmdline-toggle" ) {
-				result.State.ShowCommandLine = true;
+				result.State.ShowCommandLine = !result.State.ShowCommandLine;
 				continue;
 			}
 			if ( argument is "-H" or "--threads-show" ) {
@@ -1271,7 +1823,8 @@ Interactive keys:
 				continue;
 			}
 			if ( argument is "-i" or "--idle-toggle" ) {
-				result.State.HideIdle = true;
+				result.State.HideIdle = !result.State.HideIdle;
+				result.State.MaximumTasks = 0;
 				continue;
 			}
 			if ( argument is "-O" or "--list-fields" ) {
@@ -1287,12 +1840,14 @@ Interactive keys:
 				continue;
 			}
 			if ( argument is "-1" or "--single-cpu-toggle" ) {
-				result.State.SingleCpuSummary = false;
+				result.State.SingleCpuSummary = !result.State.SingleCpuSummary;
 				continue;
 			}
 
 			if ( TryOptionValue( args, ref index, argument, "-d", "--delay", out string? delayText ) ) {
-				if ( !TryParseDelay( delayText!, out TimeSpan delay ) ) {
+				if ( result.State.SecureMode ) {
+					result.Fail( "-d/--delay is unavailable in secure mode" );
+				} else if ( !TryParseDelay( delayText!, out TimeSpan delay ) ) {
 					result.Fail( $"invalid delay '{delayText}'" );
 				} else {
 					result.State.Delay = delay;
@@ -1308,7 +1863,7 @@ Interactive keys:
 				continue;
 			}
 			if ( TryOptionValue( args, ref index, argument, "-e", "--scale-task-mem", out string? taskScale ) ) {
-				if ( !TopRenderer.TryParseScale( taskScale!, out TopMemoryScale scale ) ) {
+				if ( !TopRenderer.TryParseTaskScale( taskScale!, out TopMemoryScale scale ) ) {
 					result.Fail( $"invalid task memory scale '{taskScale}'" );
 				} else {
 					result.State.TaskScale = scale;
@@ -1335,6 +1890,7 @@ Interactive keys:
 					result.Fail( $"unknown sort field '{sortText}'" );
 				} else {
 					result.State.SortField = sortField;
+					result.State.ExitForestForSort();
 					if ( sortHighToLow.HasValue ) {
 						result.State.SortHighToLow = sortHighToLow.Value;
 					}
@@ -1342,7 +1898,9 @@ Interactive keys:
 				continue;
 			}
 			if ( TryOptionValue( args, ref index, argument, "-p", "--pid", out string? pidText ) ) {
-				if ( !AddProcessIds( pidText!, result.State.ProcessIds, currentProcessId, out string? error ) ) {
+				if ( result.State.UserFilter is not null ) {
+					result.Fail( "selection options -p, -u, and -U are mutually exclusive except that -p may be repeated" );
+				} else if ( !AddProcessIds( pidText!, result.State.ProcessIds, currentProcessId, out string? error ) ) {
 					result.Fail( error! );
 				} else if ( MaximumMonitoredProcessIds < result.State.ProcessIds.Count ) {
 					result.Fail( $"no more than {MaximumMonitoredProcessIds} process IDs may be monitored" );
@@ -1350,7 +1908,9 @@ Interactive keys:
 				continue;
 			}
 			if ( TryOptionValue( args, ref index, argument, "-u", "--filter-only-euser", out string? effectiveUser ) ) {
-				if ( !TryParseUserFilter( effectiveUser!, false, accountResolver, out TopUserFilter? filter, out string? error ) ) {
+				if ( 0 < result.State.ProcessIds.Count || result.State.UserFilter is not null ) {
+					result.Fail( "selection options -p, -u, and -U are mutually exclusive except that -p may be repeated" );
+				} else if ( !TryParseUserFilter( effectiveUser!, false, accountResolver, out TopUserFilter? filter, out string? error ) ) {
 					result.Fail( error! );
 				} else {
 					result.State.UserFilter = filter;
@@ -1358,7 +1918,9 @@ Interactive keys:
 				continue;
 			}
 			if ( TryOptionValue( args, ref index, argument, "-U", "--filter-any-user", out string? anyUser ) ) {
-				if ( !TryParseUserFilter( anyUser!, true, accountResolver, out TopUserFilter? filter, out string? error ) ) {
+				if ( 0 < result.State.ProcessIds.Count || result.State.UserFilter is not null ) {
+					result.Fail( "selection options -p, -u, and -U are mutually exclusive except that -p may be repeated" );
+				} else if ( !TryParseUserFilter( anyUser!, true, accountResolver, out TopUserFilter? filter, out string? error ) ) {
 					result.Fail( error! );
 				} else {
 					result.State.UserFilter = filter;
@@ -1368,8 +1930,26 @@ Interactive keys:
 			if ( TryParseWidthOption( args, ref index, argument, out int? width, out bool matched, out string? widthError ) ) {
 				if ( widthError is not null ) {
 					result.Fail( widthError );
+				} else if ( matched && width.HasValue ) {
+					result.BatchWidth = width.Value;
+					result.OutputWidth = width.Value;
 				} else if ( matched ) {
-					result.BatchWidth = width ?? DefaultBatchWidth;
+					int environmentWidth = ReadEnvironmentDimension(
+						environmentVariableProvider,
+						"COLUMNS",
+						MinimumOutputColumns,
+						MaximumOutputColumns
+					) ?? DefaultBatchWidth;
+					int? environmentHeight = ReadEnvironmentDimension(
+						environmentVariableProvider,
+						"LINES",
+						MinimumOutputRows,
+						maximum: null
+					);
+					result.BatchWidth = environmentWidth;
+					result.BatchHeight = environmentHeight;
+					result.OutputWidth = environmentWidth;
+					result.OutputHeight = environmentHeight;
 				}
 				continue;
 			}
@@ -1379,11 +1959,6 @@ Interactive keys:
 
 		if ( result.Error is null && result.ApplyDefaults && 1 != args.Count ) {
 			result.Fail( "-A/--apply-defaults must be the only command-line option" );
-		}
-		if ( result.Error is null
-			&& 0 < result.State.ProcessIds.Count
-			&& result.State.UserFilter is not null ) {
-			result.Fail( "-p/--pid is mutually exclusive with -u and -U user filtering" );
 		}
 		return result;
 	}
@@ -1431,17 +2006,13 @@ Interactive keys:
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		ArgumentNullException.ThrowIfNull( argument );
+		_ = index;
 		width = null;
 		matched = false;
 		error = null;
 		string? text = null;
 		if ( "-w" == argument || "--width" == argument ) {
 			matched = true;
-			if ( index + 1 < args.Count
-				&& !args[ index + 1 ].StartsWith( "-", StringComparison.Ordinal )
-				&& int.TryParse( args[ index + 1 ], NumberStyles.None, CultureInfo.InvariantCulture, out _ ) ) {
-				text = args[ ++index ];
-			}
 		} else if ( argument.StartsWith( "--width=", StringComparison.Ordinal ) ) {
 			matched = true;
 			text = argument[ "--width=".Length.. ];
@@ -1456,13 +2027,60 @@ Interactive keys:
 			width = null;
 			return true;
 		}
-		if ( !int.TryParse( text, NumberStyles.None, CultureInfo.InvariantCulture, out int parsedWidth )
-			|| 0 >= parsedWidth ) {
-			error = $"invalid output width '{text}'";
+		if (
+			!int.TryParse(
+				text,
+				NumberStyles.None,
+				CultureInfo.InvariantCulture,
+				out int parsedWidth
+			)
+			|| parsedWidth is < MinimumOutputColumns or > MaximumOutputColumns
+		) {
+			error = $"output width must be {MinimumOutputColumns} through {MaximumOutputColumns} columns";
 			return true;
 		}
 		width = parsedWidth;
 		return true;
+	}
+
+	private static int? ReadEnvironmentDimension(
+		Func<string, string?> environmentVariableProvider,
+		string name,
+		int minimum,
+		int? maximum
+	) {
+		ArgumentNullException.ThrowIfNull( environmentVariableProvider );
+		ArgumentException.ThrowIfNullOrWhiteSpace( name );
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( minimum );
+		if ( maximum.HasValue && maximum.Value < minimum ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( maximum )
+			);
+		}
+
+		string? text = environmentVariableProvider( name );
+		if (
+			!int.TryParse(
+				text,
+				NumberStyles.Integer,
+				CultureInfo.InvariantCulture,
+				out int value
+			)
+			|| 0 >= value
+		) {
+			return null;
+		}
+		value = Math.Max(
+			minimum,
+			value
+		);
+		if ( maximum.HasValue ) {
+			value = Math.Min(
+				maximum.Value,
+				value
+			);
+		}
+		return value;
 	}
 
 	private static bool AddProcessIds(
@@ -1553,6 +2171,26 @@ Interactive keys:
 		return 0 == starts.Length ? string.Empty : text[ ..starts[ ^1 ] ];
 	}
 
+	private static TopTerminalDimensions ApplyOutputDimensions(
+		TopTerminalDimensions actual,
+		ParsedArguments parsed
+	) {
+		ArgumentNullException.ThrowIfNull( parsed );
+
+		int columns = parsed.OutputWidth.HasValue
+			? Math.Min( actual.Columns, parsed.OutputWidth.Value )
+			: actual.Columns
+		;
+		int rows = parsed.OutputHeight.HasValue
+			? Math.Min( actual.Rows, parsed.OutputHeight.Value )
+			: actual.Rows
+		;
+		return new TopTerminalDimensions(
+			columns,
+			rows
+		);
+	}
+
 	private static bool IsUsableDimensions( TopTerminalDimensions dimensions ) =>
 		dimensions.Columns >= MinimumColumns && dimensions.Rows >= MinimumRows;
 
@@ -1591,14 +2229,12 @@ Interactive keys:
 		await output.WriteAsync( bytes.AsMemory(), cancellationToken ).ConfigureAwait( false );
 	}
 
-	private enum TopCommandAction {
-		None,
-		Rerender,
-		Resample,
-		Exit
-	}
-
 	private sealed class ParsedArguments {
+		internal ParsedArguments( TopRuntimeState state ) {
+			ArgumentNullException.ThrowIfNull( state );
+			this.State = state;
+		}
+
 		internal bool ApplyDefaults { get; set; }
 		internal bool Batch { get; set; }
 		internal bool Help { get; set; }
@@ -1606,7 +2242,10 @@ Interactive keys:
 		internal bool ListFields { get; set; }
 		internal int? Iterations { get; set; }
 		internal int BatchWidth { get; set; } = DefaultBatchWidth;
-		internal TopRuntimeState State { get; } = new();
+		internal int? BatchHeight { get; set; }
+		internal int? OutputWidth { get; set; }
+		internal int? OutputHeight { get; set; }
+		internal TopRuntimeState State { get; }
 		internal string? Error { get; private set; }
 
 		internal void Fail( string error ) {

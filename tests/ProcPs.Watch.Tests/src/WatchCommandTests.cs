@@ -21,6 +21,7 @@
 
 namespace Icod.ProcPs.Watch.Tests;
 
+using System.Globalization;
 using System.Text;
 using Icod.DCurses;
 using Icod.Processes;
@@ -175,6 +176,52 @@ public sealed class WatchCommandTests {
 		Assert.Equal( "H", terminal.Frames[ 1 ].Screen.GetCell( 0, 3 ).Content );
 	}
 
+	[Theory]
+	[InlineData( "-d1" )]
+	[InlineData( "--differences=1" )]
+	[InlineData( "--differences=permanent" )]
+	public async Task AttachedDifferencesArgumentEnablesPermanentHighlight(
+		string option
+	) {
+		ArgumentException.ThrowIfNullOrWhiteSpace( option );
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new WatchTerminalDimensions( 30, 4 )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent( WatchTerminalEventKind.Timeout )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent( WatchTerminalEventKind.Timeout )
+		);
+		terminal.Events.Enqueue( Input( 'q' ) );
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "alpha" ),
+			Execution.Success( "alpHa" ),
+			Execution.Success( "alpha" )
+		);
+
+		CommandResult result = await RunAsync(
+			[ "--exec", "--no-title", option, "tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 3, executor.Options.Count );
+		Assert.Equal( 3, terminal.Frames.Count );
+		Assert.NotNull( terminal.Frames[ 1 ].Highlights );
+		Assert.NotNull( terminal.Frames[ 2 ].Highlights );
+		Assert.True( terminal.Frames[ 1 ].Highlights![ 3 ] );
+		Assert.True(
+			terminal.Frames[ 2 ].Highlights![ 3 ],
+			"Permanent highlighting should retain a prior visible difference."
+		);
+	}
+
 	[Fact]
 	public async Task ColorOptionTranslatesSgrToSemanticCursesStyle() {
 		FakeClock coloredClock = new();
@@ -210,12 +257,155 @@ public sealed class WatchCommandTests {
 
 		Assert.Equal( 0, plainResult.ExitCode );
 		Assert.True( plain.Frames[ 0 ].Screen.GetCell( 0, 0 ).Style.IsDefault );
+		Assert.StartsWith(
+			"[31mred[0m",
+			VisibleRow(
+				plain.Frames[ 0 ].Screen,
+				0
+			),
+			StringComparison.Ordinal
+		);
+	}
+
+	[Fact]
+	public void IndexedSgrAndBoldResetMatchProcpsColorProfile() {
+		WatchScreen screen = WatchScreen.Create(
+			"\u001b[1;21;38;5;200;48;5;17mX",
+			new WatchTerminalDimensions( 10, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: true
+		);
+
+		CursesStyle style = screen.GetCell( 0, 0 ).Style;
+		Assert.Equal( CursesTextAttributes.None, style.Attributes );
+		Assert.Equal( CursesColorKind.Indexed, style.Foreground.Kind );
+		Assert.Equal( 200, style.Foreground.Index );
+		Assert.Equal( CursesColorKind.Indexed, style.Background.Kind );
+		Assert.Equal( 17, style.Background.Index );
+	}
+
+	[Fact]
+	public void UnsupportedSgrStopsRemainingAttributesAndRgbIsNotInterpreted() {
+		WatchScreen unsupported = WatchScreen.Create(
+			"\u001b[1;6;31mX",
+			new WatchTerminalDimensions( 10, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: true
+		);
+		CursesStyle unsupportedStyle = unsupported.GetCell( 0, 0 ).Style;
+		Assert.True(
+			0 != (
+				unsupportedStyle.Attributes
+				& CursesTextAttributes.Bold
+			)
+		);
+		Assert.True( unsupportedStyle.Foreground.IsDefault );
+
+		WatchScreen rgb = WatchScreen.Create(
+			"\u001b[38;2;1;2;3mX",
+			new WatchTerminalDimensions( 10, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: true
+		);
+		Assert.True( rgb.GetCell( 0, 0 ).Style.IsDefault );
+	}
+
+	[Fact]
+	public void PrivateAnsiSequenceConsumesOnlyProcpsPrefix() {
+		WatchScreen screen = WatchScreen.Create(
+			"\u001b[?25lX",
+			new WatchTerminalDimensions( 10, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: true
+		);
+
+		Assert.StartsWith(
+			"25lX",
+			VisibleRow(
+				screen,
+				0
+			),
+			StringComparison.Ordinal
+		);
+	}
+
+	[Fact]
+	public void NoWrapDiscardedTailResetsAnsiBeforeNextLine() {
+		WatchScreen screen = WatchScreen.Create(
+			"\u001b[31mAB\u001b[32mignored\nX",
+			new WatchTerminalDimensions( 1, 2 ),
+			noTitle: true,
+			noWrap: true,
+			preserveColor: true
+		);
+
+		CursesStyle firstStyle = screen.GetCell( 0, 0 ).Style;
+		Assert.Equal( 1, firstStyle.Foreground.Index );
+		Assert.Equal( "X", screen.GetCell( 1, 0 ).Content );
+		Assert.True( screen.GetCell( 1, 0 ).Style.IsDefault );
+	}
+
+	[Fact]
+	public void CarriageReturnIsIgnoredAsNonPrintingOutput() {
+		WatchScreen screen = WatchScreen.Create(
+			"ab\rcd",
+			new WatchTerminalDimensions( 6, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: false
+		);
+
+		Assert.StartsWith(
+			"abcd",
+			VisibleRow( screen, 0 ),
+			StringComparison.Ordinal
+		);
+	}
+
+	[Fact]
+	public void FollowCarriageReturnDoesNotRewindRetainedCursor() {
+		WatchScreen screen = WatchScreen.AppendFollow(
+			null,
+			"ab",
+			new WatchTerminalDimensions( 6, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: false
+		);
+		screen = WatchScreen.AppendFollow(
+			screen,
+			"\rcd",
+			new WatchTerminalDimensions( 6, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: false
+		);
+
+		Assert.StartsWith(
+			"abcd",
+			VisibleRow( screen, 0 ),
+			StringComparison.Ordinal
+		);
 	}
 
 	[Fact]
 	public async Task BeepAndErrorExitPropagateChildStatus() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock, new WatchTerminalDimensions( 40, 5 ) );
+		terminal.Events.Enqueue(
+			Input(
+				' ',
+				availableDuringZeroTimeout: true
+			)
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent( WatchTerminalEventKind.Repaint )
+		);
+		terminal.Events.Enqueue( Input( 'x' ) );
 
 		CommandResult result = await RunAsync(
 			[ "--exec", "--beep", "--errexit", "tool" ],
@@ -227,6 +417,128 @@ public sealed class WatchCommandTests {
 		Assert.Equal( 7, result.ExitCode );
 		Assert.Equal( 1, terminal.AlertCount );
 		Assert.Single( terminal.Frames );
+		Assert.Equal( 1, terminal.RepaintCount );
+		Assert.Equal( 2, terminal.StatusMessages.Count );
+		Assert.All(
+			terminal.StatusMessages,
+			static message => Assert.Contains(
+				"press a key to exit",
+				message,
+				StringComparison.Ordinal
+			)
+		);
+		Assert.Equal( 4, terminal.Waits.Count );
+		Assert.Equal( TimeSpan.Zero, terminal.Waits[ 0 ] );
+		Assert.Equal( TimeSpan.Zero, terminal.Waits[ 1 ] );
+	}
+
+	[Theory]
+	[InlineData( ProcessLaunchFailureKind.NotFound )]
+	[InlineData( ProcessLaunchFailureKind.CannotInvoke )]
+	public async Task ErrorExitNormalizesLaunchFailureTo127(
+		ProcessLaunchFailureKind failureKind
+	) {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new WatchTerminalDimensions( 40, 5 )
+		);
+		terminal.Events.Enqueue( Input( 'x' ) );
+		FakeExecutor executor = new(
+			clock,
+			Execution.LaunchFailure(
+				"unable to execute",
+				failureKind
+			)
+		);
+
+		CommandResult result = await RunAsync(
+			[ "--exec", "--errexit", "missing-tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 127, result.ExitCode );
+		Assert.Single( executor.Options );
+		Assert.Single( terminal.Frames );
+		Assert.Single( terminal.StatusMessages );
+		Assert.Contains(
+			"unable to execute",
+			VisibleText( terminal.Frames[ 0 ].Screen ),
+			StringComparison.Ordinal
+		);
+	}
+
+	[Fact]
+	public async Task ChildBellAlertsWithoutBeepOption() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new WatchTerminalDimensions( 20, 3 )
+		);
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "a\ab" ),
+			Execution.Success( "a\ab" )
+		);
+
+		CommandResult result = await RunAsync(
+			[ "--exec", "--no-title", "--equexit=1", "tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 2, executor.Options.Count );
+		Assert.Equal( 2, terminal.AlertCount );
+		Assert.Equal( 2, terminal.Frames.Count );
+	}
+
+	[Fact]
+	public void OrdinaryScreenDoesNotCountBellBeyondConsumedBody() {
+		WatchScreen screen = WatchScreen.Create(
+			"A\n\a",
+			new WatchTerminalDimensions( 1, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: false,
+			alertCount: out int alertCount
+		);
+
+		Assert.Equal( 0, alertCount );
+		Assert.Equal( "A", screen.GetCell( 0, 0 ).Content );
+	}
+
+	[Fact]
+	public void FollowScreenCountsBellAfterScrollingPastFirstBody() {
+		WatchScreen screen = WatchScreen.AppendFollow(
+			null,
+			"A\n\a",
+			new WatchTerminalDimensions( 1, 1 ),
+			noTitle: true,
+			noWrap: false,
+			preserveColor: false,
+			alertCount: out int alertCount
+		);
+
+		Assert.Equal( 1, alertCount );
+		Assert.Equal( string.Empty, screen.GetCell( 0, 0 ).Content );
+	}
+
+	[Fact]
+	public void NoWrapDoesNotCountBellInDiscardedLineTail() {
+		_ = WatchScreen.Create(
+			"AB\a\n",
+			new WatchTerminalDimensions( 1, 2 ),
+			noTitle: true,
+			noWrap: true,
+			preserveColor: false,
+			alertCount: out int alertCount
+		);
+
+		Assert.Equal( 0, alertCount );
 	}
 
 	[Fact]
@@ -300,6 +612,22 @@ public sealed class WatchCommandTests {
 		Assert.Equal( 3, terminal.Frames.Count );
 		Assert.Equal( 5, terminal.Frames[ 0 ].Screen.Width );
 		Assert.Equal( 6, terminal.Frames[ 1 ].Screen.Width );
+		Assert.Equal(
+			"5",
+			executor.Options[ 0 ].EnvironmentVariables[ "COLUMNS" ]
+		);
+		Assert.Equal(
+			"3",
+			executor.Options[ 0 ].EnvironmentVariables[ "LINES" ]
+		);
+		Assert.Equal(
+			"6",
+			executor.Options[ 1 ].EnvironmentVariables[ "COLUMNS" ]
+		);
+		Assert.Equal(
+			"3",
+			executor.Options[ 1 ].EnvironmentVariables[ "LINES" ]
+		);
 	}
 
 	[Fact]
@@ -335,6 +663,7 @@ public sealed class WatchCommandTests {
 	public async Task StandardOutputAndErrorShareDisplayStream() {
 		FakeClock clock = new();
 		FakeTerminal terminal = new( clock, new WatchTerminalDimensions( 40, 5 ) );
+		terminal.Events.Enqueue( Input( 'x' ) );
 
 		CommandResult result = await RunAsync(
 			[ "--exec", "--errexit", "tool" ],
@@ -381,22 +710,44 @@ public sealed class WatchCommandTests {
 			titled,
 			new FakeExecutor(
 				titledClock,
-				Execution.Success( "same" ),
-				Execution.Success( "same" )
+				new Execution( "same", string.Empty, 0, TimeSpan.FromMilliseconds( 125 ) ),
+				new Execution( "same", string.Empty, 0, TimeSpan.FromMilliseconds( 125 ) )
 			),
 			titledClock
 		);
 
 		Assert.Equal( 0, titledResult.ExitCode );
 		Assert.Equal( 2, titled.Frames[ 0 ].HeaderLines.Count );
+		string intervalText = 2d.ToString(
+			"0.0",
+			CultureInfo.CurrentCulture
+		);
 		Assert.Contains(
-			"Every 2s: tool",
+			$"Every {intervalText}s: tool",
 			titled.Frames[ 0 ].HeaderLines[ 0 ],
 			StringComparison.Ordinal
 		);
-		Assert.Contains(
-			"test-host",
+		DateTimeOffset now = new(
+			2026,
+			8,
+			25,
+			12,
+			34,
+			56,
+			TimeSpan.Zero
+		);
+		Assert.EndsWith(
+			$"test-host: {now.ToString( "G", CultureInfo.CurrentCulture )}",
 			titled.Frames[ 0 ].HeaderLines[ 0 ],
+			StringComparison.Ordinal
+		);
+		string elapsedText = 0.125d.ToString(
+			"0.000",
+			CultureInfo.CurrentCulture
+		);
+		Assert.EndsWith(
+			$"in {elapsedText}s (0)",
+			titled.Frames[ 0 ].HeaderLines[ 1 ],
 			StringComparison.Ordinal
 		);
 
@@ -528,7 +879,7 @@ public sealed class WatchCommandTests {
 			FakeClock clock = new();
 			FakeTerminal terminal = new(
 				clock,
-				new WatchTerminalDimensions( 40, 5 )
+				new WatchTerminalDimensions( 80, 5 )
 			);
 			terminal.Events.Enqueue(
 				Input(
@@ -577,7 +928,10 @@ public sealed class WatchCommandTests {
 			);
 			Assert.Equal( 6, lines.Length );
 			Assert.StartsWith(
-				"Every 2s: tool",
+				$"Every {2d.ToString(
+					"0.0",
+					CultureInfo.CurrentCulture
+				)}s: tool",
 				lines[ 0 ],
 				StringComparison.Ordinal
 			);
@@ -588,7 +942,7 @@ public sealed class WatchCommandTests {
 			);
 			for ( int index = 0; index < 5; index++ ) {
 				Assert.Equal(
-					40,
+					80,
 					lines[ index ].Length
 				);
 			}
@@ -637,6 +991,189 @@ public sealed class WatchCommandTests {
 		Assert.Empty( executor.Options );
 		Assert.Equal( 0, terminal.OpenCount );
 		Assert.False( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task FollowRetainsCursorAndScrollsAcrossExecutions() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new WatchTerminalDimensions( 8, 3 )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent( WatchTerminalEventKind.Timeout )
+		);
+		terminal.Events.Enqueue(
+			Input( 'q' )
+		);
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "one\ntwo" ),
+			Execution.Success( "!\nthree\nfour" )
+		);
+
+		CommandResult result = await RunAsync(
+			[
+				"--exec",
+				"--follow",
+				"--no-title",
+				"--interval=0.1",
+				"tool"
+			],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Equal( 2, executor.Options.Count );
+		Assert.Equal( 2, terminal.Frames.Count );
+		Assert.StartsWith(
+			"one",
+			VisibleRow( terminal.Frames[ 0 ].Screen, 0 ),
+			StringComparison.Ordinal
+		);
+		Assert.StartsWith(
+			"two!",
+			VisibleRow( terminal.Frames[ 1 ].Screen, 0 ),
+			StringComparison.Ordinal
+		);
+		Assert.StartsWith(
+			"three",
+			VisibleRow( terminal.Frames[ 1 ].Screen, 1 ),
+			StringComparison.Ordinal
+		);
+		Assert.StartsWith(
+			"four",
+			VisibleRow( terminal.Frames[ 1 ].Screen, 2 ),
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
+	}
+
+	[Fact]
+	public async Task FollowScreenshotSerializesRetainedScrollingFrame() {
+		string directory = Path.Combine(
+			Path.GetTempPath(),
+			"Icod.ProcPs.Watch.Tests",
+			Guid.NewGuid().ToString(
+				"N"
+			)
+		);
+		Directory.CreateDirectory(
+			directory
+		);
+		try {
+			FakeClock clock = new();
+			FakeTerminal terminal = new(
+				clock,
+				new WatchTerminalDimensions( 8, 3 )
+			);
+			terminal.Events.Enqueue(
+				new ScheduledTerminalEvent( WatchTerminalEventKind.Timeout )
+			);
+			terminal.Events.Enqueue( Input( 's' ) );
+			terminal.Events.Enqueue( Input( 'q' ) );
+			FakeExecutor executor = new(
+				clock,
+				Execution.Success( "one\ntwo" ),
+				Execution.Success( "!\nthree\nfour" )
+			);
+
+			CommandResult result = await RunAsync(
+				[
+					"--exec",
+					"--follow",
+					"--no-title",
+					"--interval=0.1",
+					"--shotsdir",
+					directory,
+					"tool"
+				],
+				terminal,
+				executor,
+				clock
+			);
+
+			Assert.Equal( 0, result.ExitCode );
+			Assert.Equal( 2, executor.Options.Count );
+			string[] files = Directory.GetFiles(
+				directory
+			);
+			Assert.Single( files );
+
+			string content = await File.ReadAllTextAsync(
+				files[ 0 ]
+			);
+			string[] lines = content.Split(
+				'\n'
+			);
+			Assert.Equal( 4, lines.Length );
+			Assert.StartsWith(
+				"two!",
+				lines[ 0 ],
+				StringComparison.Ordinal
+			);
+			Assert.StartsWith(
+				"three",
+				lines[ 1 ],
+				StringComparison.Ordinal
+			);
+			Assert.StartsWith(
+				"four",
+				lines[ 2 ],
+				StringComparison.Ordinal
+			);
+		} finally {
+			Directory.Delete(
+				directory,
+				recursive: true
+			);
+		}
+	}
+
+	[Fact]
+	public async Task FollowNoRerunResizeRepaintsRetainedBody() {
+		FakeClock clock = new();
+		FakeTerminal terminal = new(
+			clock,
+			new WatchTerminalDimensions( 8, 3 )
+		);
+		terminal.Events.Enqueue(
+			new ScheduledTerminalEvent(
+				WatchTerminalEventKind.Resize,
+				new WatchTerminalDimensions( 10, 4 )
+			)
+		);
+		terminal.Events.Enqueue( Input( 'q' ) );
+		FakeExecutor executor = new(
+			clock,
+			Execution.Success( "one\ntwo" )
+		);
+
+		CommandResult result = await RunAsync(
+			[ "--exec", "--follow", "--no-title", "--no-rerun", "tool" ],
+			terminal,
+			executor,
+			clock
+		);
+
+		Assert.Equal( 0, result.ExitCode );
+		Assert.Single( executor.Options );
+		Assert.Equal( 2, terminal.Frames.Count );
+		Assert.Equal( 10, terminal.Frames[ 1 ].Screen.Width );
+		Assert.Equal( 4, terminal.Frames[ 1 ].Screen.Height );
+		Assert.StartsWith(
+			"one",
+			VisibleRow( terminal.Frames[ 1 ].Screen, 0 ),
+			StringComparison.Ordinal
+		);
+		Assert.StartsWith(
+			"two",
+			VisibleRow( terminal.Frames[ 1 ].Screen, 1 ),
+			StringComparison.Ordinal
+		);
+		Assert.True( terminal.Disposed );
 	}
 
 	[Fact]
@@ -694,15 +1231,41 @@ public sealed class WatchCommandTests {
 		return builder.ToString();
 	}
 
+	private static string VisibleRow(
+		WatchScreen screen,
+		int row
+	) {
+		ArgumentNullException.ThrowIfNull( screen );
+		if ( 0 > row || screen.Height <= row ) {
+			throw new ArgumentOutOfRangeException( nameof( row ) );
+		}
+
+		StringBuilder builder = new();
+		for ( int column = 0; column < screen.Width; column++ ) {
+			WatchCell cell = screen.GetCell(
+				row,
+				column
+			);
+			if ( !cell.IsContinuation ) {
+				builder.Append(
+					0 == cell.Content.Length ? " " : cell.Content
+				);
+			}
+		}
+		return builder.ToString();
+	}
+
 	private static ScheduledTerminalEvent Input(
-		char value
+		char value,
+		bool availableDuringZeroTimeout = false
 	) {
 		return new ScheduledTerminalEvent(
 			WatchTerminalEventKind.Input,
 			Input: new WatchInputEvent(
 				WatchInputKey.Character,
 				new Rune( value )
-			)
+			),
+			AvailableDuringZeroTimeout: availableDuringZeroTimeout
 		);
 	}
 
@@ -749,7 +1312,8 @@ public sealed class WatchCommandTests {
 		string StandardOutput,
 		string StandardError,
 		int ExitCode,
-		TimeSpan Elapsed
+		TimeSpan Elapsed,
+		ProcessTermination? Termination = null
 	) {
 		internal static Execution Success(
 			string output
@@ -762,6 +1326,23 @@ public sealed class WatchCommandTests {
 			string output
 		) {
 			return new Execution( output, string.Empty, exitCode, TimeSpan.Zero );
+		}
+
+		internal static Execution LaunchFailure(
+			string message,
+			ProcessLaunchFailureKind failureKind
+		) {
+			ArgumentException.ThrowIfNullOrWhiteSpace( message );
+			return new Execution(
+				string.Empty,
+				string.Empty,
+				0,
+				TimeSpan.Zero,
+				ProcessTermination.LaunchFailed(
+					message,
+					failureKind
+				)
+			);
 		}
 	}
 
@@ -808,8 +1389,12 @@ public sealed class WatchCommandTests {
 				).ConfigureAwait( false );
 			}
 			this.clock.Advance( execution.Elapsed );
+			ProcessTermination termination = execution.Termination
+				?? ProcessTermination.Exited( execution.ExitCode );
 			return ProcessResult.FromTermination(
-				ProcessTermination.Exited( execution.ExitCode ),
+				termination,
+				started: ProcessTerminationKind.LaunchFailed
+					!= termination.Kind,
 				elapsed: execution.Elapsed
 			);
 		}
@@ -873,7 +1458,8 @@ public sealed class WatchCommandTests {
 	private sealed record ScheduledTerminalEvent(
 		WatchTerminalEventKind Kind,
 		WatchTerminalDimensions? Dimensions = null,
-		WatchInputEvent? Input = null
+		WatchInputEvent? Input = null,
+		bool AvailableDuringZeroTimeout = false
 	);
 
 	private sealed class FakeTerminal : IWatchTerminalSession {
@@ -902,6 +1488,10 @@ public sealed class WatchCommandTests {
 		} = new();
 
 		internal List<WatchRenderFrame> Frames {
+			get;
+		} = [];
+
+		internal List<string> StatusMessages {
 			get;
 		} = [];
 
@@ -943,7 +1533,16 @@ public sealed class WatchCommandTests {
 			cancellationToken.ThrowIfCancellationRequested();
 			this.Waits.Add( timeout );
 			if ( 0 < this.Events.Count ) {
-				ScheduledTerminalEvent scripted = this.Events.Dequeue();
+				ScheduledTerminalEvent scripted = this.Events.Peek();
+				if (
+					TimeSpan.Zero == timeout
+					&& !scripted.AvailableDuringZeroTimeout
+				) {
+					return ValueTask.FromResult(
+						new WatchTerminalEvent( WatchTerminalEventKind.Timeout )
+					);
+				}
+				_ = this.Events.Dequeue();
 				if ( scripted.Dimensions.HasValue ) {
 					this.dimensions = scripted.Dimensions.Value;
 				}
@@ -968,6 +1567,16 @@ public sealed class WatchCommandTests {
 			ArgumentNullException.ThrowIfNull( frame );
 			cancellationToken.ThrowIfCancellationRequested();
 			this.Frames.Add( frame );
+			return ValueTask.CompletedTask;
+		}
+
+		public ValueTask ShowStatusAsync(
+			string message,
+			CancellationToken cancellationToken = default
+		) {
+			ArgumentException.ThrowIfNullOrWhiteSpace( message );
+			cancellationToken.ThrowIfCancellationRequested();
+			this.StatusMessages.Add( message );
 			return ValueTask.CompletedTask;
 		}
 
