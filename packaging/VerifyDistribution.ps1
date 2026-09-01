@@ -143,7 +143,15 @@ function Assert-ToolPackage {
         [string]$ExpectedCommand,
 
         [Parameter(Mandatory = $true)]
-        [string[]]$RequiredAssemblies
+        [string]$ExpectedReadmeEntry,
+
+        [Parameter(Mandatory = $true)]
+        [string]$ExpectedReadmeSourcePath,
+
+        [Parameter(Mandatory = $true)]
+        [string[]]$RequiredAssemblies,
+
+        [string[]]$RequiredPackageEntries = @()
     )
 
     $result = Read-ToolSettingsFromPackage -PackagePath $PackagePath -TargetFramework $TargetFramework
@@ -166,6 +174,63 @@ function Assert-ToolPackage {
             if (-not ($archive.Entries | Where-Object { $_.FullName -eq $entryPath } | Select-Object -First 1)) {
                 throw "Package '$PackagePath' does not contain '$entryPath'."
             }
+        }
+
+        foreach ($entryPath in $RequiredPackageEntries) {
+            if (-not ($archive.Entries | Where-Object { $_.FullName -eq $entryPath } | Select-Object -First 1)) {
+                throw "Package '$PackagePath' does not contain '$entryPath'."
+            }
+        }
+
+        $nuspecEntries = @(
+            $archive.Entries |
+                Where-Object {
+                    $_.FullName.EndsWith(
+                        '.nuspec',
+                        [System.StringComparison]::OrdinalIgnoreCase
+                    )
+                }
+        )
+        if (1 -ne $nuspecEntries.Count) {
+            throw "Package '$PackagePath' contains $($nuspecEntries.Count) nuspec files; expected exactly one."
+        }
+
+        $reader = [System.IO.StreamReader]::new($nuspecEntries[0].Open())
+        try {
+            [xml]$nuspec = $reader.ReadToEnd()
+        } finally {
+            $reader.Dispose()
+        }
+
+        $readmeNode = $nuspec.SelectSingleNode(
+            "/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='readme']"
+        )
+        if ($null -eq $readmeNode -or [string]::IsNullOrWhiteSpace($readmeNode.InnerText)) {
+            throw "Package '$PackagePath' does not declare NuGet readme metadata."
+        }
+
+        $readmeEntryPath = $readmeNode.InnerText.Trim().Replace('\', '/')
+        if ($ExpectedReadmeEntry -ne $readmeEntryPath) {
+            throw "Package '$PackagePath' declares readme '$readmeEntryPath'; expected '$ExpectedReadmeEntry'."
+        }
+
+        $readmeEntry = $archive.Entries |
+            Where-Object { $_.FullName -eq $readmeEntryPath } |
+            Select-Object -First 1
+        if ($null -eq $readmeEntry) {
+            throw "Package '$PackagePath' does not contain declared readme '$readmeEntryPath'."
+        }
+
+        $reader = [System.IO.StreamReader]::new($readmeEntry.Open())
+        try {
+            $actualReadme = $reader.ReadToEnd()
+        } finally {
+            $reader.Dispose()
+        }
+
+        $expectedReadme = [System.IO.File]::ReadAllText($ExpectedReadmeSourcePath)
+        if ($expectedReadme -ne $actualReadme) {
+            throw "Package '$PackagePath' readme does not match '$ExpectedReadmeSourcePath'."
         }
     } finally {
         $archive.Dispose()
@@ -243,7 +308,9 @@ $productNames = [ordered]@{
 [xml]$routerProject = Get-Content -LiteralPath $routerProjectPath -Raw
 $targetFramework = Get-ProjectProperty -Project $routerProject -Name 'TargetFramework'
 $routerPackageId = Get-ProjectProperty -Project $routerProject -Name 'PackageId'
+$routerPackageReadme = Get-ProjectProperty -Project $routerProject -Name 'PackageReadmeFile'
 $routerVersion = Get-ProjectProperty -Project $suiteProperties -Name 'IcodProcPsSuiteVersion'
+$repositoryReadmePath = Join-Path $repositoryRoot 'README.md'
 
 $validationRoot = Join-Path $repositoryRoot 'artifacts/distribution-validation'
 $packageDirectory = Join-Path $validationRoot 'packages'
@@ -306,7 +373,10 @@ try {
         -PackagePath $routerPackagePath `
         -TargetFramework $targetFramework `
         -ExpectedCommand 'procps' `
-        -RequiredAssemblies $commandAssemblies
+        -ExpectedReadmeEntry $routerPackageReadme `
+        -ExpectedReadmeSourcePath $repositoryReadmePath `
+        -RequiredAssemblies $commandAssemblies `
+        -RequiredPackageEntries @('procps/README.md')
 
     Write-LocalNuGetConfig -PackageDirectory $packageDirectory -Path $nugetConfigPath
 

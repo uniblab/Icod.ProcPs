@@ -98,9 +98,9 @@ osx-arm64
 To build an archive locally with PowerShell 7:
 
 ```text
-pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier win-x64 -Version 1.0.1
-pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier linux-x64 -Version 1.0.1
-pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier osx-x64 -Version 1.0.1
+pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier win-x64 -Version 1.1.1
+pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier linux-x64 -Version 1.1.1
+pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier osx-x64 -Version 1.1.1
 ```
 
 The script smoke-tests all eighteen apphosts when the requested RID matches the
@@ -132,6 +132,9 @@ The verifier:
   `procps`;
 - verifies that the router and seventeen managed command assemblies are present in
   the package;
+- verifies that NuGet readme metadata names the repository-level `README.md`,
+  that the packaged readme exactly matches that file, and that the router-specific
+  `procps/README.md` is retained separately;
 - installs the package from an isolated local NuGet source; and
 - exercises `procps --version` and each routed command's `--version` path.
 
@@ -145,8 +148,7 @@ for both x64 and ARM64.
 
 - the tag has the form `v<semver>`;
 - the tagged commit is contained in `main`;
-- the tag version matches both `Version` and `PackageVersion` in
-  `procps/Icod.ProcPs.Router.csproj`;
+- the tag version matches `IcodProcPsSuiteVersion` in `Directory.Build.props`;
 - distribution verification passes on Windows, Linux, and macOS on x64 and
   ARM64;
 - all six RID-specific ZIPs build and smoke-test; and
@@ -180,8 +182,13 @@ Trusted Publishing policy with these values:
 Repository owner: uniblab
 Repository:       Icod.ProcPs
 Workflow file:    release.yaml
-Environment:      (leave empty)
+Environment:      Release
 ```
+
+The `publish-nuget` job is bound to the GitHub `Release` environment. The
+environment name is part of the OIDC identity presented to NuGet.org, so the
+Trusted Publishing policy must specify `Release` exactly; leaving the policy
+environment blank will not match this workflow.
 
 Create an Actions repository secret named `NUGET_USER` containing the NuGet.org
 profile name that owns or is authorized to publish `Icod.ProcPs`. Use the
@@ -205,8 +212,8 @@ tag:
 ```text
 git switch main
 git pull
-git tag -a v1.0.1 -m "Icod.ProcPs 1.0.1"
-git push origin v1.0.1
+git tag -a v1.1.1 -m "Icod.ProcPs 1.1.1"
+git push origin v1.1.1
 ```
 
 The tag is the release trigger and the immutable source identity for every
@@ -232,11 +239,11 @@ suite version used by release archives:
 Icod.ProcPs.X (VERSION) inspired by procps-ng 4.0.6
 ```
 
-Keep all three values aligned when preparing a suite release. Distribution
+`Version` and `PackageVersion` in the router project derive from this central
+property, so the release tag must match `IcodProcPsSuiteVersion`. Distribution
 verification and release-archive smoke tests compare every standalone and routed
-command's version output against the router package version and fail on a
-mismatch. The independent `Icod.ProcPs.Shared` package keeps its own package
-version.
+command's version output against the same suite version and fail on a mismatch.
+The independent `Icod.ProcPs.Shared` package keeps its own package version.
 
 ## Licensing
 
