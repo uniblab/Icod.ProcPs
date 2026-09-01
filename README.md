@@ -5,7 +5,6 @@
 [![PR build and test](https://github.com/uniblab/Icod.ProcPs/actions/workflows/pr-build-and-test.yaml/badge.svg)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/pr-build-and-test.yaml)
 [![Package validation](https://github.com/uniblab/Icod.ProcPs/actions/workflows/distribution-validation.yaml/badge.svg?branch=main)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/push-main.yaml)
 [![Main build and test](https://github.com/uniblab/Icod.ProcPs/actions/workflows/push-main.yaml/badge.svg?branch=main)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/push-main.yaml)
-[![Release package](https://github.com/uniblab/Icod.ProcPs/actions/workflows/release.yaml/badge.svg?branch=main)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/release.yaml)
 
 `Icod.ProcPs` is a managed .NET implementation of a selected set of tools from
 procps-ng 4.0.6.
