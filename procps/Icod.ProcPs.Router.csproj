@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.0-alpha.36 closes the slabtop release-readiness audit: documentation now records the procps-ng 4.0.6 slab-memory accounting caveats, the exact /proc/slabinfo data source, upstream authorship, and the two intentional managed deviations for sort-preserving input and live DCurses geometry.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.0-alpha.37 closes the top release-readiness audit: procps-ng 4.0.6 command-line scale, selector, and width semantics are tightened; directly observed task identity fields are exposed and round-trip through native top configuration; synthetic scheduler priority is removed; and remaining provider-blocked top surfaces are documented.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

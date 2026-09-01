@@ -109,7 +109,10 @@ public static class Command {
 	private const int Canceled = 130;
 	private const int MinimumColumns = 40;
 	private const int MinimumRows = 7;
-	private const int DefaultBatchWidth = 512;
+	private const int MinimumOutputColumns = 3;
+	private const int MinimumOutputRows = 3;
+	private const int MaximumOutputColumns = 512;
+	private const int DefaultBatchWidth = MaximumOutputColumns;
 	private const int MaximumMonitoredProcessIds = 20;
 	private static readonly string VersionText = global::Icod.ProcPs.ProcCommandVersion.Format(
 		"Icod.ProcPs.Top",
@@ -126,18 +129,18 @@ Options:
  -c, --cmdline-toggle          reverse the remembered command name/line state
  -d, --delay SECONDS           set the refresh delay; fractional seconds are accepted
  -E, --scale-summary-mem SCALE set summary memory scale: k, m, g, t, p, or e
- -e, --scale-task-mem SCALE    set task memory scale: k, m, g, t, p, or e
+ -e, --scale-task-mem SCALE    set task memory scale: k, m, g, t, or p
  -H, --threads-show            show individual lightweight tasks where supported
  -i, --idle-toggle             reverse the remembered idle-task state
  -n, --iterations NUMBER       exit after NUMBER refreshes
  -O, --list-fields             list fields implemented by this top and exit
- -o, --sort-override FIELD     sort by PID, USER, PR, NI, VIRT, RES, SHR, S, %CPU, %MEM, TIME+, or COMMAND
+ -o, --sort-override FIELD     sort by any field listed by -O/--list-fields
  -p, --pid PIDLIST             monitor only the selected process IDs (maximum 20)
  -s, --secure-mode             force secure mode, including for privileged users
  -S, --accum-time-toggle       not available: child CPU counters are not yet observed
  -U, --filter-any-user USER    filter by any observed real/effective user ID
  -u, --filter-only-euser USER  filter by effective user ID
- -w, --width [COLUMNS]         batch output width; without COLUMNS use 512
+ -w, --width[=COLUMNS]         constrain geometry; bare -w uses COLUMNS/LINES
  -1, --single-cpu-toggle       reverse the remembered aggregate CPU state
  -V, --version                 display version information and exit
  -h, --help                    display this help and exit
@@ -365,7 +368,8 @@ Interactive keys:
 			foreach ( string line in TopRenderer.RenderBatch(
 				sample,
 				parsed.State,
-				parsed.BatchWidth
+				parsed.BatchWidth,
+				parsed.BatchHeight
 			) ) {
 				await WriteLineAsync( output, line, cancellationToken ).ConfigureAwait( false );
 			}
@@ -419,7 +423,10 @@ Interactive keys:
 				).ConfigureAwait( false );
 				return Failure;
 			}
-			TopTerminalDimensions dimensions = terminal.GetDimensions();
+			TopTerminalDimensions dimensions = ApplyOutputDimensions(
+				terminal.GetDimensions(),
+				parsed
+			);
 			if ( !IsUsableDimensions( dimensions ) ) {
 				await WriteLineAsync(
 					errorOutput,
@@ -443,7 +450,10 @@ Interactive keys:
 					token
 				).ConfigureAwait( false );
 				completed++;
-				dimensions = terminal.GetDimensions();
+				dimensions = ApplyOutputDimensions(
+					terminal.GetDimensions(),
+					parsed
+				);
 				if ( !IsUsableDimensions( dimensions ) ) {
 					parsed.State.Message = "terminal is too small for the top display";
 				}
@@ -500,7 +510,10 @@ Interactive keys:
 						continue;
 					}
 					if ( TopTerminalEventKind.Resize == terminalEvent.Kind ) {
-						dimensions = terminal.GetDimensions();
+						dimensions = ApplyOutputDimensions(
+							terminal.GetDimensions(),
+							parsed
+						);
 						await RenderInteractiveAsync(
 							terminal,
 							sample,
@@ -921,7 +934,7 @@ Interactive keys:
 				state.SummaryScale = TopRenderer.NextScale( state.SummaryScale );
 				return TopCommandAction.Rerender;
 			case 'e':
-				state.TaskScale = TopRenderer.NextScale( state.TaskScale );
+				state.TaskScale = TopRenderer.NextTaskScale( state.TaskScale );
 				return TopCommandAction.Rerender;
 			case 'X':
 				state.Message = null;
@@ -1776,11 +1789,6 @@ Interactive keys:
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( currentProcessId );
 		ArgumentNullException.ThrowIfNull( startupState );
 		var result = new ParsedArguments( startupState );
-		string? columns = environmentVariableProvider( "COLUMNS" );
-		if ( int.TryParse( columns, NumberStyles.None, CultureInfo.InvariantCulture, out int environmentWidth )
-			&& 0 < environmentWidth ) {
-			result.BatchWidth = environmentWidth;
-		}
 
 		for ( int index = 0; index < args.Count && result.Error is null; index++ ) {
 			string argument = args[ index ];
@@ -1816,6 +1824,7 @@ Interactive keys:
 			}
 			if ( argument is "-i" or "--idle-toggle" ) {
 				result.State.HideIdle = !result.State.HideIdle;
+				result.State.MaximumTasks = 0;
 				continue;
 			}
 			if ( argument is "-O" or "--list-fields" ) {
@@ -1854,7 +1863,7 @@ Interactive keys:
 				continue;
 			}
 			if ( TryOptionValue( args, ref index, argument, "-e", "--scale-task-mem", out string? taskScale ) ) {
-				if ( !TopRenderer.TryParseScale( taskScale!, out TopMemoryScale scale ) ) {
+				if ( !TopRenderer.TryParseTaskScale( taskScale!, out TopMemoryScale scale ) ) {
 					result.Fail( $"invalid task memory scale '{taskScale}'" );
 				} else {
 					result.State.TaskScale = scale;
@@ -1889,7 +1898,9 @@ Interactive keys:
 				continue;
 			}
 			if ( TryOptionValue( args, ref index, argument, "-p", "--pid", out string? pidText ) ) {
-				if ( !AddProcessIds( pidText!, result.State.ProcessIds, currentProcessId, out string? error ) ) {
+				if ( result.State.UserFilter is not null ) {
+					result.Fail( "selection options -p, -u, and -U are mutually exclusive except that -p may be repeated" );
+				} else if ( !AddProcessIds( pidText!, result.State.ProcessIds, currentProcessId, out string? error ) ) {
 					result.Fail( error! );
 				} else if ( MaximumMonitoredProcessIds < result.State.ProcessIds.Count ) {
 					result.Fail( $"no more than {MaximumMonitoredProcessIds} process IDs may be monitored" );
@@ -1897,7 +1908,9 @@ Interactive keys:
 				continue;
 			}
 			if ( TryOptionValue( args, ref index, argument, "-u", "--filter-only-euser", out string? effectiveUser ) ) {
-				if ( !TryParseUserFilter( effectiveUser!, false, accountResolver, out TopUserFilter? filter, out string? error ) ) {
+				if ( 0 < result.State.ProcessIds.Count || result.State.UserFilter is not null ) {
+					result.Fail( "selection options -p, -u, and -U are mutually exclusive except that -p may be repeated" );
+				} else if ( !TryParseUserFilter( effectiveUser!, false, accountResolver, out TopUserFilter? filter, out string? error ) ) {
 					result.Fail( error! );
 				} else {
 					result.State.UserFilter = filter;
@@ -1905,7 +1918,9 @@ Interactive keys:
 				continue;
 			}
 			if ( TryOptionValue( args, ref index, argument, "-U", "--filter-any-user", out string? anyUser ) ) {
-				if ( !TryParseUserFilter( anyUser!, true, accountResolver, out TopUserFilter? filter, out string? error ) ) {
+				if ( 0 < result.State.ProcessIds.Count || result.State.UserFilter is not null ) {
+					result.Fail( "selection options -p, -u, and -U are mutually exclusive except that -p may be repeated" );
+				} else if ( !TryParseUserFilter( anyUser!, true, accountResolver, out TopUserFilter? filter, out string? error ) ) {
 					result.Fail( error! );
 				} else {
 					result.State.UserFilter = filter;
@@ -1915,8 +1930,26 @@ Interactive keys:
 			if ( TryParseWidthOption( args, ref index, argument, out int? width, out bool matched, out string? widthError ) ) {
 				if ( widthError is not null ) {
 					result.Fail( widthError );
+				} else if ( matched && width.HasValue ) {
+					result.BatchWidth = width.Value;
+					result.OutputWidth = width.Value;
 				} else if ( matched ) {
-					result.BatchWidth = width ?? DefaultBatchWidth;
+					int environmentWidth = ReadEnvironmentDimension(
+						environmentVariableProvider,
+						"COLUMNS",
+						MinimumOutputColumns,
+						MaximumOutputColumns
+					) ?? DefaultBatchWidth;
+					int? environmentHeight = ReadEnvironmentDimension(
+						environmentVariableProvider,
+						"LINES",
+						MinimumOutputRows,
+						maximum: null
+					);
+					result.BatchWidth = environmentWidth;
+					result.BatchHeight = environmentHeight;
+					result.OutputWidth = environmentWidth;
+					result.OutputHeight = environmentHeight;
 				}
 				continue;
 			}
@@ -1926,11 +1959,6 @@ Interactive keys:
 
 		if ( result.Error is null && result.ApplyDefaults && 1 != args.Count ) {
 			result.Fail( "-A/--apply-defaults must be the only command-line option" );
-		}
-		if ( result.Error is null
-			&& 0 < result.State.ProcessIds.Count
-			&& result.State.UserFilter is not null ) {
-			result.Fail( "-p/--pid is mutually exclusive with -u and -U user filtering" );
 		}
 		return result;
 	}
@@ -1978,17 +2006,13 @@ Interactive keys:
 	) {
 		ArgumentNullException.ThrowIfNull( args );
 		ArgumentNullException.ThrowIfNull( argument );
+		_ = index;
 		width = null;
 		matched = false;
 		error = null;
 		string? text = null;
 		if ( "-w" == argument || "--width" == argument ) {
 			matched = true;
-			if ( index + 1 < args.Count
-				&& !args[ index + 1 ].StartsWith( "-", StringComparison.Ordinal )
-				&& int.TryParse( args[ index + 1 ], NumberStyles.None, CultureInfo.InvariantCulture, out _ ) ) {
-				text = args[ ++index ];
-			}
 		} else if ( argument.StartsWith( "--width=", StringComparison.Ordinal ) ) {
 			matched = true;
 			text = argument[ "--width=".Length.. ];
@@ -2003,13 +2027,60 @@ Interactive keys:
 			width = null;
 			return true;
 		}
-		if ( !int.TryParse( text, NumberStyles.None, CultureInfo.InvariantCulture, out int parsedWidth )
-			|| 0 >= parsedWidth ) {
-			error = $"invalid output width '{text}'";
+		if (
+			!int.TryParse(
+				text,
+				NumberStyles.None,
+				CultureInfo.InvariantCulture,
+				out int parsedWidth
+			)
+			|| parsedWidth is < MinimumOutputColumns or > MaximumOutputColumns
+		) {
+			error = $"output width must be {MinimumOutputColumns} through {MaximumOutputColumns} columns";
 			return true;
 		}
 		width = parsedWidth;
 		return true;
+	}
+
+	private static int? ReadEnvironmentDimension(
+		Func<string, string?> environmentVariableProvider,
+		string name,
+		int minimum,
+		int? maximum
+	) {
+		ArgumentNullException.ThrowIfNull( environmentVariableProvider );
+		ArgumentException.ThrowIfNullOrWhiteSpace( name );
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( minimum );
+		if ( maximum.HasValue && maximum.Value < minimum ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( maximum )
+			);
+		}
+
+		string? text = environmentVariableProvider( name );
+		if (
+			!int.TryParse(
+				text,
+				NumberStyles.Integer,
+				CultureInfo.InvariantCulture,
+				out int value
+			)
+			|| 0 >= value
+		) {
+			return null;
+		}
+		value = Math.Max(
+			minimum,
+			value
+		);
+		if ( maximum.HasValue ) {
+			value = Math.Min(
+				maximum.Value,
+				value
+			);
+		}
+		return value;
 	}
 
 	private static bool AddProcessIds(
@@ -2100,6 +2171,26 @@ Interactive keys:
 		return 0 == starts.Length ? string.Empty : text[ ..starts[ ^1 ] ];
 	}
 
+	private static TopTerminalDimensions ApplyOutputDimensions(
+		TopTerminalDimensions actual,
+		ParsedArguments parsed
+	) {
+		ArgumentNullException.ThrowIfNull( parsed );
+
+		int columns = parsed.OutputWidth.HasValue
+			? Math.Min( actual.Columns, parsed.OutputWidth.Value )
+			: actual.Columns
+		;
+		int rows = parsed.OutputHeight.HasValue
+			? Math.Min( actual.Rows, parsed.OutputHeight.Value )
+			: actual.Rows
+		;
+		return new TopTerminalDimensions(
+			columns,
+			rows
+		);
+	}
+
 	private static bool IsUsableDimensions( TopTerminalDimensions dimensions ) =>
 		dimensions.Columns >= MinimumColumns && dimensions.Rows >= MinimumRows;
 
@@ -2151,6 +2242,9 @@ Interactive keys:
 		internal bool ListFields { get; set; }
 		internal int? Iterations { get; set; }
 		internal int BatchWidth { get; set; } = DefaultBatchWidth;
+		internal int? BatchHeight { get; set; }
+		internal int? OutputWidth { get; set; }
+		internal int? OutputHeight { get; set; }
 		internal TopRuntimeState State { get; }
 		internal string? Error { get; private set; }
 

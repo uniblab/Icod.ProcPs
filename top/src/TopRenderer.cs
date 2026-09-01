@@ -527,11 +527,17 @@ internal static class TopRenderer {
 	internal static IReadOnlyList<string> RenderBatch(
 		TopSample sample,
 		TopRuntimeState state,
-		int width
+		int width,
+		int? height = null
 	) {
 		ArgumentNullException.ThrowIfNull( sample );
 		ArgumentNullException.ThrowIfNull( state );
 		ArgumentOutOfRangeException.ThrowIfNegativeOrZero( width );
+		if ( height.HasValue && 0 >= height.Value ) {
+			throw new ArgumentOutOfRangeException(
+				nameof( height )
+			);
+		}
 		List<TopTaskRow> tasks = SelectAndOrderTasks(
 			sample,
 			state
@@ -556,6 +562,11 @@ internal static class TopRenderer {
 				).Text,
 				width
 			) );
+		}
+		if ( height.HasValue && height.Value < lines.Count ) {
+			return lines.Take(
+				height.Value
+			).ToArray();
 		}
 		return lines;
 	}
@@ -809,6 +820,14 @@ internal static class TopRenderer {
 		_ => TopMemoryScale.Kibibytes
 	};
 
+	internal static TopMemoryScale NextTaskScale( TopMemoryScale scale ) => scale switch {
+		TopMemoryScale.Kibibytes => TopMemoryScale.Mebibytes,
+		TopMemoryScale.Mebibytes => TopMemoryScale.Gibibytes,
+		TopMemoryScale.Gibibytes => TopMemoryScale.Tebibytes,
+		TopMemoryScale.Tebibytes => TopMemoryScale.Pebibytes,
+		_ => TopMemoryScale.Kibibytes
+	};
+
 	internal static bool TryParseScale( string text, out TopMemoryScale scale ) {
 		ArgumentNullException.ThrowIfNull( text );
 		if ( 1 != text.Length ) {
@@ -825,6 +844,24 @@ internal static class TopRenderer {
 			_ => default
 		};
 		return char.ToLowerInvariant( text[ 0 ] ) is 'k' or 'm' or 'g' or 't' or 'p' or 'e';
+	}
+
+	internal static bool TryParseTaskScale(
+		string text,
+		out TopMemoryScale scale
+	) {
+		ArgumentNullException.ThrowIfNull( text );
+		if (
+			!TryParseScale(
+				text,
+				out scale
+			)
+			|| TopMemoryScale.Exbibytes == scale
+		) {
+			scale = default;
+			return false;
+		}
+		return true;
 	}
 
 	internal static TopRenderFrame RenderColorManager(
@@ -2112,16 +2149,6 @@ internal static class TopRenderer {
 	internal static ulong FieldObservedOrZero(
 		ProcObservedValue<ulong> value
 	) => ObservedOrZero( value );
-
-	internal static int FieldObservedPriority(
-		ProcProcessSnapshot process
-	) {
-		ArgumentNullException.ThrowIfNull( process );
-		if ( !process.NiceValue.HasValue ) {
-			return int.MaxValue;
-		}
-		return 20 + process.NiceValue.Value;
-	}
 
 	internal static int FieldObservedNice(
 		ProcProcessSnapshot process

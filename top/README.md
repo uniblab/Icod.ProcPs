@@ -49,7 +49,9 @@ Batch mode does not open a terminal and is suitable for redirection or pipelines
   MiB, GiB, TiB, PiB, and EiB respectively.
 
 `-e SCALE`, `--scale-task-mem SCALE`
-: Select the VIRT and RES task-column scale using the same scale letters.
+: Select the VIRT and RES task-column scale. `k`, `m`, `g`, `t`, and `p` select
+  KiB through PiB. Procps-ng 4.0.6 does not accept EiB for task columns, even
+  though `-E e` is valid for summary memory.
 
 `-H`, `--threads-show`
 : Show Linux lightweight tasks where the shared ProcPs provider can enumerate
@@ -67,10 +69,12 @@ Batch mode does not open a terminal and is suitable for redirection or pipelines
 : List the fields implemented by this `top` presentation engine and exit.
 
 `-o FIELD`, `--sort-override FIELD`
-: Select the initial sort field. Implemented names are `CPU`, `%CPU`, `MEM`,
-  `%MEM`, `PID`, `TIME+`, `VIRT`, `RES`, `USER`, `COMMAND`, `NI`, and `S`.
-  Prefix the field with `+` to force high-to-low ordering or `-` to force
-  low-to-high ordering; without a prefix the active/default direction is kept.
+: Select the initial sort field. Implemented names include `PID`, `PPID`, `UID`,
+  `USER`, `RUID`, `GID`, `PGRP`, `TTY`, `TPGID`, `SID`, `PR`, `NI`, `nTH`,
+  `VIRT`, `RES`, `SHR`, `S`, `%CPU`, `%MEM`, `TIME+`, and `COMMAND`. `CPU`,
+  `MEM`, and the established one-letter aliases remain accepted. Prefix the
+  field with `+` to force high-to-low ordering or `-` to force low-to-high
+  ordering; without a prefix the active/default direction is kept.
 
 `-p PIDLIST`, `--pid PIDLIST`
 : Restrict the display to a comma- or whitespace-separated set of process IDs.
@@ -97,10 +101,17 @@ Batch mode does not open a terminal and is suitable for redirection or pipelines
 : Restrict the display to the effective user. Prefix USER with `!` to invert the
   match.
 
-`-w [COLUMNS]`, `--width [COLUMNS]`
-: Select batch output width. When no width is supplied, 512 columns are used.
-  Without `-w`, a positive `COLUMNS` environment value is honored; otherwise
-  the batch default is 512.
+`-w[COLUMNS]`, `--width[=COLUMNS]`
+: Follow procps-ng 4.0.6's optional-width model. An explicit value must be
+  attached (`-w80` or `--width=80`) and must be between 3 and 512 columns.
+  Bare `-w` consults positive `COLUMNS` and `LINES` values: columns are clamped
+  to 3..512 and rows to a minimum of 3. In batch mode `LINES` limits the emitted
+  frame height; in interactive mode either override may reduce, but never
+  enlarge, the live DCurses geometry. The managed interactive renderer still
+  requires at least 40 columns by 7 rows, so widths below 40 are useful only
+  to batch mode. Without `-w`, managed batch mode uses its 512-column
+  no-terminal fallback and deliberately does not consult those environment
+  variables.
 
 `-1`, `--single-cpu-toggle`
 : Reverse the remembered aggregate CPU presentation state. The current shared
@@ -344,7 +355,10 @@ process observations.
 
 The current neutral process model does not expose a defensible per-process
 shared-resident (`SHR`) value. The SHR column is therefore rendered as `-`
-instead of being estimated from unrelated counters.
+instead of being estimated from unrelated counters. Likewise, procps `PR`
+represents scheduler priority (including realtime priority), so it is rendered
+as unavailable rather than being incorrectly derived from the observed nice
+value.
 
 ## PLATFORM MODEL
 
@@ -361,10 +375,13 @@ on the current host.
 
 The production monitor now covers the core summary, task, scrolling, field,
 color, four-window, filtering, search, process-control, and configuration
-interactions supported by the current observation model. Per-window native
-`View_LOADAV` and `View_SCROLL` state round-trips through Icod/native
-configuration and is controlled by `l` / `C`; `<` / `>` provide direct sort
-field movement in addition to Fields Management.
+interactions supported by the current observation model. Existing shared
+process facts now expose `PPID`, `UID`, `RUID`, `GID`, `PGRP`, `TTY`, `TPGID`,
+`SID`, and `nTH` through Fields Management, sorting, Other Filters, `-O`, and
+native procps configuration round-tripping without extending or weakening the
+provider contract. Per-window native `View_LOADAV` and `View_SCROLL` state
+round-trips through Icod/native configuration and is controlled by `l` / `C`;
+`<` / `>` provide direct sort field movement in addition to Fields Management.
 
 Forest parent focus/collapse (`F` / `v`) now operate on the same reuse-aware
 hierarchy used by ordinary forest rendering. `X` / `Fixed_widest` now controls
@@ -381,9 +398,16 @@ the shared observation contracts:
 - separate per-logical-CPU, NUMA, combined-CPU, adjacent-CPU, and P/E-core
   summary views (`1` / `2` / `3` / `4` / `5` / `!`) beyond the current
   aggregate-state toggle;
-- cumulative dead-child CPU time (`-S` / interactive `S`); and
-- fields whose source facts are not yet present in the neutral process model,
-  including exact SHR accounting.
+- cumulative dead-child CPU time (`-S` / interactive `S`);
+- actual scheduler priority for `PR`, last-processor assignment (`P`), saved
+  user/group identities, and exact shared-resident (`SHR`) accounting; and
+- further Linux accounting fields that require facts such as smaps/PSS/USS or
+  per-task I/O counters rather than values already present in
+  `ProcProcessSnapshot`.
+
+Lower-priority native UI details such as the full procps prompt/help vocabulary
+and control-key conveniences including Ctrl+E, Ctrl+O, and Ctrl+R remain
+deliberate presentation differences rather than claims of missing observations.
 
 ## TESTING
 

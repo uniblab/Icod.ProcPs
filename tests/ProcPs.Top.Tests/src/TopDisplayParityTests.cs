@@ -160,6 +160,147 @@ public sealed class TopDisplayParityTests {
 		);
 	}
 
+	[Fact]
+	public void ObservedProcpsIdentityFieldsRenderWithoutSynthesis() {
+		TopRuntimeState state = new();
+		TopTaskRow row = CreateTask(
+			101,
+			"alpha"
+		);
+
+		Assert.Equal(
+			"1",
+			TopRenderer.FieldDisplayValue(
+				row,
+				state,
+				4,
+				TopFieldId.ParentProcessId
+			).Trim()
+		);
+		Assert.Equal(
+			"1000",
+			TopRenderer.FieldDisplayValue(
+				row,
+				state,
+				4,
+				TopFieldId.EffectiveUserId
+			).Trim()
+		);
+		Assert.Equal(
+			"900",
+			TopRenderer.FieldDisplayValue(
+				row,
+				state,
+				4,
+				TopFieldId.RealUserId
+			).Trim()
+		);
+		Assert.Equal(
+			"100",
+			TopRenderer.FieldDisplayValue(
+				row,
+				state,
+				4,
+				TopFieldId.EffectiveGroupId
+			).Trim()
+		);
+		Assert.Equal(
+			"101",
+			TopRenderer.FieldDisplayValue(
+				row,
+				state,
+				4,
+				TopFieldId.ProcessGroupId
+			).Trim()
+		);
+		Assert.Equal(
+			"pts/2",
+			TopRenderer.FieldDisplayValue(
+				row,
+				state,
+				4,
+				TopFieldId.Terminal
+			).Trim()
+		);
+		Assert.Equal(
+			"101",
+			TopRenderer.FieldDisplayValue(
+				row,
+				state,
+				4,
+				TopFieldId.ForegroundProcessGroupId
+			).Trim()
+		);
+		Assert.Equal(
+			"77",
+			TopRenderer.FieldDisplayValue(
+				row,
+				state,
+				4,
+				TopFieldId.SessionId
+			).Trim()
+		);
+		Assert.Equal(
+			"4",
+			TopRenderer.FieldDisplayValue(
+				row,
+				state,
+				4,
+				TopFieldId.ThreadCount
+			).Trim()
+		);
+		Assert.Equal(
+			"-",
+			TopRenderer.FieldDisplayValue(
+				row,
+				state,
+				4,
+				TopFieldId.Priority
+			).Trim()
+		);
+	}
+
+	[Fact]
+	public void ObservedFieldsRoundTripThroughNativeConfiguration() {
+		TopRuntimeState source = new() {
+			SortField = TopFieldId.ParentProcessId
+		};
+		source.VisibleFields.Clear();
+		source.VisibleFields.UnionWith(
+			[
+				TopFieldId.ParentProcessId,
+				TopFieldId.EffectiveUserId,
+				TopFieldId.RealUserId,
+				TopFieldId.EffectiveGroupId,
+				TopFieldId.ProcessGroupId,
+				TopFieldId.Terminal,
+				TopFieldId.ForegroundProcessGroupId,
+				TopFieldId.SessionId,
+				TopFieldId.ThreadCount
+			]
+		);
+
+		string native = TopProcpsConfigurationCodec.Serialize(
+			source
+		);
+		TopRuntimeState restored = new();
+		TopProcpsConfigurationCodec.Apply(
+			native,
+			restored
+		);
+
+		Assert.Equal(
+			TopFieldId.ParentProcessId,
+			restored.SortField
+		);
+		foreach ( TopFieldId field in source.VisibleFields ) {
+			Assert.Contains(
+				field,
+				restored.VisibleFields
+			);
+		}
+	}
+
 	private static TopSample CreateSample() {
 		return new TopSample(
 			new ProcSystemSnapshot(),
@@ -208,7 +349,20 @@ public sealed class TopDisplayParityTests {
 			CommandName = Exact( command ),
 			State = Exact( ProcProcessState.Sleeping ),
 			ParentProcessId = Exact( 1 ),
-			NiceValue = Exact( 0 )
+			EffectiveUserId = Exact( 1000U ),
+			RealUserId = Exact( 900U ),
+			EffectiveGroupId = Exact( 100U ),
+			ProcessGroupId = Exact( processId ),
+			Terminal = Exact(
+				new ProcTerminalInfo(
+					123,
+					"/dev/pts/2"
+				)
+			),
+			ForegroundProcessGroupId = Exact( processId ),
+			SessionId = Exact( 77 ),
+			NiceValue = Exact( 0 ),
+			ThreadCount = Exact( 4 )
 		};
 		return new TopTaskRow(
 			process,

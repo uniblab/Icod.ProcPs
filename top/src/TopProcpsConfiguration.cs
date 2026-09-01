@@ -1521,14 +1521,41 @@ internal static partial class TopProcpsConfigurationCodec {
 			case 0:
 				field = TopFieldId.Pid;
 				return true;
+			case 1:
+				field = TopFieldId.ParentProcessId;
+				return true;
+			case 2:
+				field = TopFieldId.EffectiveUserId;
+				return true;
 			case 3:
 				field = TopFieldId.User;
+				return true;
+			case 4:
+				field = TopFieldId.RealUserId;
+				return true;
+			case 8:
+				field = TopFieldId.EffectiveGroupId;
+				return true;
+			case 10:
+				field = TopFieldId.ProcessGroupId;
+				return true;
+			case 11:
+				field = TopFieldId.Terminal;
+				return true;
+			case 12:
+				field = TopFieldId.ForegroundProcessGroupId;
+				return true;
+			case 13:
+				field = TopFieldId.SessionId;
 				return true;
 			case 14:
 				field = TopFieldId.Priority;
 				return true;
 			case 15:
 				field = TopFieldId.Nice;
+				return true;
+			case 16:
+				field = TopFieldId.ThreadCount;
 				return true;
 			case 18:
 				field = TopFieldId.Cpu;

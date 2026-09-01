@@ -356,14 +356,41 @@ internal static partial class TopProcpsConfigurationCodec {
 			case TopFieldId.Pid:
 				nativeField = 0;
 				return true;
+			case TopFieldId.ParentProcessId:
+				nativeField = 1;
+				return true;
+			case TopFieldId.EffectiveUserId:
+				nativeField = 2;
+				return true;
 			case TopFieldId.User:
 				nativeField = 3;
+				return true;
+			case TopFieldId.RealUserId:
+				nativeField = 4;
+				return true;
+			case TopFieldId.EffectiveGroupId:
+				nativeField = 8;
+				return true;
+			case TopFieldId.ProcessGroupId:
+				nativeField = 10;
+				return true;
+			case TopFieldId.Terminal:
+				nativeField = 11;
+				return true;
+			case TopFieldId.ForegroundProcessGroupId:
+				nativeField = 12;
+				return true;
+			case TopFieldId.SessionId:
+				nativeField = 13;
 				return true;
 			case TopFieldId.Priority:
 				nativeField = 14;
 				return true;
 			case TopFieldId.Nice:
 				nativeField = 15;
+				return true;
+			case TopFieldId.ThreadCount:
+				nativeField = 16;
 				return true;
 			case TopFieldId.Cpu:
 				nativeField = 18;
