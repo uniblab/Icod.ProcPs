@@ -1386,11 +1386,6 @@ internal sealed class WatchScreen {
 				);
 				continue;
 			}
-			if ( '\r' == character ) {
-				column = 0;
-				index++;
-				continue;
-			}
 			if ( '\a' == character ) {
 				alertCount++;
 				index++;
@@ -1556,11 +1551,6 @@ internal sealed class WatchScreen {
 					index,
 					ref style
 				);
-				continue;
-			}
-			if ( '\r' == character ) {
-				column = 0;
-				index++;
 				continue;
 			}
 			if ( '\a' == character ) {
