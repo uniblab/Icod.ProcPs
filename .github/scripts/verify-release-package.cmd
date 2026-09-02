@@ -28,23 +28,9 @@ if not exist "%ARTIFACT_DIR%" (
 
 for %%I in ("%ARTIFACT_DIR%") do set "ARTIFACT_DIR=%%~fI"
 
-set "PACKAGE_VERSION="
-for /f "delims=" %%V in ('dotnet msbuild procps\Icod.ProcPs.Router.csproj -nologo -getProperty:PackageVersion') do set "PACKAGE_VERSION=%%V"
-if not defined PACKAGE_VERSION (
-    echo Unable to determine PackageVersion. 1>&2
-    popd
-    exit /b 1
-)
-
-if not exist "%ARTIFACT_DIR%\Icod.ProcPs.%PACKAGE_VERSION%.nupkg" (
-    echo Icod.ProcPs package not found in "%ARTIFACT_DIR%". 1>&2
-    popd
-    exit /b 1
-)
-
 echo.
-echo === Verify ProcPs distribution (%CONFIGURATION%) ===
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File packaging\VerifyDistribution.ps1 -Configuration %CONFIGURATION%
+echo === Verify packed ProcPs artifact (%CONFIGURATION%) ===
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .github\scripts\verify-release-package.ps1 -ArtifactDirectory "%ARTIFACT_DIR%" -Configuration %CONFIGURATION%
 set "RESULT=%errorlevel%"
 
 popd
