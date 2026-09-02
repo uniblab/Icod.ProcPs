@@ -25,13 +25,13 @@ jobs:
         include:
           - os: windows-latest
             name: Windows
-            verify-package: false
+            verify_package: false
           - os: ubuntu-latest
             name: Linux
-            verify-package: true
+            verify_package: true
           - os: macos-latest
             name: macOS
-            verify-package: false
+            verify_package: false
     name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     steps:
@@ -54,7 +54,7 @@ jobs:
           --no-build
           --no-restore
       - name: Pack exact PR artifact
-        if: matrix.verify-package
+        if: matrix.verify_package
         run: >-
           dotnet pack ${{ env.ROUTER_PROJECT }}
           -c ${{ env.CONFIGURATION }}
@@ -63,7 +63,7 @@ jobs:
           --output ${{ env.ARTIFACT_DIRECTORY }}
           -p:ContinuousIntegrationBuild=true
       - name: Verify exact PR artifact
-        if: matrix.verify-package
+        if: matrix.verify_package
         shell: pwsh
         run: >-
           ./.github/scripts/verify-release-package.ps1
