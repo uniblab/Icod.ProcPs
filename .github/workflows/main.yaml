@@ -1,20 +1,12 @@
-name: distribution-validation
+name: main
 
 on:
-  workflow_dispatch:
-    inputs:
-      configuration:
-        description: Build configuration to validate
-        required: true
-        default: Release
-        type: choice
-        options:
-          - Debug
-          - Staging
-          - Release
+  push:
+    branches:
+      - main
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.configuration }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -22,9 +14,10 @@ permissions:
 
 env:
   DOTNET_VERSION: 10.0.x
+  CONFIGURATION: Release
 
 jobs:
-  validate-distributions:
+  release-validation:
     strategy:
       fail-fast: false
       matrix:
@@ -54,8 +47,8 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
-      - name: Build, pack, install, and exercise distributions
+      - name: Build, test, pack, install, and exercise Release distributions
         shell: pwsh
         run: >-
           ./packaging/VerifyDistribution.ps1
-          -Configuration '${{ inputs.configuration }}'
+          -Configuration '${{ env.CONFIGURATION }}'

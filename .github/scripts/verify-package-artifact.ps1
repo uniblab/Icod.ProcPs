@@ -22,6 +22,26 @@ function Invoke-DotNet {
     }
 }
 
+function Get-MSBuildProperty {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectPath,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Name
+    )
+
+    $value = (& dotnet msbuild $ProjectPath -nologo "-getProperty:$Name").Trim()
+    if (0 -ne $LASTEXITCODE) {
+        throw "Unable to read MSBuild property '$Name' from '$ProjectPath'."
+    }
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        throw "MSBuild property '$Name' is empty in '$ProjectPath'."
+    }
+
+    return $value
+}
+
 function Invoke-Tool {
     param(
         [Parameter(Mandatory = $true)]
@@ -71,10 +91,12 @@ $repositoryReadmePath = Join-Path $repositoryRoot 'README.md'
 
 Push-Location $repositoryRoot
 try {
-    $packageVersion = (& dotnet msbuild $routerProjectPath -nologo -getProperty:PackageVersion).Trim()
-    if (0 -eq $packageVersion.Length) {
-        throw 'Unable to determine PackageVersion.'
-    }
+    $packageId = Get-MSBuildProperty -ProjectPath $routerProjectPath -Name 'PackageId'
+    $packageVersion = Get-MSBuildProperty -ProjectPath $routerProjectPath -Name 'PackageVersion'
+    $targetFramework = Get-MSBuildProperty -ProjectPath $routerProjectPath -Name 'TargetFramework'
+    $toolCommandName = Get-MSBuildProperty -ProjectPath $routerProjectPath -Name 'ToolCommandName'
+    $assemblyName = Get-MSBuildProperty -ProjectPath $routerProjectPath -Name 'AssemblyName'
+    $packageReadme = Get-MSBuildProperty -ProjectPath $routerProjectPath -Name 'PackageReadmeFile'
 
     if (-not [System.IO.Path]::IsPathRooted($ArtifactDirectory)) {
         $ArtifactDirectory = Join-Path $repositoryRoot $ArtifactDirectory
@@ -84,15 +106,16 @@ try {
         throw "Artifact directory '$ArtifactDirectory' does not exist."
     }
 
-    $packagePath = Join-Path $ArtifactDirectory "Icod.ProcPs.$packageVersion.nupkg"
+    $packagePath = Join-Path $ArtifactDirectory "$packageId.$packageVersion.nupkg"
     if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
-        throw "Icod.ProcPs package '$packagePath' was not produced by the pack stage."
+        throw "Package '$packagePath' was not produced by the pack stage."
     }
 
     Write-Host ''
     Write-Host "=== Verify exact package artifact ($Configuration) ==="
     Write-Host "Package: $packagePath"
 
+    $toolRoot = "tools/$targetFramework/any"
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $archive = [System.IO.Compression.ZipFile]::OpenRead($packagePath)
     try {
@@ -107,42 +130,42 @@ try {
             throw 'Package nuspec does not contain metadata.'
         }
 
-        $packageId = $metadata.SelectSingleNode("*[local-name()='id']").InnerText
+        $nuspecPackageId = $metadata.SelectSingleNode("*[local-name()='id']").InnerText
         $nuspecVersion = $metadata.SelectSingleNode("*[local-name()='version']").InnerText
-        if ('Icod.ProcPs' -ne $packageId) {
-            throw "Package ID '$packageId' does not match Icod.ProcPs."
+        if ($packageId -ne $nuspecPackageId) {
+            throw "Package ID '$nuspecPackageId' does not match expected ID '$packageId'."
         }
         if ($packageVersion -ne $nuspecVersion) {
             throw "Package version '$nuspecVersion' does not match expected version '$packageVersion'."
         }
 
         $readmeNode = $metadata.SelectSingleNode("*[local-name()='readme']")
-        if ($null -eq $readmeNode -or 'README.md' -ne $readmeNode.InnerText.Trim().Replace('\', '/')) {
-            throw 'Package must declare repository README.md as its NuGet readme.'
+        if ($null -eq $readmeNode -or $packageReadme -ne $readmeNode.InnerText.Trim().Replace('\', '/')) {
+            throw "Package must declare '$packageReadme' as its NuGet readme."
         }
 
         $requiredEntries = @(
-            'README.md',
+            $packageReadme,
             'procps/README.md',
-            'tools/net10.0/any/DotnetToolSettings.xml',
-            'tools/net10.0/any/procps.dll',
-            'tools/net10.0/any/free.dll',
-            'tools/net10.0/any/pgrep.dll',
-            'tools/net10.0/any/pidof.dll',
-            'tools/net10.0/any/pidwait.dll',
-            'tools/net10.0/any/pkill.dll',
-            'tools/net10.0/any/pmap.dll',
-            'tools/net10.0/any/ps.dll',
-            'tools/net10.0/any/pwdx.dll',
-            'tools/net10.0/any/slabtop.dll',
-            'tools/net10.0/any/hugetop.dll',
-            'tools/net10.0/any/sysctl.dll',
-            'tools/net10.0/any/tload.dll',
-            'tools/net10.0/any/top.dll',
-            'tools/net10.0/any/uptime.dll',
-            'tools/net10.0/any/vmstat.dll',
-            'tools/net10.0/any/w.dll',
-            'tools/net10.0/any/watch.dll'
+            "$toolRoot/DotnetToolSettings.xml",
+            "$toolRoot/$assemblyName.dll",
+            "$toolRoot/free.dll",
+            "$toolRoot/pgrep.dll",
+            "$toolRoot/pidof.dll",
+            "$toolRoot/pidwait.dll",
+            "$toolRoot/pkill.dll",
+            "$toolRoot/pmap.dll",
+            "$toolRoot/ps.dll",
+            "$toolRoot/pwdx.dll",
+            "$toolRoot/slabtop.dll",
+            "$toolRoot/hugetop.dll",
+            "$toolRoot/sysctl.dll",
+            "$toolRoot/tload.dll",
+            "$toolRoot/top.dll",
+            "$toolRoot/uptime.dll",
+            "$toolRoot/vmstat.dll",
+            "$toolRoot/w.dll",
+            "$toolRoot/watch.dll"
         )
         foreach ($entryPath in $requiredEntries) {
             if (-not ($archive.Entries | Where-Object { $_.FullName -eq $entryPath } | Select-Object -First 1)) {
@@ -150,27 +173,27 @@ try {
             }
         }
 
-        $readmeEntry = $archive.Entries | Where-Object { $_.FullName -eq 'README.md' } | Select-Object -First 1
+        $readmeEntry = $archive.Entries | Where-Object { $_.FullName -eq $packageReadme } | Select-Object -First 1
         $packagedReadme = Get-ZipEntryText -Entry $readmeEntry
         $repositoryReadme = [System.IO.File]::ReadAllText($repositoryReadmePath)
         if ($repositoryReadme -ne $packagedReadme) {
-            throw 'Packaged README.md does not exactly match the repository README.md.'
+            throw "Packaged '$packageReadme' does not exactly match the repository README.md."
         }
 
-        $toolSettingsEntry = $archive.Entries | Where-Object { $_.FullName -eq 'tools/net10.0/any/DotnetToolSettings.xml' } | Select-Object -First 1
+        $toolSettingsEntry = $archive.Entries | Where-Object { $_.FullName -eq "$toolRoot/DotnetToolSettings.xml" } | Select-Object -First 1
         [xml]$toolSettings = Get-ZipEntryText -Entry $toolSettingsEntry
         $commands = @($toolSettings.DotNetCliTool.Commands.Command)
         if (1 -ne $commands.Count) {
             throw "Package declares $($commands.Count) tool commands; expected exactly one."
         }
-        if ('procps' -ne "$($commands[0].Name)" -or 'dotnet' -ne "$($commands[0].Runner)") {
-            throw "Package tool settings do not declare the expected procps/dotnet command."
+        if ($toolCommandName -ne "$($commands[0].Name)" -or 'dotnet' -ne "$($commands[0].Runner)") {
+            throw "Package tool settings do not declare the expected '$toolCommandName'/dotnet command."
         }
     } finally {
         $archive.Dispose()
     }
 
-    $smokeRoot = Join-Path ([System.IO.Path]::GetTempPath()) "Icod.ProcPs-package-smoke-$([Guid]::NewGuid().ToString('N'))"
+    $smokeRoot = Join-Path ([System.IO.Path]::GetTempPath()) "$packageId-package-smoke-$([Guid]::NewGuid().ToString('N'))"
     $toolPath = Join-Path $smokeRoot 'tool'
     $nugetConfigPath = Join-Path $smokeRoot 'NuGet.Config'
     New-Item -ItemType Directory -Path $smokeRoot -Force | Out-Null
@@ -189,7 +212,7 @@ try {
         [System.IO.File]::WriteAllText($nugetConfigPath, $nugetConfig, [System.Text.UTF8Encoding]::new($false))
 
         Invoke-DotNet -Arguments @(
-            'tool', 'install', 'Icod.ProcPs',
+            'tool', 'install', $packageId,
             '--version', $packageVersion,
             '--tool-path', $toolPath,
             '--configfile', $nugetConfigPath,
@@ -197,16 +220,16 @@ try {
         )
 
         $shimName = if ([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)) {
-            'procps.exe'
+            "$toolCommandName.exe"
         } else {
-            'procps'
+            $toolCommandName
         }
         $routerShim = Join-Path $toolPath $shimName
         if (-not (Test-Path -LiteralPath $routerShim -PathType Leaf)) {
             throw "Installed tool shim '$routerShim' was not created."
         }
 
-        Invoke-Tool -Path $routerShim -Arguments @('--version') -ExpectedOutput "procps (Icod.ProcPs) $packageVersion"
+        Invoke-Tool -Path $routerShim -Arguments @('--version') -ExpectedOutput "$toolCommandName ($packageId) $packageVersion"
 
         $products = [ordered]@{
             'free' = 'Icod.ProcPs.Free'

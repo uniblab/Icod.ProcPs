@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.2 restores successful standard uptime output on Windows when Unix load averages are unavailable. Standard output now omits the unavailable load-average clause while preserving valid uptime and user information; raw mode retains its strict observation requirements.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.3 refines the repository CI/CD and packaging pipeline. Pull requests now validate Staging builds, main performs the authoritative Release distribution gate, tag publication validates and publishes the exact Release package artifact, redundant workflow/build work is removed, and workflow/package metadata handling is simplified without changing command behavior.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>

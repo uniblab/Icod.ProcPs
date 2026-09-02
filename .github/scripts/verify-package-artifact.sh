@@ -30,6 +30,6 @@ fi
 artifact_dir=$(CDPATH= cd -- "$artifact_dir" && pwd)
 
 printf '\n=== Verify packed ProcPs artifact (%s) ===\n' "$configuration"
-pwsh -NoLogo -NoProfile -File .github/scripts/verify-release-package.ps1 \
+pwsh -NoLogo -NoProfile -File .github/scripts/verify-package-artifact.ps1 \
     -ArtifactDirectory "$artifact_dir" \
     -Configuration "$configuration"

@@ -93,5 +93,5 @@ exit /b %errorlevel%
 :validate
 echo.
 echo === Validate ===
-call .github\scripts\verify-release-package.cmd artifacts Debug
+call .github\scripts\verify-package-artifact.cmd artifacts Debug
 exit /b %errorlevel%

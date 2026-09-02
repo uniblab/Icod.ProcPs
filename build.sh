@@ -39,7 +39,7 @@ pack()
 validate()
 {
     printf '\n=== Validate ===\n'
-    sh ./.github/scripts/verify-release-package.sh artifacts Debug
+    sh ./.github/scripts/verify-package-artifact.sh artifacts Debug
 }
 
 case "${1-}" in

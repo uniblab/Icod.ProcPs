@@ -30,7 +30,7 @@ for %%I in ("%ARTIFACT_DIR%") do set "ARTIFACT_DIR=%%~fI"
 
 echo.
 echo === Verify packed ProcPs artifact (%CONFIGURATION%) ===
-powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .github\scripts\verify-release-package.ps1 -ArtifactDirectory "%ARTIFACT_DIR%" -Configuration %CONFIGURATION%
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File .github\scripts\verify-package-artifact.ps1 -ArtifactDirectory "%ARTIFACT_DIR%" -Configuration %CONFIGURATION%
 set "RESULT=%errorlevel%"
 
 popd

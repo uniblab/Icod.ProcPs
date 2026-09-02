@@ -338,6 +338,7 @@ try {
         $solutionPath,
         '-c', $Configuration,
         '--no-build',
+        '--no-restore',
         '--logger', 'trx'
     )
 
@@ -356,6 +357,8 @@ try {
         'pack',
         $routerProjectPath,
         '-c', $Configuration,
+        '--no-build',
+        '--no-restore',
         '-o', $packageDirectory,
         '-p:ContinuousIntegrationBuild=true'
     )
@@ -384,7 +387,8 @@ try {
         'tool', 'install', $routerPackageId,
         '--version', $routerVersion,
         '--tool-path', $routerToolPath,
-        '--configfile', $nugetConfigPath
+        '--configfile', $nugetConfigPath,
+        '--no-cache'
     )
 
     $routerShim = Get-ExecutablePath -Directory $routerToolPath -CommandName 'procps'

@@ -133,6 +133,7 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
 }
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+$solutionPath = Join-Path $repositoryRoot 'Icod.ProcPs.sln'
 $releaseRoot = Join-Path $repositoryRoot 'artifacts/release'
 $publishRoot = Join-Path $releaseRoot "publish/$RuntimeIdentifier"
 $stageDirectoryName = "Icod.ProcPs-$Version-$RuntimeIdentifier"
@@ -196,6 +197,12 @@ New-Item -ItemType Directory -Path $stageDirectory -Force | Out-Null
 
 Push-Location $repositoryRoot
 try {
+    Invoke-DotNet -Arguments @(
+        'restore',
+        $solutionPath,
+        '-r', $RuntimeIdentifier
+    )
+
     foreach ($commandName in $projects.Keys) {
         $projectPath = Join-Path $repositoryRoot $projects[$commandName]
         $publishDirectory = Join-Path $publishRoot $commandName
@@ -206,6 +213,7 @@ try {
             $projectPath,
             '-c', $Configuration,
             '-r', $RuntimeIdentifier,
+            '--no-restore',
             '--self-contained', $selfContainedValue,
             "-p:PublishSelfContained=$selfContainedValue",
             '-p:PublishSingleFile=true',

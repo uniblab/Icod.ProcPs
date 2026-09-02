@@ -10,6 +10,30 @@ The supported distribution model has two forms:
 2. traditional ZIP archives containing all eighteen executable entry points for
    a specific runtime identifier.
 
+## Build and validation ladder
+
+The repository deliberately increases validation rigor as changes move toward a
+release:
+
+| Trigger | Configuration | Purpose |
+|---|---|---|
+| local `build.cmd` / `build.sh` | `Debug` | developer build, test, pack, and exact-package validation |
+| pull request | `Staging` | cross-platform pre-merge build and test, plus exact package validation |
+| push to `main` | `Release` | authoritative six-platform distribution validation |
+| `v*` tag contained in `main` | `Release` | build, validate, and publish immutable release artifacts |
+
+The automatic workflows are named for their responsibilities:
+
+```text
+.github/workflows/pull-request.yaml
+.github/workflows/main.yaml
+.github/workflows/release.yaml
+```
+
+`distribution-validation.yaml` remains available through `workflow_dispatch` for
+explicit diagnostic runs in `Debug`, `Staging`, or `Release`; it no longer runs
+automatically in parallel with PR or `main` validation.
+
 ## .NET tool package
 
 The SDK tool package is produced directly from the router project:
@@ -18,8 +42,13 @@ The SDK tool package is produced directly from the router project:
 dotnet pack procps/Icod.ProcPs.Router.csproj -c Release -o artifacts
 ```
 
-The resulting package ID is `Icod.ProcPs`. It installs exactly one tool command,
-`procps`, which routes in-process to:
+The package identity, version, target framework, tool command, and readme metadata
+are authoritative MSBuild properties of the router project. Verification scripts
+read those properties rather than duplicating them as repository-name
+conventions.
+
+The package installs exactly one tool command, `procps`, which routes in-process
+to:
 
 ```text
 procps free [args...]
@@ -55,8 +84,8 @@ The historical executable projects are ordinary executable projects and are
 non-packable through the repository's `Directory.Build.targets`. The `procps`
 router is the only executable project explicitly packaged as a .NET tool.
 
-`BuildReleaseArchive.ps1` publishes framework-dependent single-file apphosts and
-creates a ZIP containing:
+`BuildReleaseArchive.ps1` restores the requested RID once, publishes each
+executable with `--no-restore`, and creates a ZIP containing:
 
 ```text
 free
@@ -95,12 +124,12 @@ osx-x64
 osx-arm64
 ```
 
-To build an archive locally with PowerShell 7:
+To build an archive locally with PowerShell 7, pass the version being tested:
 
 ```text
-pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier win-x64 -Version 1.1.1
-pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier linux-x64 -Version 1.1.1
-pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier osx-x64 -Version 1.1.1
+pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier win-x64 -Version <version>
+pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier linux-x64 -Version <version>
+pwsh packaging/BuildReleaseArchive.ps1 -RuntimeIdentifier osx-x64 -Version <version>
 ```
 
 The script smoke-tests all eighteen apphosts when the requested RID matches the
@@ -127,7 +156,7 @@ The verifier:
 
 - restores, builds, and tests the solution;
 - executes the seventeen built standalone command apphosts through `--version`;
-- packs `Icod.ProcPs` from the `procps` router project;
+- packs `Icod.ProcPs` from the already validated build without rebuilding it;
 - inspects the generated tool package and requires exactly one command named
   `procps`;
 - verifies that the router and seventeen managed command assemblies are present in
@@ -138,25 +167,46 @@ The verifier:
 - installs the package from an isolated local NuGet source; and
 - exercises `procps --version` and each routed command's `--version` path.
 
-GitHub Actions runs the same verification natively on Windows, Linux, and macOS
-for both x64 and ARM64.
+The authoritative `main` workflow runs this verification natively on Windows,
+Linux, and macOS for both x64 and ARM64 using the `Release` configuration.
+
+## Exact package verification
+
+`.github/scripts/verify-package-artifact.ps1` validates an already-produced
+`.nupkg`. The `.cmd` and `.sh` files of the same name provide local platform
+entry points. The verifier reads `PackageId`, `PackageVersion`, `TargetFramework`,
+`ToolCommandName`, `AssemblyName`, and `PackageReadmeFile` from MSBuild, then:
+
+- opens the exact package passed by the caller;
+- verifies its nuspec and required payload;
+- compares its packaged root readme with the repository readme;
+- installs only from the supplied artifact directory with NuGet caches disabled;
+  and
+- exercises the installed router and every routed command.
+
+Local Debug builds, PR Staging builds, and tagged Release package builds all use
+this exact-artifact verifier so the package that passed validation is the same
+package produced by the corresponding pack stage.
 
 ## Automated releases
 
 `.github/workflows/release.yaml` is triggered only by pushed tags beginning with
-`v`. Before publishing anything, it requires all of the following:
+`v`. Before publishing anything, it requires:
 
 - the tag has the form `v<semver>`;
 - the tagged commit is contained in `main`;
 - the tag version matches `IcodProcPsSuiteVersion` in `Directory.Build.props`;
-- distribution verification passes on Windows, Linux, and macOS on x64 and
-  ARM64;
-- all six RID-specific ZIPs build and smoke-test; and
-- the `Icod.ProcPs` NuGet tool package is built successfully.
+- the Release NuGet package is built and exact-artifact verification succeeds;
+  and
+- all six RID-specific ZIPs build and smoke-test.
 
-Only after those gates pass does the workflow publish the same `.nupkg` first to
-NuGet.org and then to GitHub Packages. If both publications succeed, it creates
-a GitHub Release for the existing tag and attaches:
+Package production and the six archive builds begin independently after metadata
+validation. NuGet.org publication depends only on the verified package; it does
+not wait for unrelated archive jobs. GitHub Packages publication follows
+NuGet.org publication. GitHub Release creation is the final rendezvous and waits
+for all archives, the package, and both registry publications.
+
+The GitHub Release attaches:
 
 ```text
 Icod.ProcPs-<version>-win-x64.zip
@@ -205,23 +255,47 @@ workflow grants `packages: write` only to the GitHub Packages publication job an
 ### Publishing a version
 
 First update `IcodProcPsSuiteVersion` in `Directory.Build.props`; the router and
-standalone commands consume that shared value. Merge that change
-to `main`, and ensure normal CI is green. Then tag that exact commit and push the
-tag:
+standalone commands consume that shared value. Merge that change to `main` and
+ensure the authoritative Release workflow is green. Then tag that exact commit
+and push the tag:
 
 ```text
 git switch main
 git pull
-git tag -a v1.1.1 -m "Icod.ProcPs 1.1.1"
-git push origin v1.1.1
+git tag -a v<version> -m "Icod.ProcPs <version>"
+git push origin refs/tags/v<version>:refs/tags/v<version>
 ```
 
-The tag is the release trigger and the immutable source identity for every
-package and archive produced by that workflow. Package registries are immutable
-for a published version, so use a new version for a new release. Both registry
-pushes use `--skip-duplicate`, which makes publication jobs safe to rerun after a
-later stage fails. Prefer GitHub Actions' "Re-run failed jobs" operation when
-recovering a partially completed release.
+The explicit tag ref avoids ambiguity if a branch happens to have the same short
+name. The tag is the immutable source identity for every package and archive
+produced by the release workflow.
+
+Package registries are immutable for a published version, so use a new version
+for a new release. Both registry pushes use `--skip-duplicate`, which makes
+publication jobs safe to rerun after a later stage fails. Prefer GitHub Actions'
+"Re-run failed jobs" operation when recovering a partially completed release.
+
+## Workflow environment conventions
+
+Workflow `env` values are used for stable repository-layout facts and build
+settings, for example:
+
+```text
+DOTNET_VERSION
+SOLUTION_PATH
+ROUTER_PROJECT
+ARTIFACT_DIRECTORY
+RELEASE_DIRECTORY
+CONFIGURATION
+```
+
+GitHub contexts are used for facts owned by GitHub, such as repository, owner,
+workflow, ref, and actor names. Repository paths are not derived from the GitHub
+repository name merely because their current names happen to match. For example,
+`Icod.ProcPs.sln` remains the explicit solution path.
+
+Package identity and other package/build metadata are read from MSBuild rather
+than inferred from GitHub metadata.
 
 ## Versioning
 
@@ -232,8 +306,8 @@ Directory.Build.props                           IcodProcPsSuiteVersion
 ```
 
 `IcodProcPsSuiteVersion` supplies assembly version metadata to every standalone
-historical command. Their version output is therefore derived from the same
-suite version used by release archives:
+historical command. Their version output is therefore derived from the same suite
+version used by release archives:
 
 ```text
 Icod.ProcPs.X (VERSION) inspired by procps-ng 4.0.6
