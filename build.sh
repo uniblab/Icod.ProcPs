@@ -27,12 +27,29 @@ test()
         --no-build
 }
 
+pack()
+{
+    printf '\n=== Pack ===\n'
+    dotnet pack Icod.ProcPs.sln \
+        -c Debug \
+        --no-build \
+	--output artifacts 
+}
+
+validate()
+{
+    printf '\n=== Validate ===\n'
+    ./.github/scripts/verify-release-package.sh artifacts Debug
+}
+
 case "${1-}" in
     "")
         clean
         restore
         build
         test
+        pack
+	validate
         ;;
 
     clean)
@@ -51,9 +68,17 @@ case "${1-}" in
         test
         ;;
 
+    pack)
+        pack
+        ;;
+
+    validate)
+        validate
+        ;;
+
     *)
         printf 'Invalid section: %s\n' "$1" >&2
-        printf 'Usage: %s [clean|restore|build|test]\n' "$0" >&2
+        printf 'Usage: %s [clean|restore|build|test|pack|validate]\n' "$0" >&2
         exit 1
         ;;
 esac
