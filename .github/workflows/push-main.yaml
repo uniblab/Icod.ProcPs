@@ -5,26 +5,50 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
+env:
+  DOTNET_VERSION: 10.0.x
+  CONFIGURATION: Release
+
 jobs:
-  # ----------------------------------------------------
-  # STAGE 1: Cross-Platform Build (All 3 OSs)
-  # ----------------------------------------------------
-  build:
+  release-validation:
     strategy:
+      fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            platform: Windows
+            architecture: x64
+          - os: windows-11-arm
+            platform: Windows
+            architecture: ARM64
+          - os: ubuntu-24.04
+            platform: Linux
+            architecture: x64
+          - os: ubuntu-24.04-arm
+            platform: Linux
+            architecture: ARM64
+          - os: macos-15-intel
+            platform: macOS
+            architecture: x64
+          - os: macos-15
+            platform: macOS
+            architecture: ARM64
+    name: ${{ matrix.platform }} ${{ matrix.architecture }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
-
-      - run: dotnet clean Icod.ProcPs.sln -c Release
-      - run: dotnet restore Icod.ProcPs.sln
-      - run: dotnet build Icod.ProcPs.sln -c Release --no-restore -p:ContinuousIntegrationBuild=true
-      - run: dotnet test Icod.ProcPs.sln -c Release --no-build --no-restore
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Build, test, pack, install, and exercise Release distributions
+        shell: pwsh
+        run: >-
+          ./packaging/VerifyDistribution.ps1
+          -Configuration '${{ env.CONFIGURATION }}'
