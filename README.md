@@ -2,9 +2,8 @@
 
 ![Icod.ProcPs](https://raw.githubusercontent.com/uniblab/Icod.ProcPs/v1.1.0/Icod.ProcPs.banner.png)
 
-[![PR build and test](https://github.com/uniblab/Icod.ProcPs/actions/workflows/pr-build-and-test.yaml/badge.svg)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/pr-build-and-test.yaml)
-[![Package validation](https://github.com/uniblab/Icod.ProcPs/actions/workflows/distribution-validation.yaml/badge.svg?branch=main)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/push-main.yaml)
-[![Main build and test](https://github.com/uniblab/Icod.ProcPs/actions/workflows/push-main.yaml/badge.svg?branch=main)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/push-main.yaml)
+[![PR Staging build](https://github.com/uniblab/Icod.ProcPs/actions/workflows/pr-build-and-test.yaml/badge.svg)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/pr-build-and-test.yaml)
+[![Main Release validation](https://github.com/uniblab/Icod.ProcPs/actions/workflows/push-main.yaml/badge.svg?branch=main)](https://github.com/uniblab/Icod.ProcPs/actions/workflows/push-main.yaml)
 
 `Icod.ProcPs` is a managed .NET implementation of a selected set of tools from
 procps-ng 4.0.6.
@@ -28,8 +27,7 @@ load-average observations.
 The `1.1.2` work also extends the local build workflow with explicit package and
 artifact-validation stages. The package produced by the local `pack` stage is
 inspected, installed from an isolated local NuGet source, and exercised before
-validation succeeds. Existing GitHub Actions distribution and release
-verification remain independent and unchanged.
+validation succeeds.
 
 The repository provides familiar process- and system-observation commands such
 as `ps`, `pgrep`, `pkill`, `free`, `uptime`, `vmstat`, `w`, `watch`, `slabtop`,
@@ -190,15 +188,19 @@ The solution defines `Debug`, `Staging`, and `Release` configurations.
 
 ## Continuous integration
 
-Pull requests are restored, built, and tested with .NET 10 on:
+Validation intentionally escalates with the source lifecycle:
 
-- `windows-latest`
-- `ubuntu-latest`
-- `macos-latest`
+- local `build.cmd` and `build.sh` use `Debug`;
+- pull requests use `Staging` on Windows, Linux, and macOS, with the Linux job
+  also packing and validating the exact Staging NuGet artifact;
+- pushes to `main` use `Release` distribution verification on Windows, Linux,
+  and macOS on both x64 and ARM64; and
+- pushed `v*` tags contained in `main` build and publish `Release` artifacts.
 
-Release-oriented builds additionally use the repository's `Release`
-configuration, where compiler warnings are treated as errors except for
-documentation warning `CS1591`.
+Release builds treat compiler warnings as errors except for documentation warning
+`CS1591`. The six-platform distribution-validation workflow remains available
+for explicit manual diagnostic runs without duplicating normal PR or `main`
+validation.
 
 ## Project layout
 
