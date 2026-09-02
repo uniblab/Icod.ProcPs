@@ -182,7 +182,7 @@ jobs:
           }
 
   publish-github-packages:
-    needs: [metadata, package, publish-nuget]
+    needs: [metadata, package]
     runs-on: ubuntu-latest
     permissions:
       contents: read
