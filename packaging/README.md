@@ -201,10 +201,11 @@ package produced by the corresponding pack stage.
 - all six RID-specific ZIPs build and smoke-test.
 
 Package production and the six archive builds begin independently after metadata
-validation. NuGet.org publication depends only on the verified package; it does
-not wait for unrelated archive jobs. GitHub Packages publication follows
-NuGet.org publication. GitHub Release creation is the final rendezvous and waits
-for all archives, the package, and both registry publications.
+validation. Once the exact package has been validated and uploaded as a workflow
+artifact, NuGet.org and GitHub Packages publication run independently in parallel;
+neither waits for archive production or for the other registry. GitHub Release
+creation is the final rendezvous and waits for all archives, the package, and
+both registry publications to succeed.
 
 The GitHub Release attaches:
 
@@ -272,7 +273,9 @@ produced by the release workflow.
 
 Package registries are immutable for a published version, so use a new version
 for a new release. Both registry pushes use `--skip-duplicate`, which makes
-publication jobs safe to rerun after a later stage fails. Prefer GitHub Actions'
+publication jobs safe to rerun after a later stage fails. Because the registry
+jobs run independently, one registry may succeed while the other fails; the
+GitHub Release remains blocked until both have succeeded. Prefer GitHub Actions'
 "Re-run failed jobs" operation when recovering a partially completed release.
 
 ## Workflow environment conventions
