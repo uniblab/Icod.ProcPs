@@ -47,7 +47,7 @@
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
 		<PackageRequireLicenseAcceptance>True</PackageRequireLicenseAcceptance>
-		<PackageReleaseNotes>1.1.1 corrects the NuGet package README to use the repository-level suite documentation, scopes NuGet.org Trusted Publishing to the Release GitHub environment, and strengthens distribution validation so the packaged README metadata and payload are verified before publication.</PackageReleaseNotes>
+		<PackageReleaseNotes>1.1.2 restores successful standard uptime output on Windows when Unix load averages are unavailable. Standard output now omits the unavailable load-average clause while preserving valid uptime and user information; raw mode retains its strict observation requirements.</PackageReleaseNotes>
 		<PackageTags>procps;procps-ng;ps;pgrep;pkill;pidwait;pidof;pwdx;pmap;free;uptime;vmstat;w;watch;slabtop;hugetop;tload;top;sysctl;process;linux;tool;icod;system-monitoring;dotnet</PackageTags>
 		<PackageIcon>icon.png</PackageIcon>
 	</PropertyGroup>
