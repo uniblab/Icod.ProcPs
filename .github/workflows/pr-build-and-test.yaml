@@ -3,18 +3,69 @@ name: pr-build
 on:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: 10.0.x
+  SOLUTION_PATH: Icod.ProcPs.sln
+  ROUTER_PROJECT: procps/Icod.ProcPs.Router.csproj
+  ARTIFACT_DIRECTORY: artifacts
+  CONFIGURATION: Staging
+
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
-        os: [windows-latest, ubuntu-latest, macos-latest]
+        include:
+          - os: windows-latest
+            name: Windows
+            verify-package: false
+          - os: ubuntu-latest
+            name: Linux
+            verify-package: true
+          - os: macos-latest
+            name: macOS
+            verify-package: false
+    name: ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
-      - run: dotnet clean Icod.ProcPs.sln -c Staging
-      - run: dotnet restore Icod.ProcPs.sln
-      - run: dotnet build Icod.ProcPs.sln -c Staging --no-restore
-      - run: dotnet test Icod.ProcPs.sln -c Staging --no-build --no-restore
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      - name: Restore
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+      - name: Build
+        run: >-
+          dotnet build ${{ env.SOLUTION_PATH }}
+          -c ${{ env.CONFIGURATION }}
+          --no-restore
+          -p:ContinuousIntegrationBuild=true
+      - name: Test
+        run: >-
+          dotnet test ${{ env.SOLUTION_PATH }}
+          -c ${{ env.CONFIGURATION }}
+          --no-build
+          --no-restore
+      - name: Pack exact PR artifact
+        if: matrix.verify-package
+        run: >-
+          dotnet pack ${{ env.ROUTER_PROJECT }}
+          -c ${{ env.CONFIGURATION }}
+          --no-build
+          --no-restore
+          --output ${{ env.ARTIFACT_DIRECTORY }}
+          -p:ContinuousIntegrationBuild=true
+      - name: Verify exact PR artifact
+        if: matrix.verify-package
+        shell: pwsh
+        run: >-
+          ./.github/scripts/verify-release-package.ps1
+          -ArtifactDirectory '${{ env.ARTIFACT_DIRECTORY }}'
+          -Configuration '${{ env.CONFIGURATION }}'
