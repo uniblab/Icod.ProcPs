@@ -99,11 +99,16 @@ For more details see uptime(1).
 			}
 			var snapshot = await metrics.GetSnapshotAsync( cancellationToken ).ConfigureAwait( false );
 			var load = ResolveLoadAverages( snapshot );
-			if ( !load.HasValue ) {
-				await WriteDiagnosticAsync( stderr, "uptime: Cannot get load average", cancellationToken ).ConfigureAwait( false );
-				return 1;
-			}
-			await WriteLineAsync( stdout, FormatStandard( clock.GetLocalNow(), uptime.Value.Uptime.TotalSeconds, snapshot.UserSessions, load.Value ), cancellationToken ).ConfigureAwait( false );
+			await WriteLineAsync(
+				stdout,
+				FormatStandard(
+					clock.GetLocalNow(),
+					uptime.Value.Uptime.TotalSeconds,
+					snapshot.UserSessions,
+					load.HasValue ? load.Value : null
+				),
+				cancellationToken
+			).ConfigureAwait( false );
 			return 0;
 		} catch ( OperationCanceledException ) when ( cancellationToken.IsCancellationRequested ) { return 130; }
 	}
@@ -153,15 +158,27 @@ For more details see uptime(1).
 	/// <summary>Formats the procps-ng standard uptime display using Linux-specific load details.</summary>
 	public static string FormatStandard( DateTimeOffset now, double uptimeSeconds, ProcObservedValue<ProcUserSessionInfo> users, ProcLoadAverage load )
 		=> FormatStandard( now, uptimeSeconds, users, new ProcLoadAverages( load.OneMinute, load.FiveMinutes, load.FifteenMinutes ) );
-	/// <summary>Formats the procps-ng standard uptime display using cross-platform load averages.</summary>
-	public static string FormatStandard( DateTimeOffset now, double uptimeSeconds, ProcObservedValue<ProcUserSessionInfo> users, ProcLoadAverages load ) {
+	/// <summary>Formats the standard uptime display, including load averages when the host exposes them.</summary>
+	public static string FormatStandard( DateTimeOffset now, double uptimeSeconds, ProcObservedValue<ProcUserSessionInfo> users, ProcLoadAverages? load ) {
 		var userText = users.HasValue
-			? string.Format( CultureInfo.InvariantCulture, ", {0,2} {1},  ", users.Value.Count, 1 == users.Value.Count ? "user" : "users" )
-			: ", ? users,  ";
+			? string.Format( CultureInfo.InvariantCulture, ", {0,2} {1}", users.Value.Count, 1 == users.Value.Count ? "user" : "users" )
+			: ", ? users";
+		var prefix = string.Format(
+			CultureInfo.InvariantCulture,
+			" {0:HH:mm:ss} up {1}{2}",
+			now,
+			FormatUptimeOnly( uptimeSeconds, pretty: false ),
+			userText
+		);
+		if ( null == load )
+			return prefix;
 		return string.Format(
 			CultureInfo.InvariantCulture,
-			" {0:HH:mm:ss} up {1}{2}load average: {3:F2}, {4:F2}, {5:F2}",
-			now, FormatUptimeOnly( uptimeSeconds, pretty: false ), userText, load.OneMinute, load.FiveMinutes, load.FifteenMinutes
+			"{0},  load average: {1:F2}, {2:F2}, {3:F2}",
+			prefix,
+			load.OneMinute,
+			load.FiveMinutes,
+			load.FifteenMinutes
 		);
 	}
 	private static ProcObservedValue<ProcLoadAverages> ResolveLoadAverages( ProcSystemSnapshot snapshot ) {

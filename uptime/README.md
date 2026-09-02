@@ -14,7 +14,7 @@ uptime [options]
 
 `Icod.ProcPs.Uptime` is a managed .NET implementation of procps-ng `uptime(1)`, modeled on procps-ng 4.0.6.
 
-The normal display reports the local time, elapsed system uptime, logged-in user count, and 1-, 5-, and 15-minute load averages. Alternate modes can show a human-readable uptime duration, the boot time, a raw machine-friendly record, or container uptime.
+The normal display reports the local time, elapsed system uptime, logged-in user count, and, when available, 1-, 5-, and 15-minute load averages. Alternate modes can show a human-readable uptime duration, the boot time, a raw machine-friendly record, or container uptime.
 
 ## OPTIONS
 
@@ -46,13 +46,15 @@ If `PROCPS_CONTAINER` is set, container mode is enabled before command-line opti
 
 ```text
 0    Requested uptime information was reported.
-1    Invalid arguments or a required observation was unavailable.
+1    Invalid arguments or an observation required by the selected mode was unavailable.
 130  Operation was cancelled.
 ```
 
 ## PLATFORM NOTES
 
-System uptime itself is available on the principal Windows, Linux, and macOS providers. Standard and raw output additionally require the corresponding user-count and load-average observations; a platform that cannot provide those ProcPs semantics returns a controlled diagnostic. `--pretty` and `--since` require only uptime.
+System uptime itself is available on the principal Windows, Linux, and macOS providers. Standard output reports every observation available on the host: when load averages are unavailable, as on Windows, the load-average clause is omitted while the available local time, uptime, and user-count information is still reported successfully. `--pretty` and `--since` require only uptime.
+
+Raw output intentionally retains stricter procps-compatible semantics and requires uptime, user-count, and load-average observations. A platform that cannot provide all observations required by `--raw` returns a controlled diagnostic rather than inventing substitute load-average values.
 
 ## AUTHORS
 
