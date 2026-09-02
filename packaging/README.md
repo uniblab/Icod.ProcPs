@@ -22,6 +22,14 @@ release:
 | push to `main` | `Release` | authoritative six-platform distribution validation |
 | `v*` tag contained in `main` | `Release` | build, validate, and publish immutable release artifacts |
 
+The automatic workflows are named for their responsibilities:
+
+```text
+.github/workflows/pull-request.yaml
+.github/workflows/main.yaml
+.github/workflows/release.yaml
+```
+
 `distribution-validation.yaml` remains available through `workflow_dispatch` for
 explicit diagnostic runs in `Debug`, `Staging`, or `Release`; it no longer runs
 automatically in parallel with PR or `main` validation.
@@ -164,8 +172,9 @@ Linux, and macOS for both x64 and ARM64 using the `Release` configuration.
 
 ## Exact package verification
 
-`.github/scripts/verify-release-package.ps1` validates an already-produced
-`.nupkg`. It reads `PackageId`, `PackageVersion`, `TargetFramework`,
+`.github/scripts/verify-package-artifact.ps1` validates an already-produced
+`.nupkg`. The `.cmd` and `.sh` files of the same name provide local platform
+entry points. The verifier reads `PackageId`, `PackageVersion`, `TargetFramework`,
 `ToolCommandName`, `AssemblyName`, and `PackageReadmeFile` from MSBuild, then:
 
 - opens the exact package passed by the caller;
@@ -297,8 +306,8 @@ Directory.Build.props                           IcodProcPsSuiteVersion
 ```
 
 `IcodProcPsSuiteVersion` supplies assembly version metadata to every standalone
-historical command. Their version output is therefore derived from the same
-suite version used by release archives:
+historical command. Their version output is therefore derived from the same suite
+version used by release archives:
 
 ```text
 Icod.ProcPs.X (VERSION) inspired by procps-ng 4.0.6
