@@ -25,7 +25,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
-      package-id: ${{ steps.version.outputs.package-id }}
+      package_id: ${{ steps.version.outputs.package_id }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,7 +70,7 @@ jobs:
 
           "version=$tagVersion" >> $env:GITHUB_OUTPUT
           "prerelease=$($tagVersion.Contains('-').ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
-          "package-id=$packageId" >> $env:GITHUB_OUTPUT
+          "package_id=$packageId" >> $env:GITHUB_OUTPUT
 
   archives:
     needs: metadata
@@ -108,7 +108,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.rid }}
-          path: ${{ env.RELEASE_DIRECTORY }}/${{ needs.metadata.outputs.package-id }}-${{ needs.metadata.outputs.version }}-${{ matrix.rid }}.zip
+          path: ${{ env.RELEASE_DIRECTORY }}/${{ needs.metadata.outputs.package_id }}-${{ needs.metadata.outputs.version }}-${{ matrix.rid }}.zip
           if-no-files-found: error
           retention-days: 7
 
@@ -135,7 +135,7 @@ jobs:
       - name: Require expected package
         shell: pwsh
         run: |
-          $path = '${{ env.RELEASE_DIRECTORY }}/${{ needs.metadata.outputs.package-id }}.${{ needs.metadata.outputs.version }}.nupkg'
+          $path = '${{ env.RELEASE_DIRECTORY }}/${{ needs.metadata.outputs.package_id }}.${{ needs.metadata.outputs.version }}.nupkg'
           if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
               throw "Expected package '$path' was not produced."
           }
@@ -143,7 +143,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ env.PACKAGE_ARTIFACT }}
-          path: ${{ env.RELEASE_DIRECTORY }}/${{ needs.metadata.outputs.package-id }}.${{ needs.metadata.outputs.version }}.nupkg
+          path: ${{ env.RELEASE_DIRECTORY }}/${{ needs.metadata.outputs.package_id }}.${{ needs.metadata.outputs.version }}.nupkg
           if-no-files-found: error
           retention-days: 7
 
@@ -172,7 +172,7 @@ jobs:
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: |
-          $package = 'artifacts/package/${{ needs.metadata.outputs.package-id }}.${{ needs.metadata.outputs.version }}.nupkg'
+          $package = 'artifacts/package/${{ needs.metadata.outputs.package_id }}.${{ needs.metadata.outputs.version }}.nupkg'
           dotnet nuget push $package `
               --api-key $env:NUGET_API_KEY `
               --source 'https://api.nuget.org/v3/index.json' `
@@ -212,7 +212,7 @@ jobs:
               throw "GitHub Packages source configuration failed with status $LASTEXITCODE."
           }
 
-          $package = 'artifacts/package/${{ needs.metadata.outputs.package-id }}.${{ needs.metadata.outputs.version }}.nupkg'
+          $package = 'artifacts/package/${{ needs.metadata.outputs.package_id }}.${{ needs.metadata.outputs.version }}.nupkg'
           dotnet nuget push $package `
               --source github-release `
               --api-key $env:GITHUB_TOKEN `
@@ -262,7 +262,7 @@ jobs:
         run: |
           $tag = $env:GITHUB_REF_NAME
           $version = '${{ needs.metadata.outputs.version }}'
-          $packageId = '${{ needs.metadata.outputs.package-id }}'
+          $packageId = '${{ needs.metadata.outputs.package_id }}'
           $assetDirectory = [System.IO.Path]::GetFullPath('artifacts/release-assets')
           $notes = @'
           ## Installation
