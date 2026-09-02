@@ -10,24 +10,31 @@ procps-ng 4.0.6.
 
 ## Current release status
 
-Version `1.1.2` is a bugfix release restoring normal `uptime` operation on
-Windows. The Windows provider already supplied equivalent system uptime through
-`GetTickCount64`, but the standard `uptime` report incorrectly treated the
-absence of a native Unix load-average metric as a fatal error. As a result,
-Windows hosts could provide valid uptime and logged-in-user observations while
-the command nevertheless exited with an error.
+Version `1.1.3` is a CI/CD and packaging-maintenance release. It does not change
+the intended runtime behavior of the ProcPs commands; the version bump records a
+substantial revision of how the repository validates, packages, and publishes the
+suite.
 
-In `1.1.2`, standard `uptime` output reports the observations the host can
-faithfully provide and omits the load-average clause when load averages are not
-available. No synthetic load-average values are introduced. `uptime --pretty`
-and `uptime --since` continue to require only uptime, while `uptime --raw`
-retains its stricter procps-compatible requirement for uptime, user-count, and
-load-average observations.
+The release pipeline now follows an explicit validation ladder: local
+`build.cmd` and `build.sh` use `Debug`, pull requests elevate to `Staging`,
+pushes to `main` elevate to the authoritative six-platform `Release` validation
+gate, and tags contained in `main` publish `Release` artifacts. Redundant
+automatic distribution-validation runs have been removed, while the full
+six-platform distribution verifier remains available for explicit diagnostics.
 
-The `1.1.2` work also extends the local build workflow with explicit package and
-artifact-validation stages. The package produced by the local `pack` stage is
-inspected, installed from an isolated local NuGet source, and exercised before
-validation succeeds.
+For tagged releases, package and archive production can proceed independently.
+NuGet.org publication no longer waits for unrelated archive jobs, and the exact
+`.nupkg` produced by the release package stage is inspected, installed from an
+isolated local NuGet source, and exercised before publication. Distribution
+packing reuses already validated build output, RID archive production restores
+once before publishing its command set, and package metadata is read from
+MSBuild instead of being inferred from repository-name conventions.
+
+Version `1.1.2` restored normal Windows `uptime` operation when Unix load
+averages are unavailable. That behavior is retained in `1.1.3`: standard
+`uptime` reports the observations Windows can faithfully provide and omits the
+load-average clause rather than synthesizing values, while `uptime --raw`
+remains intentionally strict.
 
 The repository provides familiar process- and system-observation commands such
 as `ps`, `pgrep`, `pkill`, `free`, `uptime`, `vmstat`, `w`, `watch`, `slabtop`,
