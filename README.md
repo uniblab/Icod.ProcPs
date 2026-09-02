@@ -9,6 +9,28 @@
 `Icod.ProcPs` is a managed .NET implementation of a selected set of tools from
 procps-ng 4.0.6.
 
+## Current release status
+
+Version `1.1.2` is a bugfix release restoring normal `uptime` operation on
+Windows. The Windows provider already supplied equivalent system uptime through
+`GetTickCount64`, but the standard `uptime` report incorrectly treated the
+absence of a native Unix load-average metric as a fatal error. As a result,
+Windows hosts could provide valid uptime and logged-in-user observations while
+the command nevertheless exited with an error.
+
+In `1.1.2`, standard `uptime` output reports the observations the host can
+faithfully provide and omits the load-average clause when load averages are not
+available. No synthetic load-average values are introduced. `uptime --pretty`
+and `uptime --since` continue to require only uptime, while `uptime --raw`
+retains its stricter procps-compatible requirement for uptime, user-count, and
+load-average observations.
+
+The `1.1.2` work also extends the local build workflow with explicit package and
+artifact-validation stages. The package produced by the local `pack` stage is
+inspected, installed from an isolated local NuGet source, and exercised before
+validation succeeds. Existing GitHub Actions distribution and release
+verification remain independent and unchanged.
+
 The repository provides familiar process- and system-observation commands such
 as `ps`, `pgrep`, `pkill`, `free`, `uptime`, `vmstat`, `w`, `watch`, `slabtop`,
 `hugetop`, `tload`, `top`, and `sysctl`, while factoring common ProcPs behavior
