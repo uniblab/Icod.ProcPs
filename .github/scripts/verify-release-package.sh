@@ -28,17 +28,8 @@ if [ ! -d "$artifact_dir" ]; then
 fi
 
 artifact_dir=$(CDPATH= cd -- "$artifact_dir" && pwd)
-package_version=$(dotnet msbuild procps/Icod.ProcPs.Router.csproj -nologo -getProperty:PackageVersion)
-if [ -z "$package_version" ]; then
-    printf 'Unable to determine PackageVersion.\n' >&2
-    exit 1
-fi
 
-package_path="$artifact_dir/Icod.ProcPs.$package_version.nupkg"
-if [ ! -f "$package_path" ]; then
-    printf 'Icod.ProcPs package not found at "%s".\n' "$package_path" >&2
-    exit 1
-fi
-
-printf '\n=== Verify ProcPs distribution (%s) ===\n' "$configuration"
-pwsh -NoLogo -NoProfile -File packaging/VerifyDistribution.ps1 -Configuration "$configuration"
+printf '\n=== Verify packed ProcPs artifact (%s) ===\n' "$configuration"
+pwsh -NoLogo -NoProfile -File .github/scripts/verify-release-package.ps1 \
+    -ArtifactDirectory "$artifact_dir" \
+    -Configuration "$configuration"
