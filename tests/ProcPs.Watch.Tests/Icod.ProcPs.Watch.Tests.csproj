@@ -36,8 +36,8 @@
 		<PlatformTarget>AnyCPU</PlatformTarget>
 	</PropertyGroup>
 	<ItemGroup>
-		<PackageReference Include="Icod.DCurses" Version="0.1.0" />
-		<PackageReference Include="Icod.Processes" Version="1.0.0" />
+		<PackageReference Include="Icod.DCurses" Version="1.1.0" />
+		<PackageReference Include="Icod.Processes" Version="1.2.0" />
 		<PackageReference Include="Icod.Timing" Version="1.0.0" />
 		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
 		<PackageReference Include="xunit" Version="2.9.2" />
