@@ -10,7 +10,7 @@ procps-ng 4.0.6.
 
 ## Current release status
 
-Version `1.1.3` is a CI/CD and packaging-maintenance release. It does not change
+Version `1.1.4` is a CI/CD and packaging-maintenance release. It does not change
 the intended runtime behavior of the ProcPs commands; the version bump records a
 substantial revision of how the repository validates, packages, and publishes the
 suite.
@@ -31,7 +31,7 @@ once before publishing its command set, and package metadata is read from
 MSBuild instead of being inferred from repository-name conventions.
 
 Version `1.1.2` restored normal Windows `uptime` operation when Unix load
-averages are unavailable. That behavior is retained in `1.1.3`: standard
+averages are unavailable. That behavior is retained in `1.1.4`: standard
 `uptime` reports the observations Windows can faithfully provide and omits the
 load-average clause rather than synthesizing values, while `uptime --raw`
 remains intentionally strict.
