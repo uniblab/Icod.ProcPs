@@ -37,9 +37,9 @@ load-average clause rather than synthesizing values, while `uptime --raw`
 remains intentionally strict.
 
 The repository provides familiar process- and system-observation commands such
-as `ps`, `pgrep`, `pkill`, `free`, `uptime`, `vmstat`, `w`, `watch`, `slabtop`,
-`hugetop`, `tload`, `top`, and `sysctl`, while factoring common ProcPs behavior
-into the reusable `Icod.ProcPs.Shared` library.
+as `free`, `hugetop`, `pgrep`, `pkill`, `ps`, `slabtop`, `sysctl` `tload`, 
+`top`, `uptime`, `vmstat`, `w`, and `watch`, while factoring common ProcPs 
+behavior into the reusable `Icod.ProcPs.Shared` library.
 
 The implementation targets .NET 10 and C# 13 and is designed for Windows,
 Linux, and macOS. Linux `/proc` remains the authoritative source for Linux
@@ -52,22 +52,22 @@ reported as unavailable rather than synthesized from unrelated metrics.
 | Command | Purpose |
 |---|---|
 | [`free`](free/README.md) | Display physical-memory and swap usage. |
+| [`hugetop`](hugetop/README.md) | Display Linux huge-page pools and per-process hugetlb usage in real time or as a one-shot report. |
 | [`pgrep`](pgrep/README.md) | Find processes by name, regular expression, identity, ownership, session, terminal, and other attributes. |
-| [`pkill`](pkill/README.md) | Signal processes selected with the same matching grammar used by `pgrep`. |
-| [`pidwait`](pidwait/README.md) | Wait for processes selected by the shared ProcPs matching engine. |
 | [`pidof`](pidof/README.md) | Find process identifiers for running programs. |
-| [`pwdx`](pwdx/README.md) | Report the current working directory of one or more processes. |
+| [`pidwait`](pidwait/README.md) | Wait for processes selected by the shared ProcPs matching engine. |
+| [`pkill`](pkill/README.md) | Signal processes selected with the same matching grammar used by `pgrep`. |
 | [`pmap`](pmap/README.md) | Report process memory maps and Linux `smaps` detail. |
 | [`ps`](ps/README.md) | Report a snapshot of current processes, including ProcPs-style selection, formatting, sorting, personalities, and thread views. |
+| [`pwdx`](pwdx/README.md) | Report the current working directory of one or more processes. |
 | [`slabtop`](slabtop/README.md) | Display Linux slab-cache information in real time or as a one-shot report. |
-| [`hugetop`](hugetop/README.md) | Display Linux huge-page pools and per-process hugetlb usage in real time or as a one-shot report. |
+| [`sysctl`](sysctl/README.md) | Read and write Linux runtime kernel parameters through `/proc/sys`. |
 | [`tload`](tload/README.md) | Display a scrolling terminal graph of system load averages. |
 | [`top`](top/README.md) | Display dynamic process and system activity in batch or interactive mode. |
 | [`uptime`](uptime/README.md) | Report system uptime, user count, and load averages. |
 | [`vmstat`](vmstat/README.md) | Report virtual-memory, CPU, process, paging, disk, and system activity. |
 | [`w`](w/README.md) | Show logged-in users and what their sessions are doing. |
 | [`watch`](watch/README.md) | Execute a command periodically and display its output fullscreen. |
-| [`sysctl`](sysctl/README.md) | Read and write Linux runtime kernel parameters through `/proc/sys`. |
 
 Each executable directory contains its own man-page-style `README.md` describing
 the implemented command-line profile, exit statuses, platform behavior, and
@@ -213,9 +213,12 @@ validation.
 
 ```text
 Icod.ProcPs/
-├── Icod.ProcPs.Shared/    shared ProcPs library
+├── build.sh
+├── build.cmd
 ├── free/
 ├── hugetop/
+├── Icod.ProcPs.Shared/    shared ProcPs library
+├── Icod.ProcPs.sln
 ├── pgrep/
 ├── pidof/
 ├── pidwait/
@@ -225,16 +228,13 @@ Icod.ProcPs/
 ├── pwdx/
 ├── slabtop/
 ├── sysctl/
+├── tests/                 command and shared-library tests
 ├── tload/
 ├── top/
 ├── uptime/
 ├── vmstat/
 ├── w/
-├── watch/
-├── tests/                 command and shared-library tests
-├── Icod.ProcPs.sln
-├── build.cmd
-└── build.sh
+└── watch/
 ```
 
 ## Documentation
