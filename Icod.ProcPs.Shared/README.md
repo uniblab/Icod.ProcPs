@@ -18,7 +18,7 @@ Monotonic elapsed-time and periodic scheduling primitives are provided by the
 standalone `Icod.Timing` package. `Icod.ProcPs.Shared` exposes the neutral
 `IProcMatchPatternCompiler` and `IProcMatchPattern` contracts used by the shared
 process-matching engine and has no `Icod.CommandFramework` dependency. The
-`pgrep`, `pkill`, and `pidwait` executables adapt the CommandFramework GNU ERE
+`pgrep`, `pkill`, and `pidwait` executables adapt the Icod.Expressions GNU ERE
 provider to those contracts. ProcPs owns observation provenance and
 semantic-fidelity policy, including `ProcObservationFidelity`.
 
