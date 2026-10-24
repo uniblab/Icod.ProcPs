@@ -21,10 +21,34 @@
 
 namespace Icod.ProcPs.Pgrep.Tests;
 
+using System.Reflection;
+using Icod.ProcPs.Shared;
 using Xunit;
 
 /// <summary>Contains tests for command.</summary>
 public sealed class CommandTests {
+	/// <summary>Verifies that the process-selection compiler uses the published Expressions assembly.</summary>
+	[Fact]
+	public void ProcessPatternUsesExpressionsAssembly() {
+		var compilerType = typeof( Command ).Assembly.GetType(
+			"Icod.ProcPs.GnuProcMatchPatternCompiler",
+			throwOnError: true
+		)!;
+		var instance = compilerType.GetProperty(
+			"Instance",
+			BindingFlags.Static | BindingFlags.NonPublic
+		)!.GetValue( null );
+		var compiler = Assert.IsAssignableFrom<IProcMatchPatternCompiler>( instance );
+		var pattern = compiler.Compile( "alpha", ignoreCase: false );
+		var expressionField = pattern.GetType().GetField(
+			"expression",
+			BindingFlags.Instance | BindingFlags.NonPublic
+		)!;
+
+		Assert.Equal( "Icod.Expressions", expressionField.FieldType.Assembly.GetName().Name );
+		Assert.NotNull( pattern.Match( "alpha" ) );
+	}
+
 	/// <summary>Verifies that matches gnu extended pattern and prints pid.</summary>
 	[Fact]
 	public async Task MatchesGnuExtendedPatternAndPrintsPid() {
