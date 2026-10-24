@@ -37,6 +37,7 @@
 	</PropertyGroup>
 	<ItemGroup>
 		<PackageReference Include="Icod.CommandFramework" Version="2.1.0" />
+		<PackageReference Include="Icod.Expressions" Version="0.1.0-alpha.1" Aliases="Expressions" />
 		<ProjectReference Include="..\Icod.ProcPs.Shared\Icod.ProcPs.Shared.csproj" />
 		<Compile Include="..\build\GnuProcMatchPatternCompiler.cs" Link="GnuProcMatchPatternCompiler.cs" />
 	</ItemGroup>

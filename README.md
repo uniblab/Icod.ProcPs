@@ -99,8 +99,9 @@ Cross-suite process-control abstractions are supplied by `Icod.Processes`,
 while monotonic elapsed-time and periodic scheduling primitives are supplied by
 `Icod.Timing`. `Icod.ProcPs.Shared` owns its observation-fidelity policy and a
 neutral process-pattern contract. The `pgrep`, `pkill`, and `pidwait` executables
-reference `Icod.CommandFramework.RegularExpressions` directly and adapt its
-managed GNU/POSIX ERE provider to that contract.
+reference `Icod.Expressions` for managed GNU/POSIX ERE matching and adapt its
+provider to that contract. They continue to use `Icod.CommandFramework` for
+their other command and process contracts.
 
 Interactive full-screen commands use `Icod.DCurses` over `Icod.Terminal` and
 `Icod.TermInfo`; ProcPs command code owns application policy rather than native

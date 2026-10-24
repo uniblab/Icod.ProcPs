@@ -19,9 +19,11 @@
 	along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+extern alias Expressions;
+
 namespace Icod.ProcPs;
 
-using Icod.CommandFramework.RegularExpressions;
+using Expressions::Icod.CommandFramework.RegularExpressions;
 using Icod.ProcPs.Shared;
 
 internal sealed class GnuProcMatchPatternCompiler : IProcMatchPatternCompiler {

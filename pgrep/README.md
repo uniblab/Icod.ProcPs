@@ -130,7 +130,7 @@ The process-matching engine combines different categories of selection criteria 
     Display version information and exit.
 ```
 
-GNU extended regular-expression matching is supplied by `Icod.CommandFramework`.
+GNU extended regular-expression matching is supplied by `Icod.Expressions`.
 
 ## EXIT STATUS
 

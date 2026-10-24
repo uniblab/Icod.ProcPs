@@ -149,6 +149,7 @@ try {
             'procps/README.md',
             "$toolRoot/DotnetToolSettings.xml",
             "$toolRoot/$assemblyName.dll",
+            "$toolRoot/Icod.Expressions.dll",
             "$toolRoot/free.dll",
             "$toolRoot/pgrep.dll",
             "$toolRoot/pidof.dll",
